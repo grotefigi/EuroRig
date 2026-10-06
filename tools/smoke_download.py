@@ -7,6 +7,8 @@ import smoke_android as s
 parser=argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--device',default='emulator-5556');parser.add_argument('--prefix',default='android17-download')
 args=parser.parse_args();s.device=args.device
+if not s.device.startswith('emulator-'):
+    raise SystemExit('This smoke test clears EuroRig data. Use a dedicated emulator only.')
 for i in range(90):
     if s.run('shell','getprop','sys.boot_completed',check=False).strip()==b'1':break
     time.sleep(2)

@@ -13,7 +13,8 @@ SHA-256: `13c87608e56d22ffb60229828ec791a0d8ce09a4e9965cdef96f7a41dce2ccfb`
   Raw evidence remains local under `analysis/private` and is excluded from Git.
 - Used Android build-tools `aapt dump badging` and `aapt dump xmltree` on the
   base APK. Read ZIP entry metadata and DEX class descriptors statically.
-- No target app was executed; no paid feature was unlocked or bypassed.
+- The initial archive pass did not execute the target. Authorized tablet UI
+  observations are recorded separately below. No paid feature was unlocked or bypassed.
 
 ## Direct observations
 
@@ -61,3 +62,33 @@ Public feature reference:
 [Eurowag navigation FAQ](https://www.eurowag.com/faqs-eurowag-navigation), which
 describes vehicle profiles, route endpoints, stops and road-type avoidances.
 These descriptions are feature requirements, not recovered implementation.
+
+## Authorized tablet observations, 2026-10-06
+
+The installed 4.14.5 build was opened through its normal launcher on a Galaxy
+Tab S9 (Android 16/API 36). The base and ARM64 APKs match the supplied XAPK
+byte for byte. The tablet density split differs. APK presence and class names
+still do not establish the native algorithm. Static comparison found profile,
+search, route-overview, voice, parking and lane-assistance class declarations.
+
+Normal UI inspection covered the map, menu, search, offline maps, vehicle profile,
+load types, tunnel codes and navigation settings. Observed profile fields include
+dimensions, loaded gross/axle weight, vehicle/trailer axle and trailer counts,
+maximum speed, fuel, year and emission class. Hazardous load choices distinguish
+general material, water pollution and explosives. Tunnel choices B-E exclude
+their own category and higher categories; no restriction is a separate choice.
+The map shows red restrictions and numeric weight signs, with compact search,
+profile, parking/services and position controls. Its offline screen reported no
+maps downloaded; the reference map comparison therefore used its online data.
+
+These observations inform independent EuroRig requirements. No APK code, map
+features, imagery, icons or voices are transferred into EuroRig. Personal account
+information, location/history, screenshots, UI dumps and pulled APKs remain in
+ignored private evidence. No subscriptions were changed, no protected feature
+was bypassed and no root/instrumentation hooks were installed on the tablet.
+
+A sample Galati weight sign could not be corroborated from the corresponding
+OSM road tags. Matching visual colour alone cannot establish a legal restriction
+or exemption. EuroRig needs verified public/local sources for missing restrictions.
+Native Sygic source, paid route behavior and proprietary map semantics remain
+unrecovered. EuroRig uses its own code and licensed Valhalla/OSM data.

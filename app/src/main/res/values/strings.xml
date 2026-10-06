@@ -7,4 +7,10 @@
     <string name="download_country_start">Download a country to start</string>
     <string name="first_country">Your first country. Your first route.</string>
     <string name="choose_first_map">Choose Maps to download Romania or import a country package.</string>
+    <string name="speed_display">%1$s\nkm/h</string>
+    <string name="mode_access">%1$s · %2$s</string>
+    <string name="routing_choice">%1$s · %2$s</string>
+    <string name="load_water">Load harmful to water</string>
+    <string name="load_explosives">Explosive load</string>
+    <string name="delivery_permission">I have permission for restricted delivery access near the destination</string>
 </resources>

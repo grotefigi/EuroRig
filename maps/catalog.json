@@ -1,0 +1,16 @@
+{
+  "format": 1,
+  "native_version": "0.6.3",
+  "coverage": "europe-excluding-russia",
+  "europe_complete": false,
+  "maps": [
+    {
+      "id": "romania",
+      "name": "Romania",
+      "url": "https://github.com/grotefigi/EuroRig/releases/download/maps-current/Romania-2026-10-04-v2.eurorig",
+      "bytes": 407495153,
+      "sha256": "889538da880f16f2962dcdd3b1cdb3f6cc725e1692ee2d8614613648c8744bff",
+      "osm_timestamp": "2026-10-04T20:20:21Z"
+    }
+  ]
+}

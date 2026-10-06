@@ -4,6 +4,7 @@ Test route coordinates come from the native engine, not fictional roads.
 """
 import argparse
 import time
+import re
 import smoke_android as s
 
 parser=argparse.ArgumentParser(description=__doc__)
@@ -11,6 +12,8 @@ parser.add_argument('--device',default='emulator-5554')
 parser.add_argument('--prefix',default='android8')
 parser.add_argument('--country',help='Country package to exercise instead of the tiny test fixture')
 args=parser.parse_args();s.device=args.device
+if not s.device.startswith("emulator-"):
+    raise SystemExit("This smoke test clears EuroRig data. Use a dedicated emulator only.")
 for i in range(60):
     if s.run('shell','getprop','sys.boot_completed',check=False).strip()==b'1':break
     time.sleep(2)
@@ -55,8 +58,18 @@ s.wait_text('Plan route');s.tap('Plan route');s.wait_text('Route ready for your 
 s.run('emu','geo','fix',lon,lat);s.tap('Start guidance');s.tap('Start')
 s.wait_text('GPS GUIDANCE');s.run('emu','geo','fix',fixes[1][1],fixes[1][0]);s.wait_text('In')
 assert 'isForeground=true' in s.run('shell','dumpsys','activity','services','org.eurorig.app').decode()
-s.run('emu','geo','fix',fixes[2][1],fixes[2][0]);s.screenshot(args.prefix+'-native-gps')
+s.run('emu','geo','fix',fixes[2][1],fixes[2][0]);s.wait_text('Following')
+s.screenshot(args.prefix+'-native-gps')
+# Panning suspends following; overview keeps a driver's chosen view until recenter.
+map_node=next(n for n in s.ui().iter('node') if n.attrib.get('content-desc','').startswith('Offline road map.'))
+x1,y1,x2,y2=map(int,re.findall(r'\d+',map_node.attrib['bounds']))
+x=x1+(x2-x1)//3;y=(y1+y2)//2
+s.run('shell','input','swipe',x,y,x+60,y+40,500);s.wait_text('Recenter')
+s.run('emu','geo','fix',fixes[2][1],fixes[2][0]);s.tap('Recenter');s.wait_text('Following')
+s.tap('Overview');s.wait_text('Recenter')
+s.run('emu','geo','fix',fixes[2][1],fixes[2][0]);s.wait_text('Recenter')
+s.tap('Recenter');s.wait_text('Following')
 s.tap('Stop');s.wait_text('Route ready for your truck')
 assert 'isForeground=true' not in s.run('shell','dumpsys','activity','services','org.eurorig.app').decode()
 s.tap('Maps');s.wait_text('Offline maps');s.screenshot(args.prefix+'-country-maps');s.tap('Close')
-print('PASS: native route UI, maneuvers, cold restart, real muted GPS foreground guidance, stop and country map controls',flush=True)
+print('PASS: native route UI, maneuvers, cold restart, real muted GPS foreground guidance, pan/overview/recenter GPS follow, stop and country map controls',flush=True)

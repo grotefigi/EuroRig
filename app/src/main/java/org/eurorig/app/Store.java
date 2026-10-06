@@ -13,6 +13,8 @@ final class Store {
     static volatile DisplayDatabase display;
     static volatile Router.Route route;
     static volatile Truck truck=Truck.standard();
+    static volatile RoutingMode mode=RoutingMode.ECONOMICAL;
+    static volatile boolean deliveryAccess;
     static volatile int start=0, end=3;
     static final ExecutorService worker=Executors.newSingleThreadExecutor();
     static final ExecutorService mapWorker=Executors.newSingleThreadExecutor();
@@ -23,7 +25,8 @@ final class Store {
     static volatile boolean arrived;
     static volatile double lat=Double.NaN, lon=Double.NaN;
     static volatile String guidance="Choose your destination";
-    static volatile double remaining, speed;
+    static volatile double remaining, speed, bearing=Double.NaN;
+    static volatile long fixTime;
     static volatile boolean voiceEnabled=true;
     static void load(Context context) throws IOException {
         RegionPackages.cleanupStale(context);
@@ -45,14 +48,15 @@ final class Store {
         }
         SharedPreferences p=context.getSharedPreferences("truck",0);
         voiceEnabled=context.getSharedPreferences("settings",0).getBoolean("voice",true);
+        mode=RoutingMode.saved(context.getSharedPreferences("settings",0).getString("routing_mode","ECONOMICAL"));
         try { truck=new Truck(p.getFloat("height",4),p.getFloat("width",2.55f),p.getFloat("length",16.5f),
             p.getFloat("weight",40),p.getFloat("axle",11.5f),p.getBoolean("hazmat",false),
-            p.getBoolean("tolls",false),p.getBoolean("ferries",true),p.getBoolean("unpaved",true)); }
+            p.getBoolean("tolls",false),p.getBoolean("ferries",true),p.getBoolean("unpaved",true),p.getInt("axles",5),p.getFloat("top_speed",80),p.getInt("hazardous_load",p.getBoolean("hazmat",false)?1:0),p.getInt("tunnel_code",0)); }
         catch(IllegalArgumentException e) { truck=Truck.standard(); }
     }
     static Router.Route calculate(Graph g,int from,int to,Truck t){
-        if(nativeRouter==null)return new Router().route(g,from,to,t);
-        Graph.Node a=g.nodes[from],b=g.nodes[to];return nativeRouter.route(a.lat,a.lon,b.lat,b.lon,t);
+        if(nativeRouter==null)return new Router().route(g,from,to,t,mode);
+        Graph.Node a=g.nodes[from],b=g.nodes[to];return nativeRouter.route(a.lat,a.lon,b.lat,b.lon,t,mode,deliveryAccess);
     }
     static void setRegionEndpoints(){
         for(int i=0;i<graph.nodes.length;i++){
@@ -83,6 +87,6 @@ final class Store {
         c.getSharedPreferences("truck",0).edit().putFloat("height",(float)t.height).putFloat("width",(float)t.width)
             .putFloat("length",(float)t.length).putFloat("weight",(float)t.weight).putFloat("axle",(float)t.axleWeight)
             .putBoolean("hazmat",t.hazmat).putBoolean("tolls",t.avoidTolls).putBoolean("ferries",t.avoidFerries)
-            .putBoolean("unpaved",t.avoidUnpaved).apply();
+            .putBoolean("unpaved",t.avoidUnpaved).putInt("axles",t.axles).putFloat("top_speed",(float)t.topSpeed).putInt("hazardous_load",t.hazardousLoad).putInt("tunnel_code",t.tunnelCode).apply();
     }
 }

@@ -12,10 +12,12 @@ import java.util.zip.*;
 /** Runs actual native routing and the country index on a dedicated test device. */
 public final class NativeSmokeInstrumentation extends Instrumentation {
     private String packagePath;
-    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");start();}
+    private boolean profilesOnly;
+    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));start();}
     public void onStart(){
         Bundle result=new Bundle();
         try{
+            if(profilesOnly){ProfileRoutingChecks.run(getTargetContext(),getContext());result.putString("stream","PASS: native profile and ADR display checks\n");finish(-1,result);return;}
             require(!Arrays.asList(getTargetContext().getAssets().list("")).contains("andorra-routing.tar"),"No bundled maps");
             Store.load(getTargetContext());require(Store.graph==null,"First launch has no map");
             Graph display;
@@ -32,7 +34,7 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
                 require(visible.edges.length>100&&visible.nodes.length<40050,"Indexed roads with bounded memory");
                 require(Store.display.visible(0,0,.01,.01,70000).edges.length==0,"Empty viewport outside Romania");
             }
-            Router.Route route=Store.nativeRouter.route(a,b,c,d,Truck.standard());
+            Router.Route route=Store.nativeRouter.route(a,b,c,d,Truck.standard(),Store.mode,false);
             require(route.nativeGeometry()&&route.metres>500&&route.metres<100000,"Real truck geometry");
             require(route.seconds>0&&route.instruction(0).length()>5,"ETA and maneuvers");
             require(route.graph.nodes.length>8,"Detailed shape");
@@ -56,7 +58,8 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
                 Graph.Node n=route.graph.nodes[i];fixes.append(n.lat).append(',').append(n.lon).append('\n');
             }
             Files.write(new File(getTargetContext().getFilesDir(),"native-test-fixes.txt").toPath(),fixes.toString().getBytes(StandardCharsets.UTF_8));
-            result.putString("stream","PASS: empty install, offline truck route, ETA, maneuvers, dense GPS, coverage rejection, transactional import, country index/search\n");
+            ProfileRoutingChecks.run(getTargetContext(),getContext());
+            result.putString("stream","PASS: profile modes/dimensions/weight/axles/ADR/delivery checks; empty install, offline truck route, ETA, maneuvers, dense GPS, coverage rejection, transactional import, country index/search\n");
             result.putDouble("route_metres",route.metres);result.putInt("shape_points",route.graph.nodes.length);finish(-1,result);
         }catch(Throwable e){result.putString("stream","FAIL: "+android.util.Log.getStackTraceString(e));finish(1,result);}
     }

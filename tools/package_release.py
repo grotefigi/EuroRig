@@ -2,19 +2,21 @@
 import hashlib
 import shutil
 import zipfile
+import re
 from pathlib import Path
 
 root=Path(__file__).resolve().parents[1]
 dist=root/'dist';dist.mkdir(exist_ok=True)
-apk=dist/'EuroRig-0.3.0-dev.apk'
+version=re.search(r'''versionName\s+['"]([^'"]+)['"]''',(root/'app/build.gradle').read_text(encoding='utf-8')).group(1)
+apk=dist/f'EuroRig-{version}.apk'
 shutil.copy2(root/'app/build/outputs/apk/debug/app-debug.apk',apk)
 
 (dist/(apk.name+'.sha256')).write_text(hashlib.sha256(apk.read_bytes()).hexdigest()+'  '+apk.name+'\n')
-folders=['app/src','routing/src','tools','docs','gradle','.github']
-files=['README.md','ROADMAP.md','VERIFICATION.md','LICENSE','CONTRIBUTING.md','THIRD_PARTY_NOTICES.md','.gitignore','.gitattributes',
+folders=['app/src','routing/src','tools','docs','maps','gradle','.github']
+files=['AGENTS.md','README.md','ROADMAP.md','VERIFICATION.md','LICENSE','CONTRIBUTING.md','THIRD_PARTY_NOTICES.md','.gitignore','.gitattributes',
        'build.gradle','settings.gradle','gradle.properties','app/build.gradle','routing/build.gradle',
        'gradlew','gradlew.bat','analysis/REFERENCE.md']
-source=dist/'EuroRig-0.3.0-dev-source.zip'
+source=dist/f'EuroRig-{version}-source.zip'
 with zipfile.ZipFile(source,'w',zipfile.ZIP_DEFLATED) as archive:
     for name in files:
         archive.write(root/name,'EuroRig/'+name)

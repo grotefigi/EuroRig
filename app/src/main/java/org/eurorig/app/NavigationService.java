@@ -68,11 +68,13 @@ public final class NavigationService extends Service implements LocationListener
     }
     public void onLocationChanged(Location l){
         if(!Store.navigating||progress==null)return;
-        if(!l.hasAccuracy()||l.getAccuracy()>50||SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos()>10_000_000_000L){
+        long age=SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos();
+        if(!l.hasAccuracy()||l.getAccuracy()>50||age<0||age>10_000_000_000L){
             Store.guidance="GPS accuracy too low for guidance";return;
         }
         Store.lat=l.getLatitude();Store.lon=l.getLongitude();Store.speed=l.hasSpeed()?l.getSpeed()*3.6:0;
-        lastFix=SystemClock.elapsedRealtime();
+        lastFix=SystemClock.elapsedRealtime();Store.fixTime=lastFix-age/1_000_000;
+        Store.bearing=l.hasBearing()&&l.hasSpeed()&&l.getSpeed()>=1?l.getBearing():Double.NaN;
         Progress.Fix fix=progress.update(Store.lat,Store.lon);Store.remaining=fix.remaining;
         if(fix.arrived){Store.arrived=true;Store.guidance="You have arrived";speak(Store.guidance);stopSelf();return;}
         if(fix.offRoute>70){
@@ -94,7 +96,7 @@ public final class NavigationService extends Service implements LocationListener
                 int start=Store.nativeRouter==null?graph.nearest(lat,lon,250,truck):Store.start;
                 if(start<0)throw new IllegalStateException("Outside routable map coverage");
                 Graph.Node target=graph.nodes[destination];
-                Router.Route route=Store.nativeRouter==null?Store.calculate(graph,start,destination,truck):Store.nativeRouter.route(lat,lon,target.lat,target.lon,truck);
+                Router.Route route=Store.nativeRouter==null?Store.calculate(graph,start,destination,truck):Store.nativeRouter.route(lat,lon,target.lat,target.lon,truck,Store.mode,Store.deliveryAccess);
                 main.post(()->{if(token==generation&&Store.navigating){Store.route=route;Store.start=Store.nativeRouter==null?start:Store.coordinate(lat,lon);progress=new Progress(route);offRouteFixes=0;lastSpoken="";}recalculating=false;});
             }catch(RuntimeException e){main.post(()->{if(token==generation&&Store.navigating){Store.guidance="Rerouting unavailable: "+e.getMessage();}recalculating=false;});}
         });

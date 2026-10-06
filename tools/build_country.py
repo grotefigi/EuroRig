@@ -14,6 +14,7 @@ import tarfile
 import urllib.request
 from pathlib import Path
 from compile_display import compile_display
+from enrich_display import enrich
 from package_region import package,sha256
 
 
@@ -46,6 +47,7 @@ def build_country(work,pbf,name,start,end,jobs):
         with (work/(tool+'.log')).open('w',encoding='utf-8') as log:
             subprocess.run(command,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
     display=work/'display.sqlite';meta=compile_display([pbf],display,name,{'start':start,'end':end})
+    meta['restrictions']=enrich([pbf],display)
     tiles=work/'routing.tar';count=0
     with tarfile.open(tiles,'w',format=tarfile.USTAR_FORMAT) as archive:
         for file in sorted((work/'tiles').rglob('*.gph')):

@@ -1,5 +1,51 @@
 # Verification
 
+## 0.4.0-dev, 2026-10-06
+
+- 34 Java tests and 14 Python tests pass. Android lint reports no issues.
+- Android 8/API 26 and Android 17/API 37 pass Romania route/search/import
+  checks, GPS matching, cold restart, foreground guidance and pan/overview/recenter.
+  Original synthetic native networks test all three preferences with separate
+  height, width, length, gross weight and axle-load exclusions, permitted local
+  delivery access, a prohibited low bridge and ADR C-to-B tunnel detours. A highway
+  preference fixture selects a longer motorway alternative to the shortest route.
+- Updated Romania data has 424,527 way-rule records and 25,886 node-rule records.
+  These include access, nonmotor roads, physical limits and uncertain metadata;
+  their presence does not establish complete restriction coverage. Routing tiles
+  are unchanged. The 407,495,153-byte archive uses ordinary SQLite grid indexes.
+  Android 8 SQLite lacks RTree support; the first RTree-based candidate failed
+  and was replaced before release.
+- On an authorized Galaxy Tab S9, Android 16/API 36, installation and replacement
+  of Romania succeed without clearing user data. Native sample routing, map
+  controls, profile/options UI and landscape are exercised. APK and UI evidence
+  remain private. A physical GPS attempt rejected poor accuracy; no real drive,
+  physical guidance or spoken output is claimed.
+- Four equal 700-ms swipes on the Tab S9 sample route measured 281 frames with
+  5-ms median/90th percentile, 6-ms 95th percentile and 2.49% missed deadlines.
+  Earlier redraw-on-every-frame candidates measured 150-ms median and 100%
+  missed deadlines in the same gesture sequence. Cache replacement still pauses
+  (150-ms 99th percentile); these samples are not low-end device guarantees.
+  Desktop indexed query time for one 1,541-road sample improved from 127 ms
+  cold to 7.55 ms median across ten runs; this is not whole-app frame timing.
+- The audit initially rejected private origin departure and unsigned-limit
+  metadata. Dedicated checks now preserve numeric limits while allowing a bounded
+  private egress. An ADR reroute initially excluded a shared junction; exclusion
+  now targets the failed edge interior. Route audit failure has no car or server
+  fallback. Default-height references are not treated as proof for trucks over 4 m.
+
+Reproduce with dedicated emulators only:
+
+```text
+python tools/smoke_native.py --country dist/Romania-2026-10-04-v2.eurorig --device emulator-5554 --prefix android8-final
+python tools/smoke_native.py --country dist/Romania-2026-10-04-v2.eurorig --device emulator-5556 --prefix android17-final
+```
+
+The script rejects physical serials before clearing data. GPS fixes in these
+checks are synthetic. Restricted access is limited to 2 km from the destination
+and requires driver permission; it is not a legal exemption. Global minimum
+restricted distance, literal fewest turns, absolute highway continuity, complete
+ADR/country/time rules, low-end hardware and road validation remain unfinished.
+
 ## 0.3.0-dev, 2026-10-06
 
 - 22 Java tests pass: 15 routing/geometry/decoder tests and 7 real HTTP download

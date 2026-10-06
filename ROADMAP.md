@@ -16,7 +16,11 @@ original product request requires all of the following milestones.
    supply source dates and attribution, support interrupted updates and rollback.
    Validate independent package installation and offline cross-country trips.
    Clarify coverage treatment for transcontinental Turkey and the Caucasus.
-3. **Truck rules.** Directional and conditional tags, node and via-way turns,
+3. **Truck rules.** Mapped dimensions, loaded weights, access evidence and ADR
+   load/tunnel codes are now audited; delivery access has a bounded per-trip
+   permission. Complete global restricted-distance minimization, literal minimum
+   turn counts, stronger highway continuity and verified municipal restriction
+   overlays. Directional and conditional tags, node and via-way turns,
    ADR/tunnel category, trailers, axle count and loads, low-emission/access zones,
    destination exemptions, local default laws, scheduled heavy-goods bans and
    conservative unknown-data display. Maintain traceable source-backed fixtures.

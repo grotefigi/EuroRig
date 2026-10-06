@@ -7,7 +7,7 @@ public final class Router {
     public static final class Route {
         public final Graph graph;
         public final List<Graph.Edge> edges;
-        public final double metres, seconds;
+        public final double metres, seconds, restrictedMetres;
         public final double[] cumulative;
         private final SortedMap<Integer,String> maneuvers;
         Route(Graph graph, List<Graph.Edge> edges) {
@@ -15,6 +15,10 @@ public final class Router {
         }
         /** Geometry and authoritative maneuvers supplied by an external offline engine. */
         public Route(Graph graph,List<Graph.Edge> edges,SortedMap<Integer,String> maneuvers,double duration) {
+            this(graph,edges,maneuvers,duration,0);
+        }
+        public Route(Graph graph,List<Graph.Edge> edges,SortedMap<Integer,String> maneuvers,double duration,double restrictedMetres){
+            this.restrictedMetres=restrictedMetres;
             this.graph=graph; this.edges=Collections.unmodifiableList(edges);
             this.maneuvers=maneuvers==null?null:Collections.unmodifiableSortedMap(new TreeMap<>(maneuvers));
             cumulative=new double[edges.size()+1]; double s=0;
@@ -49,6 +53,9 @@ public final class Router {
         public int compareTo(Item other) { return Double.compare(estimate,other.estimate); }
     }
     public Route route(Graph g, int start, int end, Truck t) {
+        return route(g,start,end,t,null);
+    }
+    public Route route(Graph g,int start,int end,Truck t,RoutingMode mode){
         if(start<0||end<0||start>=g.nodes.length||end>=g.nodes.length) throw new IllegalArgumentException("Choose points inside the map");
         if(start==end) return new Route(g,new ArrayList<>());
         double[] best=new double[g.edges.length]; Arrays.fill(best,Double.POSITIVE_INFINITY);
@@ -66,11 +73,12 @@ public final class Router {
             }
             for(int id:g.outgoing[node]) {
                 Graph.Edge e=g.edges[id]; if(e.blockedReason(t)!=null||!g.turnAllowed(incoming,e)) continue;
-                double cost=current.cost+e.seconds();
+                double cost=current.cost+(mode==null?e.seconds():mode.edgeCost(e,incoming,g));
                 if(cost<best[id]) {
                     best[id]=cost;parent[id]=current.edge;
                     Graph.Node a=g.nodes[e.to], b=g.nodes[end];
-                    queue.add(new Item(id,cost,cost+Geo.distance(a.lat,a.lon,b.lat,b.lon)/(80/3.6)));
+                    double remaining=Geo.distance(a.lat,a.lon,b.lat,b.lon);
+                    queue.add(new Item(id,cost,cost+(mode==null?remaining/(80/3.6):remaining)));
                 }
             }
         }

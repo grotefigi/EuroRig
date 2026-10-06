@@ -5,6 +5,7 @@ import sqlite3
 from contextlib import closing
 from pathlib import Path
 from compile_display import encode,cells,normalize,compile_display
+from enrich_display import enrich
 
 
 def decode(shape):
@@ -45,6 +46,23 @@ class DisplayTests(unittest.TestCase):
                 labels=db.execute('SELECT p.label FROM search s JOIN places p ON p.id=s.rowid WHERE s.text MATCH ?',('bucurest*',)).fetchall()
                 self.assertEqual([('București',)],labels)
                 self.assertEqual([(44.42,26.1),(44.43,26.11)],decode(db.execute('SELECT shape FROM roads').fetchone()[0]))
+            enrich([source],output)
+            with closing(sqlite3.connect(output)) as db:
+                self.assertEqual('ok',db.execute('PRAGMA integrity_check').fetchone()[0])
+                self.assertEqual(0,db.execute('SELECT count(*) FROM road_rules').fetchone()[0])
+                self.assertFalse(any('rtree' in (row[0] or '').lower() for row in db.execute('SELECT sql FROM sqlite_master')))
+
+    def test_profile_evidence_preserves_access_dimensions_and_adr_tags(self):
+        try:import osmium
+        except ImportError:self.skipTest('optional osmium build dependency unavailable')
+        with tempfile.TemporaryDirectory() as folder:
+            output=Path(folder)/'display.sqlite';source=Path(__file__).parent/'fixtures/profiles.osm'
+            compile_display([source],output,'QA',{'start':[45,27.001],'end':[45,27.015]});enrich([source],output)
+            with closing(sqlite3.connect(output)) as db:
+                self.assertEqual((3.5,2.4,12,20,8),db.execute('SELECT height,width,length,weight,axle FROM road_rules WHERE way=20000003').fetchone())
+                flags,tags=db.execute('SELECT flags,tags FROM road_rules WHERE way=20000007').fetchone()
+                self.assertTrue(flags&1);self.assertIn('"hgv":"no"',tags)
+                self.assertIn('"tunnel:category":"C"',db.execute('SELECT tags FROM road_rules WHERE way=20000013').fetchone()[0])
 
 
 if __name__=='__main__':unittest.main()
