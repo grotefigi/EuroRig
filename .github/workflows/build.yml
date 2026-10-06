@@ -1,0 +1,29 @@
+name: Build EuroRig
+on: [push, pull_request]
+jobs:
+  android:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install Android build components
+        run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
+      - name: Configure local SDK
+        run: printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+      - name: Install display compiler test dependency
+        run: python3 -m pip install osmium==4.3.1
+      - name: Verify routing, compiler and Android build
+        run: |
+          bash gradlew :routing:test :app:assembleDebug :app:lintDebug
+          python3 -m unittest discover -s tools -p 'test_*.py'
+      - uses: actions/upload-artifact@v4
+        with:
+          name: EuroRig-development-apk
+          path: app/build/outputs/apk/debug/app-debug.apk
+
