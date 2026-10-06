@@ -28,4 +28,3 @@ jobs:
         with:
           name: EuroRig-development-apk
           path: app/build/outputs/apk/debug/app-debug.apk
-
