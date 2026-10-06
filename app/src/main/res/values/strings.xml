@@ -1,0 +1,10 @@
+<resources>
+    <string name="route_endpoints">A  %1$s\nB  %2$s</string>
+    <string name="simulated_instruction">SIMULATION · %1$s</string>
+    <string name="tagline">Your road. Your rig. Your navigation.</string>
+    <string name="choose_destination">Tap the map or search to choose a destination.</string>
+    <string name="acquiring_gps">Acquiring GPS fix…</string>
+    <string name="download_country_start">Download a country to start</string>
+    <string name="first_country">Your first country. Your first route.</string>
+    <string name="choose_first_map">Choose Maps to download Romania or import a country package.</string>
+</resources>

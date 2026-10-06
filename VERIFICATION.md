@@ -1,0 +1,162 @@
+# Verification
+
+## 0.3.0-dev, 2026-10-06
+
+- 22 Java tests pass: 15 routing/geometry/decoder tests and 7 real HTTP download
+  tests (SHA-256, range resume, interrupted/complete partials, pause, unsafe URL
+  rejection and bad-range preservation). 13 Python tests pass with osmium
+  available. Android lint reports no issues. APK 16-KiB zip alignment passes.
+- No `.tar`, `.europack` or `.sqlite` map is present in the application APK.
+  Fresh installation displays No maps installed; Truck and Maps remain usable.
+- Full Romania package: 636 routing tiles, 1,057,239 display roads and 1,747,703
+  searchable places, zero missing geometry, OSM timestamp 2026-10-04T20:20:21Z.
+  Original Geofabrik PBF was checked against its published MD5. Map source,
+  derived databases, notice, provenance and SHA-256 files are publicly offered.
+- Android 8/API 26 and Android 17/API 37 native instrumentation passes real
+  Romania truck routing, ETA/maneuvers, sequential polyline GPS matching,
+  out-of-coverage rejection, invalid path/checksum rollback, bounded SQLite
+  viewport roads and accent-insensitive/prefix search.
+- Both device UI flows pass 14.0-km truck route display, maneuvers, process
+  termination/cold restart, persisted country loading, synthetic GPS fixes
+  following actual route geometry, muted foreground guidance and stop.
+- A fresh Android 17 install downloads the actual 415,239,820-byte Romania
+  package from the public GitHub HTTPS catalogue. The foreground download and
+  transactional installation succeed. After Wi-Fi/data are disabled, route
+  planning works, including after force-stop/cold restart. Country selection
+  lists Romania; all-Europe reports that full coverage is not yet published.
+- Final screenshots show smooth road strokes, cached map drawing and the
+  empty/downloaded/offline-route states. Tests use dedicated emulators only.
+
+The first sample destination did not connect within the configured road-search
+cutoff; test endpoints were changed to a connected route north of Bucharest,
+without changing restrictions or expanding the search radius. Native GPS tests
+feed successive geometry fixes instead of jumping beyond the forward matching
+window. An older Android 8 emulator instance shut down during a run; a fresh
+isolated API 26 image completed instrumentation and UI/GPS tests.
+
+Reproduce with dedicated running emulators:
+
+```text
+python tools/smoke_native.py --country dist/Romania-2026-10-04.eurorig --device emulator-5554 --prefix android8-romania
+python tools/smoke_native.py --country dist/Romania-2026-10-04.eurorig --device emulator-5556 --prefix android17-romania
+python tools/smoke_download.py --device emulator-5556 --prefix android17-download
+```
+
+These scripts clear EuroRig data on the named test device. Public downloads use
+network only for maps; offline planning is tested after that connection is disabled.
+GPS tests inject synthetic coordinates and mute TTS; they are not physical road
+or spoken-output validation. Intermediate Android versions, 32-bit devices and
+real 16-KiB-page hardware remain untested. Country truck laws, missing restrictions,
+time-dependent restrictions/timezone enrichment and cross-border routing require
+further work. The download flow is tested end-to-end on API 37; transport resume
+and pause are tested against a local HTTP server in Java.
+
+
+## 0.2.0-dev, 2026-10-06
+
+- JDK 21, Gradle 9.6.0, AGP 9.4.0; minimum API 26, compile/target API 37.
+- 15 Java tests pass, including native maneuver handling and buffered map
+  decoding under short reads/across buffer boundaries. Nine Python tests pass
+  (seven compiler, two native-region packaging). Android lint reports no issues.
+- Valhalla Mobile 0.6.3 executes real local truck routes on Android 8/API 26
+  and Android 17/API 37 emulators. Tests check native geometry, ETA, maneuvers,
+  dense-polyline GPS matching, outside-coverage rejection, successful native
+  package import, invalid-path/checksum rejection and preservation of the active
+  region. The test checks that the app has no INTERNET permission.
+- On **both emulators**, the final native smoke flow passed route display,
+  maneuver screen, process termination/cold restart, persisted region loading,
+  real-coordinate GPS injection, muted foreground guidance, stop and training-map
+  restoration. Genuine route and GPS screenshots were inspected.
+- Native ARM64/x86_64 ELF load segments use 16 KiB alignment. APK `zipalign`
+  passes the 16 KiB page check. ARMv7/x86 binaries are packaged but were not
+  executed. Real devices with 16 KiB pages have not been tested.
+- The PBF-to-XML-to-display-graph pipeline was exercised on the exact Andorra
+  source: 37,848 road nodes, 67,384 directed segments and 39 supported turn
+  restrictions. Display data is separate from native routing decisions.
+
+Startup testing exposed slow primitive stream decoding and recurring road
+redraws. Buffered decoding, viewport culling, overview road filtering and a
+static map/route cache were added. The saved native map then loaded in roughly
+four seconds on the tested Android 17 emulator. This is one sample/device
+measurement, not a continental performance guarantee.
+
+Reproduce on dedicated emulators:
+
+```powershell
+./tools/build.ps1 -Tasks ':app:assembleDebug',':app:assembleDebugAndroidTest',':routing:test',':app:lintDebug'
+python -m unittest discover -s tools -p test_*.py
+python tools/smoke_native.py --device emulator-5554 --prefix android8
+python tools/smoke_native.py --device emulator-5556 --prefix android17
+```
+
+Start each isolated emulator before its script. The scripts install only EuroRig
+and its test APK, select the Andorra region and end on the training map. Source
+includes the decoder tests and native instrumentation implementation.
+
+Not verified: physical devices, intermediate Android versions, spoken output,
+real driving, complete native truck-restriction/country-law correctness,
+continental files/performance, independent country merging, automatic updates,
+complete geocoding, multi-stop navigation, lane guidance and public CI hosting.
+The routing fixture's snapshot date is unknown. Android 8 image Pico TTS crashed
+in earlier testing; this release's GPS tests were muted. This APK is debug-signed.
+Europe-wide coverage, public release and the full product request remain unfinished.
+
+## Earlier 0.1.0-dev evidence
+
+## Build and automated checks
+
+- Gradle 9.6.0, Android Gradle plugin 9.4.0, JDK 17.
+- Android APK builds with minimum API 26 and compile/target API 37.
+- 13 Java routing tests pass: truck/van route differences, individual dimension
+  limits, axle/gross weight, hazmat, tolls, only/no turns, impossible routes,
+  coordinate snapping, search, navigation progress/arrival and malformed data.
+- Seven Python compiler tests pass: units, unknown/conditional/lanes limits,
+  directional restrictions, access specificity, barriers, tunnels/tolls,
+  one-way geometry and supported/unsupported turn relations.
+- Android lint passes with no issues in the final build.
+- APK manifest has no INTERNET permission and no billing/analytics dependency.
+
+## Device evidence
+
+Android 8/API 26 emulator: startup, truck detour calculation, route simulation,
+stopping, local search, truck-profile save and training-map restoration passed.
+Portrait and landscape screenshots were inspected. A private fictional QA
+package was imported and the foreground GPS service accepted injected location
+fixes and displayed guidance. The final muted-GPS test passed import, foreground
+service, progress display, stop and training-map restoration. This is an emulator
+test, not a truck road test.
+
+Android 17/API 37 emulator: startup, truck detour calculation, route simulation,
+stopping, local search, truck-profile save and training-map restoration passed
+on the final APK. The route screenshot was inspected.
+
+The isolated emulator images experienced System UI cold-boot ANRs; recovery is
+explicitly logged by the test helper. The Android 8 image's external Pico TTS
+provider crashed inside its native synthesis library. Spoken output is therefore
+**not verified**. Voice can be muted without requiring a network service.
+
+## Reproduce
+
+```text
+python -m unittest discover -s tools -p test_*.py
+./tools/build.ps1
+python tools/setup_emulator.py --api 26
+python tools/smoke_android.py --device emulator-5554 --prefix android8
+python tools/smoke_navigation.py --device emulator-5554 --prefix android8
+```
+
+Start the dedicated headless emulator before running the device scripts. The
+private GPS QA fixture changes a flag only in a test copy of the fictional map
+to exercise the service. It is excluded from the source archive and must never
+be used on roads. `tools/smoke_navigation.py` leaves the training map selected
+after a successful test. Android 17 setup uses `--api 37` and a separate device
+port, e.g. `emulator-5556`.
+
+## Not verified / not shipped
+
+All intermediate Android versions and physical devices, real driving, successful
+voice synthesis, continental-scale routing/performance, country-specific law/ADR
+accuracy, full European maps, cross-package trips, multi-stop navigation, complete
+geocoding, lane guidance and live information. The CI workflow has been prepared
+but has not run on a public repository. This is a debug-signed development build;
+release signing, public hosting and the full product request remain unfinished.

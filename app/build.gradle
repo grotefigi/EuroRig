@@ -1,0 +1,22 @@
+plugins { id 'com.android.application' }
+android {
+    namespace 'org.eurorig.app'
+    compileSdk 37
+    buildToolsVersion '36.0.0'
+    defaultConfig {
+        applicationId 'org.eurorig.app'
+        minSdk 26
+        targetSdk 37
+        versionCode 3
+        versionName '0.3.0-dev'
+        buildConfigField 'String', 'MAP_CATALOG_URL', groovy.json.JsonOutput.toJson(providers.gradleProperty('mapCatalogUrl').getOrElse('https://github.com/grotefigi/EuroRig/releases/download/maps-current/catalog.json'))
+        testInstrumentationRunner 'org.eurorig.app.NativeSmokeInstrumentation'
+    }
+    compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
+    buildFeatures { buildConfig true }
+    buildTypes { release { minifyEnabled false } }
+}
+dependencies {
+    implementation project(':routing')
+    implementation 'io.github.rallista:valhalla-mobile:0.6.3'
+}

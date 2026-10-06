@@ -1,0 +1,2 @@
+pyvalhalla==3.6.3
+osmium==4.3.1
