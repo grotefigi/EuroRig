@@ -3,6 +3,9 @@
 The current app is an independent, executable prototype. Completion of the
 original product request requires all of the following milestones.
 
+The additional driver parking, walking, provenance and offline renderer work is
+tracked in [docs/DRIVER_FEATURES.md](docs/DRIVER_FEATURES.md).
+
 1. **Production offline engine and renderer.** Valhalla Mobile 0.6.3 is embedded
    and routes a full Romania country offline. Indexed SQLite roads and FTS
    search are implemented. Improve rendering/geocoding, validate native rules,

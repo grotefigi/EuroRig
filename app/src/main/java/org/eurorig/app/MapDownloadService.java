@@ -54,7 +54,7 @@ public final class MapDownloadService extends Service {
                         Store.worker.execute(()->{
                             if(!Store.beginInstall()){installed.countDown();return;}
                             try(InputStream in=new FileInputStream(file)){
-                            Graph graph=RegionPackages.install(this,in);Store.graph=graph;Store.route=null;Store.start=0;Store.end=Math.min(1,graph.nodes.length-1);Store.setRegionEndpoints();
+                            Graph graph=RegionPackages.install(this,in);Store.graph=graph;Store.originChosen=false;Store.destinationChosen=false;Store.route=null;Store.start=0;Store.end=Math.min(1,graph.nodes.length-1);Store.setRegionEndpoints();
                         }catch(Exception|LinkageError e){failure[0]=new IOException(e.getMessage(),e);}finally{Store.installing=false;installed.countDown();}});
                         installed.await();if(failure[0]!=null)throw failure[0];
                     }

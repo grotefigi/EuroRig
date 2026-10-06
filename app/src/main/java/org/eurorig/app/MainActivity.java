@@ -19,10 +19,12 @@ import java.nio.file.*;
 import java.util.*;
 
 public final class MainActivity extends Activity {
-    private static final int BG=0xff10191c, PANEL=0xff1e2c30, TEXT=0xffe4eeee, MUTED=0xff9eb4b9, LIME=0xffc4f16d;
+    private int BG,PANEL,TEXT,MUTED,LIME;
+    private boolean darkMode;
     private TextView status, profile, endpoints, instruction, stats, speedDisplay;
     private LinearLayout routeCard;
     private Button gpsButton, overviewButton, modeButton;
+    private Button zoomInButton,zoomOutButton;
     private boolean guidanceWasActive;
     private Button plan, drive;
     private RoadMapView map;
@@ -36,16 +38,17 @@ public final class MainActivity extends Activity {
     private Progress simulatedProgress;
     private Router.Route exporting;
     private LocationListener pendingGps;
+    private boolean gpsAcquiring;
     private final Runnable ticker=new Runnable(){public void run(){
         if(!resumed)return;
         boolean active=simulating||Store.navigating||MapDownloadService.running;
         if(simulating) simulationTick();
         if(active||previouslyActive)refresh();
         previouslyActive=simulating||Store.navigating||MapDownloadService.running;
-        main.postDelayed(this,1500);
+        main.postDelayed(this,Store.navigating?500:1500);
     }};
     public void onCreate(Bundle state){
-        super.onCreate(state);buildUi();
+        applyAppearance();super.onCreate(state);buildUi();
         busy=true;refresh();
         Store.worker.execute(()->{
             try {Store.load(getApplicationContext());main.post(()->{if(isDestroyed())return;busy=false;map.setGraph(Store.graph);refresh();});}
@@ -60,68 +63,88 @@ public final class MainActivity extends Activity {
     protected void onPause(){resumed=false;main.removeCallbacks(ticker);cancelGps();super.onPause();}
     protected void onDestroy(){requestGeneration++;main.removeCallbacksAndMessages(null);if(simulating){Store.lat=Double.NaN;Store.lon=Double.NaN;}super.onDestroy();}
     public void onConfigurationChanged(android.content.res.Configuration configuration){
-        super.onConfigurationChanged(configuration);buildUi();if(Store.graph!=null)map.setGraph(Store.graph);refresh();
+        super.onConfigurationChanged(configuration);RoadMapView old=map;boolean followingInitialized=guidanceWasActive;buildUi();if(Store.graph!=null)map.setGraph(Store.graph);map.restoreCamera(old);guidanceWasActive=followingInitialized;refresh();
     }
     private int dp(float v){return Math.round(v*getResources().getDisplayMetrics().density);}
+    private void applyAppearance(){
+        darkMode=getSharedPreferences("settings",0).getBoolean("dark_mode",(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);
+        BG=darkMode?0xff10191c:0xfff7f9fc;PANEL=darkMode?0xff1e2c30:0xffe8eef5;TEXT=darkMode?0xffe4eeee:0xff14242b;MUTED=darkMode?0xff9eb4b9:0xff52646e;LIME=darkMode?0xffc4f16d:0xff176bd7;
+        setTheme(darkMode?R.style.AppTheme:R.style.AppThemeLight);
+        getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
+        getWindow().getDecorView().setSystemUiVisibility(darkMode?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
+    }
+    private void appearanceDialog(){
+        Switch toggle=new Switch(this);toggle.setText(R.string.dark_mode);toggle.setTextColor(TEXT);toggle.setPadding(dp(24),dp(16),dp(24),dp(16));toggle.setMinHeight(dp(56));toggle.setChecked(darkMode);
+        AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Appearance").setView(toggle).setNegativeButton("Close",null).create();
+        toggle.setOnCheckedChangeListener((view,checked)->{dialog.dismiss();getSharedPreferences("settings",0).edit().putBoolean("dark_mode",checked).apply();RoadMapView old=map;boolean initialized=guidanceWasActive;applyAppearance();buildUi();map.setGraph(Store.graph);map.restoreCamera(old);guidanceWasActive=initialized;refresh();});dialog.show();
+    }
     private GradientDrawable background(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
     private TextView text(String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextColor(color);t.setTextSize(size);t.setFontFeatureSettings("kern");return t;}
     private LinearLayout vertical(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
-    private Button button(String value,Runnable action){Button b=new Button(this);b.setText(value);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(TEXT);b.setBackground(background(PANEL,12));b.setPadding(dp(10),0,dp(10),0);b.setMinHeight(dp(48));b.setOnClickListener(v->{if(busy)return;action.run();});return b;}
+    private Button button(String value,Runnable action){Button b=new Button(this);b.setText(value);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(TEXT);b.setBackground(background(PANEL,12));b.setPadding(dp(10),0,dp(10),0);b.setMinHeight(dp(48));b.setOnClickListener(v->action.run());return b;}
     private void buildUi(){
         guidanceWasActive=false;
-        boolean wide=getResources().getConfiguration().screenWidthDp>=500 && getResources().getConfiguration().screenWidthDp>getResources().getConfiguration().screenHeightDp;
-        LinearLayout root=vertical();root.setBackgroundColor(BG);root.setPadding(dp(16),dp(10),dp(16),dp(8));
-        LinearLayout content=root;
-        if(wide){
-            LinearLayout outer=new LinearLayout(this);outer.setBackgroundColor(BG);
-            outer.setOnApplyWindowInsetsListener((v,insets)->{outer.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});
-            outer.addView(root,new LinearLayout.LayoutParams(dp(Math.min(320,getResources().getConfiguration().screenWidthDp*.35f)),-1));
-            content=vertical();content.setPadding(0,dp(10),dp(16),dp(8));outer.addView(content,new LinearLayout.LayoutParams(0,-1,1));setContentView(outer);outer.requestApplyInsets();
-        }else{
-            root.setOnApplyWindowInsetsListener((v,insets)->{root.setPadding(dp(16)+insets.getSystemWindowInsetLeft(),dp(10)+insets.getSystemWindowInsetTop(),dp(16)+insets.getSystemWindowInsetRight(),dp(8)+insets.getSystemWindowInsetBottom());return insets;});
-            setContentView(root);root.requestApplyInsets();
-        }
-        LinearLayout header=new LinearLayout(this);header.setGravity(Gravity.CENTER_VERTICAL);
-        TextView brand=text("EuroRig",wide?24:28,TEXT);brand.setTypeface(Typeface.DEFAULT,Typeface.BOLD);header.addView(brand,new LinearLayout.LayoutParams(0,dp(44),1));
-        TextView local=text("●  FULLY LOCAL",10,LIME);local.setPadding(dp(12),dp(9),dp(12),dp(9));local.setBackground(background(PANEL,20));header.addView(local);root.addView(header);
-        status=text("Loading local map…",12,MUTED);status.setPadding(0,dp(4),0,dp(10));root.addView(status);
-        routeCard=vertical();routeCard.setPadding(dp(14),dp(10),dp(14),dp(10));routeCard.setBackground(background(PANEL,16));
-        endpoints=text("Choose route endpoints",14,TEXT);endpoints.setPadding(0,0,0,dp(6));routeCard.addView(endpoints);
-        Button search=button("Search destination or coordinates",()->{if(Store.graph==null)mapsDialog();else search(false);});search.setBackground(background(0xff2c3e43,10));routeCard.addView(search,new LinearLayout.LayoutParams(-1,dp(46)));
-        profile=text("40 t · 4.00 m · Articulated truck",12,LIME);profile.setPadding(0,dp(8),0,0);profile.setOnClickListener(v->{if(canChangeMap())truckDialog();});routeCard.addView(profile);
-        modeButton=button("Routing mode",this::routingOptions);routeCard.addView(modeButton,new LinearLayout.LayoutParams(-1,dp(48)));root.addView(routeCard);
-        map=new RoadMapView(this);map.setBackground(background(0xff162225,16));map.setClipToOutline(true);map.pick=n->{if(!editable())return;choosePoint(n);};
-        map.cameraChanged=this::updateMapControls;
-        FrameLayout mapFrame=new FrameLayout(this);mapFrame.addView(map,new FrameLayout.LayoutParams(-1,-1));
-        LinearLayout mapControls=vertical();
-        gpsButton=button("Use GPS",this::mapGps);gpsButton.setContentDescription("Use current GPS location as starting point");
-        overviewButton=button("Overview",()->{if(Store.route!=null)map.fitRoute(Store.route);else map.fit();updateMapControls();});
-        Button zoomIn=button("+",()->map.zoom(1.6)),zoomOut=button("−",()->map.zoom(1/1.6));
-        zoomIn.setTextSize(26);zoomOut.setTextSize(26);
-        zoomIn.setContentDescription("Zoom in");zoomOut.setContentDescription("Zoom out");
-        for(Button control:new Button[]{gpsButton,overviewButton}){
-            LinearLayout.LayoutParams dimensions=new LinearLayout.LayoutParams(dp(88),dp(52));dimensions.bottomMargin=dp(6);mapControls.addView(control,dimensions);
-        }
-        LinearLayout zoomControls=new LinearLayout(this);zoomControls.addView(zoomIn,new LinearLayout.LayoutParams(0,dp(52),1));zoomControls.addView(zoomOut,new LinearLayout.LayoutParams(0,dp(52),1));mapControls.addView(zoomControls,new LinearLayout.LayoutParams(dp(88),dp(52)));
-        FrameLayout.LayoutParams controlsPosition=new FrameLayout.LayoutParams(-2,-2,Gravity.TOP|Gravity.END);
-        controlsPosition.setMargins(dp(8),dp(10),dp(10),dp(8));mapFrame.addView(mapControls,controlsPosition);
-        LinearLayout.LayoutParams mapParams=new LinearLayout.LayoutParams(-1,0,1);mapParams.topMargin=wide?0:dp(12);mapParams.bottomMargin=dp(12);content.addView(mapFrame,mapParams);
-        instruction=text("Your road. Your rig. Your navigation.",18,TEXT);instruction.setTypeface(Typeface.DEFAULT,Typeface.BOLD);content.addView(instruction);
+        FrameLayout root=new FrameLayout(this);root.setBackgroundColor(BG);
+        root.setOnApplyWindowInsetsListener((v,insets)->{root.setPadding(insets.getSystemWindowInsetLeft(),insets.getSystemWindowInsetTop(),insets.getSystemWindowInsetRight(),insets.getSystemWindowInsetBottom());return insets;});
+        setContentView(root);root.requestApplyInsets();
+        map=new RoadMapView(this);map.pick=n->{if(editable())choosePoint(n);};map.cameraChanged=this::updateMapControls;
+        root.addView(map,new FrameLayout.LayoutParams(-1,-1));
+        boolean wide=getResources().getConfiguration().screenWidthDp>getResources().getConfiguration().screenHeightDp;
+        int panelWidth=wide?dp(Math.min(330,Math.max(240,getResources().getConfiguration().screenWidthDp*.42f))):-1;
+        LinearLayout top=vertical();top.setPadding(dp(12),dp(8),dp(12),dp(8));top.setBackground(background(BG,18));
+        FrameLayout.LayoutParams topPosition=new FrameLayout.LayoutParams(panelWidth,-2,Gravity.TOP|Gravity.START);topPosition.setMargins(dp(8),dp(8),dp(8),0);root.addView(top,topPosition);
+        routeCard=vertical();top.addView(routeCard);
+        Button search=button("Search destination or coordinates",()->{if(Store.graph==null)mapsDialog();else search(false);});search.setTextSize(15);routeCard.addView(search,new LinearLayout.LayoutParams(-1,dp(52)));
+        LinearLayout profileRow=new LinearLayout(this);
+        profile=text("Your truck",13,LIME);profile.setGravity(Gravity.CENTER_VERTICAL);profile.setPadding(dp(10),0,dp(4),0);profile.setContentDescription("Edit vehicle dimensions and ADR profile");profile.setOnClickListener(v->{if(canChangeMap())truckDialog();});profileRow.addView(profile,new LinearLayout.LayoutParams(0,dp(48),1));
+        modeButton=button("Economical",this::routingOptions);profileRow.addView(modeButton,new LinearLayout.LayoutParams(dp(118),dp(48)));routeCard.addView(profileRow);
+        status=text("Opening maps…",12,MUTED);status.setPadding(dp(8),dp(4),dp(8),dp(4));top.addView(status);
+        instruction=text("Choose a destination",18,TEXT);instruction.setTypeface(Typeface.DEFAULT,Typeface.BOLD);instruction.setPadding(dp(8),dp(4),dp(8),dp(4));top.addView(instruction);
+        LinearLayout bottom=vertical();bottom.setPadding(dp(12),dp(8),dp(12),dp(8));bottom.setBackground(background(BG,18));
+        FrameLayout.LayoutParams bottomPosition=new FrameLayout.LayoutParams(panelWidth,-2,Gravity.BOTTOM|Gravity.START);bottomPosition.setMargins(dp(8),0,dp(8),dp(8));root.addView(bottom,bottomPosition);
+        endpoints=text("Choose route endpoints",13,TEXT);endpoints.setGravity(Gravity.CENTER_VERTICAL);endpoints.setPadding(dp(10),dp(4),dp(10),dp(4));endpoints.setBackground(background(PANEL,12));endpoints.setContentDescription("Edit starting point and destination");endpoints.setOnClickListener(v->planner());bottom.addView(endpoints,new LinearLayout.LayoutParams(-1,dp(52)));
         LinearLayout journey=new LinearLayout(this);journey.setGravity(Gravity.CENTER_VERTICAL);
-        speedDisplay=text("—\nkm/h",30,TEXT);speedDisplay.setTypeface(Typeface.DEFAULT,Typeface.BOLD);speedDisplay.setGravity(Gravity.CENTER);
-        speedDisplay.setPadding(dp(12),dp(4),dp(12),dp(4));speedDisplay.setBackground(background(PANEL,12));
-        journey.addView(speedDisplay,new LinearLayout.LayoutParams(dp(110),-2));
-        stats=text("Set your truck profile, then plan a route.",14,MUTED);stats.setPadding(dp(12),dp(5),0,dp(10));journey.addView(stats,new LinearLayout.LayoutParams(0,-2,1));content.addView(journey);
-        LinearLayout actions=new LinearLayout(this);plan=button("Plan route",this::calculate);drive=button("Start guidance",this::startGuidance);
-        drive.setBackground(background(LIME,12));drive.setTextColor(BG);
-        LinearLayout.LayoutParams a=new LinearLayout.LayoutParams(0,dp(50),1);a.rightMargin=dp(8);actions.addView(plan,a);actions.addView(drive,new LinearLayout.LayoutParams(0,dp(50),1));content.addView(actions);
-        if(wide)root.addView(new View(this),new LinearLayout.LayoutParams(1,0,1));
-        LinearLayout dock=new LinearLayout(this);dock.setPadding(0,dp(10),0,0);
-        String[] labels={"Truck","Maps","Route","More"};Runnable[] callbacks={()->{if(canChangeMap())truckDialog();},this::mapsDialog,this::routeDialog,this::moreDialog};
-        for(int i=0;i<labels.length;i++){Button b=button(labels[i],callbacks[i]);b.setTextColor(MUTED);b.setBackgroundColor(Color.TRANSPARENT);dock.addView(b,new LinearLayout.LayoutParams(0,dp(48),1));}root.addView(dock);
+        speedDisplay=text("—\nkm/h",30,TEXT);speedDisplay.setTypeface(Typeface.DEFAULT,Typeface.BOLD);speedDisplay.setGravity(Gravity.CENTER);journey.addView(speedDisplay,new LinearLayout.LayoutParams(dp(100),-2));
+        stats=text("Download your first country to begin",13,MUTED);stats.setPadding(dp(8),dp(6),dp(8),dp(6));journey.addView(stats,new LinearLayout.LayoutParams(0,-2,1));bottom.addView(journey);
+        LinearLayout actions=new LinearLayout(this);plan=button("Plan route",this::calculate);drive=button("Start guidance",this::startGuidance);drive.setBackground(background(LIME,12));drive.setTextColor(darkMode?BG:Color.WHITE);
+        LinearLayout.LayoutParams actionSize=new LinearLayout.LayoutParams(0,dp(50),1);actionSize.rightMargin=dp(8);actions.addView(plan,actionSize);actions.addView(drive,new LinearLayout.LayoutParams(0,dp(50),1));bottom.addView(actions);
+        LinearLayout dock=new LinearLayout(this);String[] labels={"Truck","Maps","Route","More"};Runnable[] callbacks={()->{if(canChangeMap())truckDialog();},this::mapsDialog,this::routeDialog,this::moreDialog};
+        for(int i=0;i<labels.length;i++){Button control=button(labels[i],callbacks[i]);control.setBackgroundColor(Color.TRANSPARENT);dock.addView(control,new LinearLayout.LayoutParams(0,dp(48),1));}bottom.addView(dock);
+        LinearLayout controls=vertical();gpsButton=button("Use GPS",this::mapGps);overviewButton=button("Overview",()->{if(Store.route!=null)map.fitRoute(Store.route);else map.fit();updateMapControls();});
+        for(Button control:new Button[]{gpsButton,overviewButton}){LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(dp(88),dp(48));size.bottomMargin=dp(4);controls.addView(control,size);}
+        LinearLayout zoom=new LinearLayout(this);Button plus=button("+",()->map.zoom(1.6)),minus=button("−",()->map.zoom(1/1.6));plus.setContentDescription("Zoom in");minus.setContentDescription("Zoom out");plus.setTextSize(24);minus.setTextSize(24);zoom.addView(plus,new LinearLayout.LayoutParams(dp(48),dp(48)));zoom.addView(minus,new LinearLayout.LayoutParams(dp(48),dp(48)));controls.addView(zoom);
+        zoomInButton=plus;zoomOutButton=minus;
+        FrameLayout.LayoutParams controlsPosition=new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER_VERTICAL|Gravity.END);controlsPosition.setMargins(0,0,dp(16),0);root.addView(controls,controlsPosition);
+        View sidebarView=null;
+        if(wide){
+            root.removeView(top);root.removeView(bottom);LinearLayout sidebar=vertical();sidebar.addView(top,new LinearLayout.LayoutParams(-1,-2));sidebar.addView(new View(this),new LinearLayout.LayoutParams(1,0,1));sidebar.addView(bottom,new LinearLayout.LayoutParams(-1,-2));
+            ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);scroll.addView(sidebar);FrameLayout.LayoutParams position=new FrameLayout.LayoutParams(panelWidth,-1,Gravity.START);position.setMargins(dp(8),dp(8),dp(8),dp(8));root.addView(scroll,position);sidebarView=scroll;
+        }
+        RoadMapView currentMap=map;
+        View sidebar=sidebarView;boolean[] compactControls={false};
+        root.getViewTreeObserver().addOnGlobalLayoutListener(()->{
+            boolean compact=!wide&&bottom.getTop()-top.getBottom()<dp(180);
+            currentMap.setViewport(wide?sidebar.getRight()-currentMap.getLeft()+dp(8):0,wide?0:top.getBottom()-currentMap.getTop()+dp(8),currentMap.getWidth()-(compact?0:dp(112)),wide?currentMap.getHeight():bottom.getTop()-currentMap.getTop()-dp(8));
+            if(compact!=compactControls[0]){compactControls[0]=compact;controls.setOrientation(compact?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);for(Button control:new Button[]{gpsButton,overviewButton}){LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(dp(compact?(control==gpsButton?88:82):88),dp(48));if(compact)size.rightMargin=dp(4);else size.bottomMargin=dp(4);control.setLayoutParams(size);}}
+            if(!wide){FrameLayout.LayoutParams position=(FrameLayout.LayoutParams)controls.getLayoutParams();int margin=Math.max(0,compact&&(Store.navigating||simulating)?top.getBottom()-root.getPaddingTop()+dp(8):(top.getBottom()+bottom.getTop()-controls.getHeight())/2-root.getPaddingTop());if(position.gravity!=(Gravity.TOP|Gravity.END)||position.topMargin!=margin){position.gravity=Gravity.TOP|Gravity.END;position.topMargin=margin;controls.setLayoutParams(position);}}
+        });
+    }
+    private void planner(){
+        if(!editable())return;
+        new AlertDialog.Builder(this).setTitle("Route planner").setItems(new String[]{"From: "+(Store.originChosen?label(Store.start):"Choose starting point"),"To: "+(Store.destinationChosen?label(Store.end):"Choose destination"),"Start at GPS","Swap start and destination","Route preferences"},(d,i)->{
+            if(i==0)search(true);else if(i==1)search(false);else if(i==2)startAtGps();else if(i==3){int previous=Store.start;Store.start=Store.end;Store.end=previous;boolean chosen=Store.originChosen;Store.originChosen=Store.destinationChosen;Store.destinationChosen=chosen;Store.route=null;saveEndpoints();refresh();}else routingOptions();
+        }).setNegativeButton("Close",null).show();
+    }
+    private void saveEndpoints(){Store.saveEndpoints(this);}
+    private void selectedPoint(int node,boolean starting){
+        if(node<0){error("That point is outside the installed map. Choose a point within "+Store.graph.name+".");return;}
+        if(starting){cancelGps();Store.start=node;Store.originChosen=true;}else{Store.end=node;Store.destinationChosen=true;}Store.route=null;saveEndpoints();
+        Graph.Node point=Store.graph.nodes[node];map.showPoint(point.lat,point.lon);refresh();
     }
     private void refresh(){
         Graph g=Store.graph;boolean active=Store.navigating||simulating;
+        boolean compact=getResources().getConfiguration().screenHeightDp<560&&getResources().getConfiguration().screenHeightDp>getResources().getConfiguration().screenWidthDp;
+        instruction.setVisibility(compact&&!active?View.GONE:View.VISIBLE);status.setVisibility(compact&&!active&&!busy&&!MapDownloadService.running?View.GONE:View.VISIBLE);
         routeCard.setVisibility(active?View.GONE:View.VISIBLE);
         speedDisplay.setVisibility(active?View.VISIBLE:View.GONE);
         instruction.setTextSize(active?24:18);
@@ -133,63 +156,87 @@ public final class MainActivity extends Activity {
             if(displayedGraph==null||Store.display!=displayedDatabase||Store.nativeRouter==null)map.setGraph(g);else map.updateGraph(g);
             displayedGraph=g;displayedDatabase=Store.display;
         }
-        plan.setEnabled(!busy&&!Store.installing&&g!=null&&!active);drive.setEnabled(!busy&&!Store.installing&&Store.route!=null);
-        plan.setText(busy?"Working…":"Plan route");drive.setText(active?"Stop":g!=null&&g.demo?"Simulate route":"Start guidance");
-        modeButton.setText(getString(R.string.mode_access,Store.mode.title,Store.deliveryAccess?"Delivery access":"Standard access"));
-        profile.setText(String.format(Locale.getDefault(),"%.1f t  ·  %.2f m high  ·  %.2f m wide  ·  %.1f m long",Store.truck.weight,Store.truck.height,Store.truck.width,Store.truck.length));
-        if(g==null){status.setText(busy?"Opening maps…":MapDownloadService.running?MapDownloadService.status:"No maps installed");endpoints.setText(R.string.download_country_start);instruction.setText(R.string.first_country);stats.setText(R.string.choose_first_map);map.updateGraph(null);map.invalidate();updateMapControls();return;}
-        status.setText(g.demo?"DEVELOPMENT BUILD · Fictional training map":Store.navigating?"GPS GUIDANCE · Offline · Development build":"OFFLINE · "+g.name+(Store.nativeRouter!=null?" · Valhalla truck":" · Prototype router"));
-        endpoints.setText(getString(R.string.route_endpoints,label(Store.start),label(Store.end)));
+        plan.setEnabled(!busy&&!Store.installing&&!active);drive.setEnabled(!busy&&!Store.installing&&Store.route!=null);
+        plan.setAlpha(plan.isEnabled()?1:.45f);drive.setAlpha(drive.isEnabled()?1:.45f);
+        plan.setText(busy?"Working…":g==null?"Download maps":"Plan route");drive.setText(active?"Stop":g!=null&&g.demo?"Simulate route":"Start guidance");
+        modeButton.setText(Store.deliveryAccess?"Delivery":Store.mode.title);modeButton.setContentDescription("Route preferences: "+Store.mode.title+(Store.deliveryAccess?", permitted delivery access":""));
+        profile.setText(String.format(Locale.getDefault(),"%.1f t  ·  %.2f m high",Store.truck.weight,Store.truck.height));
+        if(g==null){status.setText(busy?"Opening maps…":MapDownloadService.running?MapDownloadService.status:"No maps installed");endpoints.setText(R.string.download_country_start);endpoints.setVisibility(View.VISIBLE);instruction.setText(R.string.first_country);stats.setText(R.string.choose_first_map);map.updateGraph(null);map.invalidate();updateMapControls();return;}
+        status.setText(MapDownloadService.running?MapDownloadService.status:g.demo?"DEVELOPMENT BUILD · Fictional training map":Store.navigating?"GPS GUIDANCE · Offline · Development build":"Offline · "+g.name);
+        endpoints.setText(getString(R.string.route_endpoints,Store.originChosen?label(Store.start):"Choose starting point",Store.destinationChosen?label(Store.end):"Choose destination"));endpoints.setVisibility(active?View.GONE:View.VISIBLE);
         Router.Route r=Store.route;
         if(active){instruction.setText(simulating?getString(R.string.simulated_instruction,Store.guidance):Store.guidance);stats.setText(String.format(Locale.getDefault(),"%.1f km remaining%s\n%s",Store.remaining/1000,simulating?" · Fictional roads":"",fresh?"GPS position received":"Waiting for a fresh GPS fix"));}
-        else if(r!=null){instruction.setText(Store.arrived?(g.demo?"Training route complete":"You have arrived"):r.edges.isEmpty()?"Start and destination are the same":"Route ready for your truck");stats.setText(String.format(Locale.getDefault(),"%.1f km  ·  approximately %d min  ·  %s",r.metres/1000,Math.max(1,Math.round(r.seconds/60)),r.nativeGeometry()?(Store.deliveryAccess?"Shortest delivery":Store.mode.title)+(r.restrictedMetres>0?" · "+Math.round(r.restrictedMetres)+" m restricted access":" · Valhalla truck"):"Tagged restrictions checked"));}
-        else{instruction.setText(R.string.tagline);stats.setText(R.string.choose_destination);}
+        else if(r!=null){instruction.setText(Store.arrived?(g.demo?"Training route complete":"You have arrived"):r.edges.isEmpty()?"Start and destination are the same":"Route ready for your truck");stats.setText(String.format(Locale.getDefault(),"%.1f km  ·  ≈ %s  ·  %s",r.metres/1000,duration(r.seconds),r.nativeGeometry()?(Store.deliveryAccess?"Shortest delivery":Store.mode.title)+(r.restrictedMetres>0?" · "+Math.round(r.restrictedMetres)+" m restricted access":""):"Tagged restrictions checked"));}
+        else{instruction.setText(R.string.select_destination);stats.setText(R.string.choose_destination);}
         map.updateGraph(Store.graph);
-        if(active&&!guidanceWasActive&&fresh)map.locate(Store.lat,Store.lon);
+        if(active&&!guidanceWasActive&&fresh){map.locate(Store.lat,Store.lon);guidanceWasActive=true;}
         if(active&&fresh)map.updatePosition();else map.invalidate();
-        guidanceWasActive=active;updateMapControls();
+        if(!active)guidanceWasActive=false;updateMapControls();
         if(active)getWindow().addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);else getWindow().clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
     }
     private String label(int node){if(Store.graph==null)return "";Graph.Node n=Store.graph.nodes[node];return n.label.isEmpty()?String.format(Locale.ROOT,"%.5f, %.5f",n.lat,n.lon):n.label;}
-    private boolean canChangeMap(){if(busy||Store.installing)return false;if(Store.navigating||simulating){error("Stop guidance before changing the route, map or truck.");return false;}return true;}
-    private boolean editable(){if(busy||Store.installing)return false;if(Store.navigating||simulating){error("Stop guidance before changing the route, map or truck.");return false;}return Store.graph!=null;}
-    private void choosePoint(int node){new AlertDialog.Builder(this).setTitle(label(node)).setItems(new String[]{"Set destination","Set starting point","Save favourite"},(d,i)->{if(i==2){saveFavourite(node);return;}if(i==0)Store.end=node;else Store.start=node;Store.route=null;refresh();}).show();}
+    private String duration(double seconds){long minutes=Math.max(1,Math.round(seconds/60));return minutes<60?String.format(Locale.getDefault(),"%d min",minutes):String.format(Locale.getDefault(),"%d h %02d min",minutes/60,minutes%60);}
+    private boolean canChangeMap(){if(busy||Store.installing){Toast.makeText(this,"Please wait for the map or route to finish loading",Toast.LENGTH_SHORT).show();return false;}if(Store.navigating||simulating){error("Stop guidance before changing the route, map or truck.");return false;}return true;}
+    private boolean editable(){if(busy||Store.installing){Toast.makeText(this,"Please wait for the map or route to finish loading",Toast.LENGTH_SHORT).show();return false;}if(Store.navigating||simulating){error("Stop guidance before changing the route, map or truck.");return false;}if(Store.graph==null){mapsDialog();return false;}return true;}
+    private void choosePoint(int node){new AlertDialog.Builder(this).setTitle(label(node)).setItems(new String[]{"Set destination","Set starting point","Save favourite"},(d,i)->{if(i==2){saveFavourite(node);return;}selectedPoint(node,i==1);}).show();}
     private void search(boolean starting){
         if(!editable())return;
-        LinearLayout box=vertical();box.setPadding(dp(20),dp(8),dp(20),0);
-        EditText query=new EditText(this);query.setSingleLine();query.setHint("Name or latitude, longitude");box.addView(query);
-        ListView list=new ListView(this);box.addView(list,new LinearLayout.LayoutParams(-1,dp(260)));
-        ArrayList<Integer> ids=new ArrayList<>();ArrayList<Graph.Node> results=new ArrayList<>();int[] searchGeneration={0};double[] coordinate={Double.NaN,Double.NaN};ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,new ArrayList<>());list.setAdapter(adapter);
-        AlertDialog dialog=new AlertDialog.Builder(this).setTitle(starting?"Choose starting point":"Search offline map").setView(box).setNegativeButton("Cancel",null).create();
+        LinearLayout box=vertical();box.setPadding(dp(16),dp(8),dp(16),0);
+        EditText query=new EditText(this);query.setSingleLine();query.setHint("Place, street or latitude, longitude");query.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH|android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);box.addView(query);
+        TextView message=text("Search the installed country: "+Store.graph.name,13,MUTED);box.addView(message);
+        ListView list=new ListView(this);box.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        ArrayList<Graph.Node> results=new ArrayList<>();java.util.concurrent.atomic.AtomicInteger generation=new java.util.concurrent.atomic.AtomicInteger();Runnable[] pending={null};
+        ArrayAdapter<String> adapter=new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,new ArrayList<>());list.setAdapter(adapter);
+        Dialog dialog=new Dialog(this);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        TextView title=text(starting?"Choose starting point":"Search offline map",20,TEXT);title.setPadding(0,dp(8),0,dp(12));box.addView(title,0);
+        box.addView(button("Cancel",dialog::dismiss),new LinearLayout.LayoutParams(-1,dp(48)));box.setBackgroundColor(BG);dialog.setContentView(box);
         query.addTextChangedListener(new TextWatcher(){
             public void beforeTextChanged(CharSequence s,int start,int count,int after){}
-            public void onTextChanged(CharSequence s,int start,int before,int count){
-                int generation=++searchGeneration[0];ids.clear();results.clear();adapter.clear();coordinate[0]=Double.NaN;String raw=s.toString();
-                if(raw.contains(",")){try{String[] parts=raw.split(",");if(parts.length==2){double lat=Double.parseDouble(parts[0].trim()),lon=Double.parseDouble(parts[1].trim());if(Double.isFinite(lat)&&Double.isFinite(lon)&&Math.abs(lat)<=85&&Math.abs(lon)<=180){if(Store.nativeRouter!=null){coordinate[0]=lat;coordinate[1]=lon;ids.add(-1);}else{int n=Store.graph.nearest(lat,lon,250,Store.truck);if(n>=0)ids.add(n);}}}}catch(NumberFormatException ignored){}}
-                else if(Store.display!=null){
-                    DisplayDatabase display=Store.display;
-                    Store.mapWorker.execute(()->{try{List<Graph.Node> found=display.search(raw);main.post(()->{if(generation!=searchGeneration[0]||!dialog.isShowing())return;results.clear();results.addAll(found);adapter.clear();for(Graph.Node point:found)adapter.add(point.label);adapter.notifyDataSetChanged();});}catch(RuntimeException ignored){}});
-                }else ids.addAll(Store.graph.search(raw));
-                for(int n:ids)adapter.add(n<0?String.format(Locale.ROOT,"%.5f, %.5f",coordinate[0],coordinate[1]):label(n));adapter.notifyDataSetChanged();
-            }
             public void afterTextChanged(Editable e){}
+            public void onTextChanged(CharSequence text,int start,int before,int count){
+                int token=generation.incrementAndGet();if(pending[0]!=null)main.removeCallbacks(pending[0]);results.clear();adapter.clear();String raw=text.toString().trim();
+                if(raw.length()<2){message.setText(R.string.search_minimum);return;}
+                if(raw.matches("[+\\-0-9.\\s]+,[+\\-0-9.\\s]*")){
+                    try{String[] values=raw.split(",",-1);if(values.length!=2)throw new NumberFormatException();double lat=Double.parseDouble(values[0].trim()),lon=Double.parseDouble(values[1].trim());
+                        if(!Double.isFinite(lat)||!Double.isFinite(lon)||Math.abs(lat)>85||Math.abs(lon)>180)throw new NumberFormatException();
+                        results.add(new Graph.Node(lat,lon,""));adapter.add(String.format(Locale.ROOT,"%.5f, %.5f",lat,lon));message.setText(R.string.select_coordinate);
+                    }catch(NumberFormatException e){message.setText(R.string.coordinate_format);}return;
+                }
+                message.setText(R.string.search_working);DisplayDatabase display=Store.display;Graph graph=Store.graph;
+                pending[0]=()->Store.mapWorker.execute(()->{
+                    if(token!=generation.get())return;
+                    try{ArrayList<Graph.Node> found=new ArrayList<>();if(display!=null)found.addAll(display.search(raw));else for(int id:graph.search(raw))found.add(graph.nodes[id]);
+                        main.post(()->{if(token!=generation.get()||!dialog.isShowing())return;results.clear();results.addAll(found);adapter.clear();for(Graph.Node point:found)adapter.add(point.label+String.format(Locale.ROOT,"\n%.5f, %.5f",point.lat,point.lon));message.setText(found.isEmpty()?"No results. Try a city, street or coordinates.":found.size()+" places in "+graph.name);});
+                    }catch(RuntimeException failure){main.post(()->{if(token==generation.get()&&dialog.isShowing())message.setText(R.string.search_failed);});}
+                });main.postDelayed(pending[0],250);
+            }
         });
-        list.setOnItemClickListener((p,v,position,id)->{int node;if(!results.isEmpty()){Graph.Node point=results.get(position);node=Store.coordinate(point.lat,point.lon,point.label);}else{node=ids.get(position);if(node<0)node=Store.coordinate(coordinate[0],coordinate[1]);}if(node<0)return;if(starting)Store.start=node;else Store.end=node;Store.route=null;
-            getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(query.getWindowToken(),0);
-            dialog.dismiss();refresh();});dialog.show();
+        list.setOnItemClickListener((parent,view,position,id)->{
+            if(position>=results.size())return;Graph.Node point=results.get(position);int node=Store.coordinate(point.lat,point.lon,point.label);
+            if(node<0){message.setText(getString(R.string.coordinate_outside,Store.graph.name));return;}
+            getSystemService(android.view.inputmethod.InputMethodManager.class).hideSoftInputFromWindow(query.getWindowToken(),0);dialog.dismiss();selectedPoint(node,starting);
+        });
+        dialog.setOnDismissListener(d->{generation.incrementAndGet();if(pending[0]!=null)main.removeCallbacks(pending[0]);});dialog.show();
+        dialog.getWindow().setLayout(-1,Math.round(getResources().getDisplayMetrics().heightPixels*.8f));dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);query.requestFocus();
+        // Fixed dialog heights can extend beneath the keyboard on recent Android versions.
+        box.getViewTreeObserver().addOnGlobalLayoutListener(()->{
+            android.graphics.Rect visible=new android.graphics.Rect();box.getWindowVisibleDisplayFrame(visible);
+            int height=Math.min(Math.round(getResources().getDisplayMetrics().heightPixels*.8f),visible.height()-dp(32));
+            if(dialog.isShowing()&&height>dp(160)&&dialog.getWindow().getAttributes().height!=height)dialog.getWindow().setLayout(-1,height);
+        });
     }
     private void truckDialog(){
         ScrollView scroll=new ScrollView(this);LinearLayout box=vertical();box.setPadding(dp(20),dp(8),dp(20),dp(8));scroll.addView(box);
         box.setFocusableInTouchMode(true);box.requestFocus();
         Truck t=Store.truck;String[] names={"Height (m)","Width (m)","Length (m)","Loaded gross weight (t)","Maximum loaded axle weight (t)","Total truck and trailer axles","Maximum speed (km/h)"};double[] values={t.height,t.width,t.length,t.weight,t.axleWeight,t.axles,t.topSpeed};EditText[] fields=new EditText[7];
-        for(int i=0;i<7;i++){box.addView(text(names[i],13,MUTED));fields[i]=new EditText(this);fields[i].setSingleLine();fields[i].setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);fields[i].setText(String.format(Locale.ROOT,"%.2f",values[i]));box.addView(fields[i]);}
+        for(int i=0;i<7;i++){box.addView(text(names[i],13,MUTED));fields[i]=new EditText(this);fields[i].setContentDescription(names[i]);fields[i].setSelectAllOnFocus(true);fields[i].setSingleLine();fields[i].setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);fields[i].setText(java.math.BigDecimal.valueOf(values[i]).stripTrailingZeros().toPlainString());box.addView(fields[i]);}
         String[] options={"General hazardous material","Avoid toll roads","Avoid ferries","Avoid unpaved roads"};boolean[] checks={(t.hazardousLoad&1)!=0,t.avoidTolls,t.avoidFerries,t.avoidUnpaved};CheckBox[] boxes=new CheckBox[4];
         for(int i=0;i<4;i++){boxes[i]=new CheckBox(this);boxes[i].setText(options[i]);boxes[i].setChecked(checks[i]);box.addView(boxes[i]);}
         CheckBox water=new CheckBox(this),explosives=new CheckBox(this);
         water.setText(R.string.load_water);water.setChecked((t.hazardousLoad&2)!=0);box.addView(water);
         explosives.setText(R.string.load_explosives);explosives.setChecked((t.hazardousLoad&4)!=0);box.addView(explosives);
         box.addView(text("ADR tunnel restriction code for this load",13,MUTED));
-        Spinner tunnel=new Spinner(this);tunnel.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"No tunnel code","B · Exclude B, C, D, E","C · Exclude C, D, E","D · Exclude D, E","E · Exclude E"}));tunnel.setSelection(t.tunnelCode==0?0:t.tunnelCode-1);box.addView(tunnel);
+        Spinner tunnel=new Spinner(this);tunnel.setContentDescription("ADR tunnel restriction code");tunnel.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"No tunnel code","B · Exclude B, C, D, E","C · Exclude C, D, E","D · Exclude D, E","E · Exclude E"}));tunnel.setSelection(t.tunnelCode==0?0:t.tunnelCode-1);box.addView(tunnel);
         box.addView(text("Use the code applicable to the actual consignment. Mixed and quantity-dependent codes must be resolved from the transport documents. Mapped unknown tunnel categories are excluded when a code is selected.",12,MUTED));
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Your truck").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();dialog.show();
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
@@ -210,24 +257,27 @@ public final class MainActivity extends Activity {
         choices.check(900+Store.mode.ordinal());box.addView(choices);
         CheckBox access=new CheckBox(this);access.setText(R.string.delivery_permission);access.setChecked(Store.deliveryAccess);box.addView(access);
         box.addView(text("Delivery access is limited to 2 km from the destination. It uses shortest routing and preserves height, width, length, gross/axle weight, ADR and turn restrictions. Unknown limits, barriers and bridges on restricted access are excluded. Permission applies to this trip on this device.",12,MUTED));
-        new AlertDialog.Builder(this).setTitle("Route preferences").setView(box).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{
+        ScrollView scroll=new ScrollView(this);scroll.addView(box);
+        new AlertDialog.Builder(this).setTitle("Route preferences").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{
             Store.mode=RoutingMode.values()[choices.indexOfChild(choices.findViewById(choices.getCheckedRadioButtonId()))];Store.deliveryAccess=access.isChecked();Store.route=null;
             getSharedPreferences("settings",0).edit().putString("routing_mode",Store.mode.name()).apply();refresh();
         }).show();
     }
     private void calculate(){
         if(!editable())return;
+        if(!Store.originChosen||!Store.destinationChosen){planner();return;}
+        if(pendingGps!=null&&!gpsAcquiring&&Store.fixTime>0&&SystemClock.elapsedRealtime()-Store.fixTime<15000){int current=Store.coordinate(Store.lat,Store.lon);if(current<0){error("Your location is outside the installed map.");return;}Store.start=current;saveEndpoints();}
         final Graph graph=Store.graph;final int start=Store.start,end=Store.end;final Truck truck=Store.truck;final int generation=++requestGeneration;
-        busy=true;refresh();Store.worker.execute(()->{
+        busy=true;Store.route=null;refresh();Store.worker.execute(()->{
             try{Router.Route route=Store.calculate(graph,start,end,truck);main.post(()->{if(generation!=requestGeneration||isDestroyed())return;Store.route=route;Store.arrived=false;busy=false;if(route.nativeGeometry())map.fitRoute(route);refresh();});}
-            catch(RuntimeException|LinkageError e){main.post(()->{if(generation!=requestGeneration||isDestroyed())return;Store.route=null;busy=false;refresh();error(e.getMessage());});}
+            catch(RuntimeException|LinkageError e){main.post(()->{if(generation!=requestGeneration||isDestroyed())return;Store.route=null;busy=false;refresh();error("No route could be planned for this truck. Check the endpoints, installed country and vehicle limits.\n\n"+e.getMessage());});}
         });
     }
     private void startGuidance(){
         if(Store.navigating||simulating){stopGuidance();return;}
         if(Store.installing)return;
         if(Store.route==null||Store.route.edges.isEmpty()){error("Plan a route with different endpoints first.");return;}
-        if(Store.graph.demo){simulating=true;Store.arrived=false;simulationEdge=0;simulationFraction=0;simulatedProgress=new Progress(Store.route);Store.speed=60;Store.remaining=Store.route.metres;Store.guidance="Training route. These roads are fictional.";refresh();return;}
+        if(Store.graph.demo){simulating=true;Store.arrived=false;Store.travelled=0;Store.progressRoute=Store.route;simulationEdge=0;simulationFraction=0;simulatedProgress=new Progress(Store.route);Store.speed=60;Store.remaining=Store.route.metres;Store.guidance="Training route. These roads are fictional.";refresh();return;}
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){
             requestPermissions(Build.VERSION.SDK_INT>=33?new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.POST_NOTIFICATIONS}:new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},100);return;
         }
@@ -241,30 +291,34 @@ public final class MainActivity extends Activity {
         Graph.Node origin=Store.graph.nodes[Store.start];
         if(Geo.distance(fix.getLatitude(),fix.getLongitude(),origin.lat,origin.lon)>250){error("Your route starts too far from your location. Tap Use GPS, then replan.");return;}
         new AlertDialog.Builder(this).setTitle("Development navigation").setMessage("This prototype checks a limited set of mapped restrictions. Missing map data can hide restrictions. It has not passed road validation. Use road signs and an approved route plan. Voice requires an installed offline voice.")
-            .setNegativeButton("Cancel",null).setPositiveButton("Start",(d,w)->{Store.guidance="Waiting for GPS";startForegroundService(new Intent(this,NavigationService.class));}).show();
+            .setNegativeButton("Cancel",null).setPositiveButton("Start",(d,w)->{cancelGps();Store.lat=fix.getLatitude();Store.lon=fix.getLongitude();Store.fixTime=SystemClock.elapsedRealtime()-(SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos())/1_000_000;Store.bearing=fix.hasBearing()&&fix.hasSpeed()&&fix.getSpeed()>=1?fix.getBearing():Double.NaN;map.locate(Store.lat,Store.lon);Store.guidance="Waiting for GPS";startForegroundService(new Intent(this,NavigationService.class));previouslyActive=true;}).show();
     }
-    public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==100){if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)startGuidance();else error("Precise location is needed for GPS guidance. Route planning still works offline.");}else if(request==101&&checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)startAtGps();}
+    public void onRequestPermissionsResult(int request,String[] permissions,int[] grants){super.onRequestPermissionsResult(request,permissions,grants);if(request==100){if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)startGuidance();else error("Precise location is needed for GPS guidance. Route planning still works offline.");}else if(request==101){if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)==PackageManager.PERMISSION_GRANTED)startAtGps();else error("Precise location is needed for GPS. You can still choose endpoints manually.");}}
     private void stopGuidance(){simulating=false;stopService(new Intent(this,NavigationService.class));Store.navigating=false;Store.lat=Double.NaN;Store.lon=Double.NaN;Store.bearing=Double.NaN;Store.fixTime=0;refresh();}
     private void simulationTick(){
         Router.Route route=Store.route;if(route==null||simulationEdge>=route.edges.size()){simulating=false;return;}
         Graph.Edge edge=route.edges.get(simulationEdge);simulationFraction+=120/Math.max(1,edge.metres);
         if(simulationFraction>=1){simulationFraction=0;simulationEdge++;if(simulationEdge>=route.edges.size()){simulating=false;Store.arrived=true;Store.guidance="Simulation complete";return;}edge=route.edges.get(simulationEdge);}
         Graph.Node a=route.graph.nodes[edge.from],b=route.graph.nodes[edge.to];Store.lat=a.lat+(b.lat-a.lat)*simulationFraction;Store.lon=a.lon+(b.lon-a.lon)*simulationFraction;Store.bearing=Geo.bearing(a,b);Store.fixTime=SystemClock.elapsedRealtime();
-        Progress.Fix fix=simulatedProgress.update(Store.lat,Store.lon);Store.remaining=fix.remaining;Store.guidance=Math.round(fix.toManeuver)+" m · "+route.instruction(fix.maneuver);
+        Progress.Fix fix=simulatedProgress.update(Store.lat,Store.lon);Store.remaining=fix.remaining;Store.travelled=route.metres-fix.remaining;Store.guidance=Math.round(fix.toManeuver)+" m · "+route.instruction(fix.maneuver);
     }
     private void mapsDialog(){
-        new AlertDialog.Builder(this).setTitle("Offline maps")
-            .setItems(new String[]{"Download Romania","Choose another country","Download all Europe","Pause downloads","Downloaded countries","Import country (.eurorig)","Map download source","Installed map details"},(d,w)->{
+        TextView progress=text(MapDownloadService.status,14,TEXT);progress.setPadding(dp(24),dp(12),dp(24),dp(12));
+        Dialog dialog=new Dialog(this);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);LinearLayout box=vertical();box.setBackgroundColor(BG);box.setPadding(dp(16),dp(12),dp(16),dp(12));TextView title=text("Offline maps",20,TEXT);box.addView(title);progress.setMaxLines(4);box.addView(progress);
+        ListView list=new ListView(this);list.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,new String[]{"Download Romania","Choose another country","Download all Europe","Pause downloads","Downloaded countries","Import country (.eurorig)","Map download source","Installed map details"}));box.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout actions=new LinearLayout(this);actions.addView(button("Download status",()->{dialog.dismiss();error(MapDownloadService.status);}),new LinearLayout.LayoutParams(0,dp(48),1));actions.addView(button("Close",dialog::dismiss),new LinearLayout.LayoutParams(0,dp(48),1));box.addView(actions);dialog.setContentView(box);
+        list.setOnItemClickListener((parent,view,w,id)->{dialog.dismiss();
                 if(w==0)download("romania");
                 else if(w==1)countryCatalogue();
                 else if(w==2)download(null);
-                else if(w==3){if(MapDownloadService.running)startService(new Intent(this,MapDownloadService.class).setAction("PAUSE"));}
+                else if(w==3){if(MapDownloadService.running)startService(new Intent(this,MapDownloadService.class).setAction("PAUSE"));else Toast.makeText(this,"No download is running",Toast.LENGTH_SHORT).show();}
                 else if(w==4)downloadedCountries();
                 else if(w==5){if(canChangeMap())startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE),202);}
                 else if(w==6)mapSource();
                 else{Graph g=Store.graph;if(g==null){error("No maps installed yet.");return;}
                     new AlertDialog.Builder(this).setTitle(g.name).setMessage(g.date+"\n"+g.attribution+"\n\nOffline truck routes, roads and place search. Only the selected country's coverage is active in this development build. Seamless cross-border routing is still being developed.\n\nCheck road signs. Truck-law validation and time-dependent restrictions are unfinished.").setPositiveButton("Close",null).show();}
-            }).setNeutralButton("Download status",(d,w)->error(MapDownloadService.status)).setNegativeButton("Close",null).show();
+        });dialog.show();dialog.getWindow().setLayout(-1,Math.round(getResources().getDisplayMetrics().heightPixels*.8f));
+        Runnable tick=new Runnable(){public void run(){if(dialog.isShowing()){progress.setText(MapDownloadService.status);main.postDelayed(this,1000);}}};main.post(tick);dialog.setOnDismissListener(d->main.removeCallbacks(tick));
     }
     private void download(String country){
         if(MapDownloadService.running){Toast.makeText(this,"A download is already running. Pause it before starting another.",Toast.LENGTH_LONG).show();return;}
@@ -275,6 +329,7 @@ public final class MainActivity extends Activity {
     private void countryCatalogue(){
         String url=getSharedPreferences("maps",0).getString("catalog",BuildConfig.MAP_CATALOG_URL);
         if(url.isEmpty()){error("Romania is the first test country. Other countries appear here as packages are published. Configure a map download source or import a package.");return;}
+        Toast.makeText(this,"Loading available countries…",Toast.LENGTH_SHORT).show();
         Store.mapWorker.execute(()->{try{
             org.json.JSONObject catalogue=new org.json.JSONObject(new String(new org.eurorig.maps.DownloadClient(BuildConfig.DEBUG).catalog(url),StandardCharsets.UTF_8));
             org.json.JSONArray entries=catalogue.getJSONArray("maps");String[] names=new String[entries.length()],ids=new String[entries.length()];
@@ -299,7 +354,7 @@ public final class MainActivity extends Activity {
             if(!canChangeMap()||!Store.beginInstall())return;busy=true;refresh();Store.worker.execute(()->{try(InputStream in=new FileInputStream(files.get(w))){Graph g=RegionPackages.install(this,in);main.post(()->installGraph(g));}catch(Exception|LinkageError e){main.post(()->{busy=false;refresh();error("Country installation: "+e.getMessage());});}finally{Store.installing=false;}});
         }).setNegativeButton("Close",null).show();
     }
-    private void installGraph(Graph g){Store.graph=g;Store.route=null;Store.start=0;Store.end=Math.min(3,g.nodes.length-1);if(Store.nativeRouter!=null)Store.setRegionEndpoints();Store.lat=Double.NaN;Store.lon=Double.NaN;busy=false;if(!isDestroyed()){map.setGraph(g);refresh();}}
+    private void installGraph(Graph g){Store.originChosen=false;Store.destinationChosen=false;Store.graph=g;Store.route=null;Store.start=0;Store.end=Math.min(3,g.nodes.length-1);if(Store.nativeRouter!=null)Store.setRegionEndpoints();Store.lat=Double.NaN;Store.lon=Double.NaN;busy=false;if(!isDestroyed()){map.setGraph(g);refresh();}}
     protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);if(result!=RESULT_OK||data==null||data.getData()==null)return;
         final android.net.Uri uri=data.getData();
@@ -344,17 +399,19 @@ public final class MainActivity extends Activity {
             exporting=r;startActivityForResult(new Intent(Intent.ACTION_CREATE_DOCUMENT).setType("application/gpx+xml").addCategory(Intent.CATEGORY_OPENABLE).putExtra(Intent.EXTRA_TITLE,"EuroRig-route.gpx"),201);
         }).show();
     }
-    private void moreDialog(){new AlertDialog.Builder(this).setTitle("EuroRig").setItems(new String[]{"Change starting point","Start at GPS","Fit map","Favourites",Store.voiceEnabled?"Mute voice":"Enable voice","About and limitations"},(d,i)->{
-        if(i==0)search(true);else if(i==1)startAtGps();else if(i==2)map.fit();else if(i==3)favourites();else if(i==4){
+    private void moreDialog(){new AlertDialog.Builder(this).setTitle("EuroRig").setItems(new String[]{"Change starting point","Start at GPS","Fit map","Favourites",Store.voiceEnabled?"Mute voice":"Enable voice","Appearance","About and limitations"},(d,i)->{
+        if(i==0)search(true);else if(i==1)startAtGps();else if(i==2){if(Store.graph==null)mapsDialog();else map.fit();}else if(i==3)favourites();else if(i==4){
             Store.voiceEnabled=!Store.voiceEnabled;getSharedPreferences("settings",0).edit().putBoolean("voice",Store.voiceEnabled).apply();
             if(!Store.voiceEnabled&&Store.navigating)startService(new Intent(this,NavigationService.class).setAction("MUTE"));
             Toast.makeText(this,Store.voiceEnabled?"Offline voice enabled for the next trip":"Visual guidance only",Toast.LENGTH_SHORT).show();
-        }else about();
+        }else if(i==5)appearanceDialog();else about();
     }).show();}
     private void updateMapControls(){
         boolean active=Store.navigating||simulating,hasMap=Store.graph!=null;
         gpsButton.setEnabled(hasMap&&!busy&&!Store.installing);
         overviewButton.setEnabled(hasMap&&!busy);
+        zoomInButton.setEnabled(hasMap&&!busy);zoomOutButton.setEnabled(hasMap&&!busy);
+        for(Button control:new Button[]{gpsButton,overviewButton,zoomInButton,zoomOutButton})control.setAlpha(control.isEnabled()?1:.45f);
         gpsButton.setText(active?(map.following()?"Following":"Recenter"):"Use GPS");
         gpsButton.setContentDescription(active?"Recenter map and follow GPS position":"Use current GPS location as starting point");
     }
@@ -371,23 +428,28 @@ public final class MainActivity extends Activity {
         LocationManager locations=getSystemService(LocationManager.class);
         if(!locations.isProviderEnabled(LocationManager.GPS_PROVIDER)){error("Enable device location, then tap Use GPS.");return;}
         status.setText(R.string.acquiring_gps);
-        cancelGps();busy=true;refresh();status.setText(R.string.acquiring_gps);
+        cancelGps();busy=true;gpsAcquiring=true;refresh();status.setText(R.string.acquiring_gps);
+        boolean[] acquired={false};
         LocationListener listener=new LocationListener(){
-            public void onLocationChanged(Location l){locations.removeUpdates(this);pendingGps=null;busy=false;
-                if(isDestroyed())return;
+            public void onLocationChanged(Location l){if(isDestroyed())return;
                 long age=SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos();
-                if(!l.hasAccuracy()||l.getAccuracy()>50||age<0||age>10_000_000_000L){error("GPS accuracy is too low. Try again outside.");refresh();return;}
+                if(!l.hasAccuracy()||l.getAccuracy()>50||age<0||age>10_000_000_000L){status.setText(R.string.gps_improving);return;}
+                Store.lat=l.getLatitude();Store.lon=l.getLongitude();Store.fixTime=SystemClock.elapsedRealtime()-age/1_000_000;
+                if(l.hasBearing()&&l.hasSpeed()&&l.getSpeed()>=1)Store.bearing=l.getBearing();
+                if(acquired[0]){map.updatePosition();return;}
+                busy=false;gpsAcquiring=false;
                 int n=Store.coordinate(l.getLatitude(),l.getLongitude());
-                if(n<0){error("Your location is outside routable map coverage.");refresh();return;}
-                Store.start=n;Store.route=null;Store.lat=l.getLatitude();Store.lon=l.getLongitude();Store.fixTime=SystemClock.elapsedRealtime()-age/1_000_000;Store.bearing=Double.NaN;map.locate(Store.lat,Store.lon);refresh();
+                if(n<0){cancelGps();error("Your location is outside routable map coverage.");refresh();return;}
+                acquired[0]=true;
+                Store.start=n;Store.originChosen=true;Store.route=null;saveEndpoints();Store.lat=l.getLatitude();Store.lon=l.getLongitude();Store.fixTime=SystemClock.elapsedRealtime()-age/1_000_000;Store.bearing=Double.NaN;map.locate(Store.lat,Store.lon);refresh();
             }
             public void onProviderEnabled(String p){}public void onProviderDisabled(String p){}public void onStatusChanged(String p,int s,Bundle b){}
         };
         pendingGps=listener;
-        try{locations.requestSingleUpdate(LocationManager.GPS_PROVIDER,listener,Looper.getMainLooper());main.postDelayed(()->{if(pendingGps==listener){cancelGps();if(!isDestroyed()){refresh();error("No GPS fix yet. Try again outside.");}}},20000);}
+        try{locations.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,listener,Looper.getMainLooper());main.postDelayed(()->{if(pendingGps==listener&&!acquired[0]){cancelGps();if(!isDestroyed()){refresh();error("No accurate GPS fix yet. Try again outside.");}}},20000);}
         catch(SecurityException|IllegalArgumentException e){cancelGps();error("GPS unavailable");refresh();}
     }
-    private void cancelGps(){if(pendingGps!=null){getSystemService(LocationManager.class).removeUpdates(pendingGps);pendingGps=null;busy=false;}}
+    private void cancelGps(){if(pendingGps!=null){getSystemService(LocationManager.class).removeUpdates(pendingGps);pendingGps=null;}if(gpsAcquiring)busy=false;gpsAcquiring=false;}
     private void saveFavourite(int n){
         Graph.Node p=Store.graph.nodes[n];String value=p.lat+","+p.lon+"|"+label(n);
         android.content.SharedPreferences prefs=getSharedPreferences("favourites",0);Set<String> set=new HashSet<>(prefs.getStringSet("places",Collections.emptySet()));set.add(value);prefs.edit().putStringSet("places",set).apply();Toast.makeText(this,"Favourite saved on this device",Toast.LENGTH_SHORT).show();
@@ -399,10 +461,10 @@ public final class MainActivity extends Activity {
         String[] labels=new String[items.size()];for(int i=0;i<labels.length;i++)labels[i]=items.get(i).substring(items.get(i).indexOf('|')+1);
         new AlertDialog.Builder(this).setTitle("Local favourites").setItems(labels,(d,i)->{
             String[] coordinates=items.get(i).substring(0,items.get(i).indexOf('|')).split(",");int n=Store.coordinate(Double.parseDouble(coordinates[0]),Double.parseDouble(coordinates[1]));
-            if(n<0)error("Favourite is outside the current routable map.");else{Store.end=n;Store.route=null;refresh();}
+            selectedPoint(n,false);
         }).setNegativeButton("Close",null).show();
     }
-    private void about(){new AlertDialog.Builder(this).setTitle("EuroRig 0.4.0-dev").setMessage("Made by drivers, for drivers. Free, open source, local navigation.\n\nMIT code. OSM maps: © OpenStreetMap contributors, ODbL 1.0. No accounts, subscriptions or analytics. Internet is used to download maps; routes, roads, search and GPS run on the device.\n\nNo maps are bundled. Romania is the first test country. Europe excluding Russia is the coverage target; publication of all country packages and seamless cross-border routing are pending.\n\nThis development build has not passed road validation. Mapped ADR load types and B-E tunnel codes are checked. Country truck laws, conditional restrictions and complete ADR rules need further work. Offline voice needs an installed voice.\n\nAndroid 8+ minimum; Tab S9 checks and Android 8/17 emulator tests are recorded in VERIFICATION.md. Road validation and low-end hardware tests remain necessary.").setNeutralButton("Licences",(d,w)->licences()).setPositiveButton("Close",null).show();}
+    private void about(){new AlertDialog.Builder(this).setTitle("EuroRig "+BuildConfig.VERSION_NAME).setMessage("Made by drivers, for drivers. Free, open source, local navigation.\n\nMIT code. OSM maps: © OpenStreetMap contributors, ODbL 1.0. No accounts, subscriptions or analytics. Internet is used to download maps; routes, roads, search and GPS run on the device.\n\nNo maps are bundled. Romania is the first test country. Europe excluding Russia is the coverage target; publication of all country packages and seamless cross-border routing are pending.\n\nThis development build has not passed road validation. Mapped ADR load types and B-E tunnel codes are checked. Country truck laws, conditional restrictions and complete ADR rules need further work. Offline voice needs an installed voice.\n\nAndroid 8+ minimum; Tab S9 checks and Android 8/17 emulator tests are recorded in VERIFICATION.md. Road validation and low-end hardware tests remain necessary.").setNeutralButton("Licences",(d,w)->licences()).setPositiveButton("Close",null).show();}
     private void licences(){
         try{
             String[] files=getAssets().list("licenses");if(files==null)return;

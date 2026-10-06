@@ -64,5 +64,20 @@ class DisplayTests(unittest.TestCase):
                 self.assertTrue(flags&1);self.assertIn('"hgv":"no"',tags)
                 self.assertIn('"tunnel:category":"C"',db.execute('SELECT tags FROM road_rules WHERE way=20000013').fetchone()[0])
 
+    def test_truck_access_on_minor_paths_survives_package_build(self):
+        try:import osmium
+        except ImportError:self.skipTest('optional osmium build dependency unavailable')
+        with tempfile.TemporaryDirectory() as folder:
+            output=Path(folder)/'display.sqlite';source=Path(folder)/'minor.osm'
+            source.write_text('''<osm version="0.6"><node id="1" lat="45" lon="27"/><node id="2" lat="45.001" lon="27.001"/>
+            <way id="1"><nd ref="1"/><nd ref="2"/><tag k="highway" v="track"/><tag k="hgv" v="yes"/></way>
+            <way id="2"><nd ref="1"/><nd ref="2"/><tag k="highway" v="pedestrian"/><tag k="hgv" v="delivery"/></way>
+            <way id="3"><nd ref="1"/><nd ref="2"/><tag k="highway" v="primary"/></way></osm>''',encoding='utf-8')
+            compile_display([source],output,'QA');enrich([source],output)
+            with closing(sqlite3.connect(output)) as db:
+                self.assertEqual(3,db.execute('SELECT count(*) FROM roads').fetchone()[0])
+                self.assertIn('"hgv":"yes"',db.execute('SELECT tags FROM road_rules WHERE way=1').fetchone()[0])
+                self.assertIn('"hgv":"delivery"',db.execute('SELECT tags FROM road_rules WHERE way=2').fetchone()[0])
+
 
 if __name__=='__main__':unittest.main()

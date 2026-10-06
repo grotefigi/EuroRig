@@ -74,8 +74,8 @@ public final class NavigationService extends Service implements LocationListener
         }
         Store.lat=l.getLatitude();Store.lon=l.getLongitude();Store.speed=l.hasSpeed()?l.getSpeed()*3.6:0;
         lastFix=SystemClock.elapsedRealtime();Store.fixTime=lastFix-age/1_000_000;
-        Store.bearing=l.hasBearing()&&l.hasSpeed()&&l.getSpeed()>=1?l.getBearing():Double.NaN;
-        Progress.Fix fix=progress.update(Store.lat,Store.lon);Store.remaining=fix.remaining;
+        if(l.hasBearing()&&l.hasSpeed()&&l.getSpeed()>=1)Store.bearing=l.getBearing();
+        Progress.Fix fix=progress.update(Store.lat,Store.lon);Store.remaining=fix.remaining;Store.travelled=Store.route.metres-fix.remaining;
         if(fix.arrived){Store.arrived=true;Store.guidance="You have arrived";speak(Store.guidance);stopSelf();return;}
         if(fix.offRoute>70){
             Store.guidance="Off route · checking a new route";
@@ -97,7 +97,7 @@ public final class NavigationService extends Service implements LocationListener
                 if(start<0)throw new IllegalStateException("Outside routable map coverage");
                 Graph.Node target=graph.nodes[destination];
                 Router.Route route=Store.nativeRouter==null?Store.calculate(graph,start,destination,truck):Store.nativeRouter.route(lat,lon,target.lat,target.lon,truck,Store.mode,Store.deliveryAccess);
-                main.post(()->{if(token==generation&&Store.navigating){Store.route=route;Store.start=Store.nativeRouter==null?start:Store.coordinate(lat,lon);progress=new Progress(route);offRouteFixes=0;lastSpoken="";}recalculating=false;});
+                main.post(()->{if(token==generation&&Store.navigating){Store.travelled=0;Store.progressRoute=route;Store.route=route;Store.remaining=route.metres;Store.start=Store.nativeRouter==null?start:Store.coordinate(lat,lon);progress=new Progress(route);offRouteFixes=0;lastSpoken="";}recalculating=false;});
             }catch(RuntimeException e){main.post(()->{if(token==generation&&Store.navigating){Store.guidance="Rerouting unavailable: "+e.getMessage();}recalculating=false;});}
         });
     }

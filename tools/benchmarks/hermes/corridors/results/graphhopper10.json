@@ -1,0 +1,150 @@
+{
+  "base": "http://localhost:8991",
+  "profile": "truck",
+  "corridors": {
+    "galati_nadlac": {
+      "name": "Galati -> Nadlac",
+      "kind": "long motorway haul",
+      "ch": {
+        "km": 795.7,
+        "min": 707.0,
+        "avg_kmh": 67.5,
+        "wall_s": 2.242
+      },
+      "flexible": {
+        "km": 795.7,
+        "min": 707.0,
+        "avg_kmh": 67.5,
+        "wall_s": 5.694
+      }
+    },
+    "galati_bucharest": {
+      "name": "Galati -> Bucharest",
+      "kind": "mixed motorway+national",
+      "ch": {
+        "km": 250.2,
+        "min": 222.3,
+        "avg_kmh": 67.5,
+        "wall_s": 2.069
+      },
+      "flexible": {
+        "km": 250.2,
+        "min": 222.3,
+        "avg_kmh": 67.5,
+        "wall_s": 2.288
+      }
+    },
+    "bucharest_brasov": {
+      "name": "Bucharest -> Brasov",
+      "kind": "mixed, mountain (DN1/A3)",
+      "ch": {
+        "km": 199.3,
+        "min": 192.8,
+        "avg_kmh": 62.0,
+        "wall_s": 2.084
+      },
+      "flexible": {
+        "km": 199.3,
+        "min": 192.8,
+        "avg_kmh": 62.0,
+        "wall_s": 2.294
+      }
+    },
+    "valcea_sibiu": {
+      "name": "Ramnicu Valcea -> Sibiu",
+      "kind": "national road DN7 (Olt valley)",
+      "ch": {
+        "km": 101.9,
+        "min": 113.1,
+        "avg_kmh": 54.1,
+        "wall_s": 2.069
+      },
+      "flexible": {
+        "km": 101.9,
+        "min": 113.1,
+        "avg_kmh": 54.1,
+        "wall_s": 2.137
+      }
+    },
+    "bucharest_otopeni": {
+      "name": "Bucharest centre -> Otopeni airport",
+      "kind": "short urban",
+      "ch": {
+        "km": 20.2,
+        "min": 29.0,
+        "avg_kmh": 41.8,
+        "wall_s": 2.062
+      },
+      "flexible": {
+        "km": 20.2,
+        "min": 29.0,
+        "avg_kmh": 41.8,
+        "wall_s": 2.083
+      }
+    },
+    "cluj_oradea": {
+      "name": "Cluj-Napoca -> Oradea",
+      "kind": "mixed motorway A3 + national",
+      "ch": {
+        "km": 175.6,
+        "min": 184.2,
+        "avg_kmh": 57.2,
+        "wall_s": 2.078
+      },
+      "flexible": {
+        "km": 175.6,
+        "min": 184.2,
+        "avg_kmh": 57.2,
+        "wall_s": 2.182
+      }
+    },
+    "piatra_iasi": {
+      "name": "Piatra Neamt -> Iasi",
+      "kind": "national road ~110 km",
+      "ch": {
+        "km": 126.2,
+        "min": 138.0,
+        "avg_kmh": 54.8,
+        "wall_s": 2.074
+      },
+      "flexible": {
+        "km": 126.2,
+        "min": 138.0,
+        "avg_kmh": 54.8,
+        "wall_s": 2.131
+      }
+    },
+    "galati_szeged": {
+      "name": "Galati -> Szeged",
+      "kind": "cross-border RO->HU",
+      "ch": {
+        "km": 846.8,
+        "min": 744.5,
+        "avg_kmh": 68.2,
+        "wall_s": 2.084
+      },
+      "flexible": {
+        "km": 846.8,
+        "min": 744.5,
+        "avg_kmh": 68.2,
+        "wall_s": 6.213
+      }
+    },
+    "galati_vrsac": {
+      "name": "Galati -> Vrsac",
+      "kind": "cross-border RO->RS",
+      "ch": {
+        "km": 800.1,
+        "min": 729.1,
+        "avg_kmh": 65.8,
+        "wall_s": 2.072
+      },
+      "flexible": {
+        "km": 800.1,
+        "min": 729.1,
+        "avg_kmh": 65.8,
+        "wall_s": 6.062
+      }
+    }
+  }
+}

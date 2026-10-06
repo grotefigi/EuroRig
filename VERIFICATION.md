@@ -1,5 +1,49 @@
 # Verification
 
+## 0.5.0-dev, 2026-10-06
+
+- 37 Java tests and 17 Python tests pass; Android lint reports no issues.
+- Joint Hermes/DeepSeek corpus testing now runs EuroRig's native Android router
+  and restriction audit. API 26 and API 37 each produce 28 routes and 12 expected
+  rejections over ten cases/four modes, with physical ETA and snap checks.
+  22 same-endpoint Shortest comparisons pass; six comparisons are excluded for
+  different endpoint snaps. They remain recorded, not silently accepted.
+  Disabling route hierarchy pruning fixes the observed distance anomaly; passing
+  that search option into edge-walk matching initially caused a native SIGSEGV.
+  Only the audit's copy omits the option, preserving every truck/access check.
+  Audited Shortest Galați–Bucharest improves 244.9284 to 226.3575 km, and
+  Galați–Nădlac 741.0014 to 722.3086 km. See [collaboration](docs/COLLABORATION.md).
+- A redesigned map-first UI, visible-viewport route fit, automatic guidance zoom
+  and look-ahead following are exercised on Android 8/API 26 and Android 17/API 37.
+  Camera checks cover every route geometry point, pan suspension, recenter and
+  preserved following/manual view on rotation.
+- Actual rendered-pixel checks pass on API 26 and API 37 for the original blue
+  direction arrow, stale-position dot, partial-edge route trail removal, amber
+  restricted segments, arrival clearing and new-route reset. GPS progress does
+  not rebuild the cached road bitmap.
+- Dark mode changes both actual map and control colors. Light/dark selection
+  survives restart and switching during guidance preserves the foreground service
+  and following. Physical Tab S9 appearance switching also passes.
+- The 22-control UI sweeps exercise actual Galați routes in all three preferences,
+  search feedback, endpoints/restart, GPX document export, truck form, map metadata,
+  system import picker, zoom, About and portrait/landscape. Additional checks cover
+  profile precision/invalid values, favourites/map picking, delivery permission
+  reset, licences and GPS loss/recovery/stop. See [UI audit](docs/UI_AUDIT.md).
+- Native profile/ADR checks and new Android SQLite filtering fixtures pass on both
+  emulator versions. Pedestrian and track detail is hidden conservatively, while
+  important/local/delivery roads and restriction evidence remain intact.
+- A fresh API 26 install downloaded the actual public 407 MB Romania archive and
+  routed with the network disabled, including after process termination. Romania
+  data is unchanged from 0.4. Full native country routing/search/import tests passed
+  during the 0.5 iteration; focused checks followed the last display changes.
+- Final Tab S9 APK updates preserve user data. The warm four-swipe sample recorded
+  310 frames, 5-ms median, 7-ms 95th percentile and 1.29% missed deadlines.
+  This sample preceded the final dynamic route overlay; it is not a measurement
+  of that final overlay or a low-end device guarantee.
+  Search Cancel is visible above its keyboard. No real drive or physical GPS
+  guidance is claimed; low-end hardware, spoken output and richer map behavior
+  still need validation. Europe coverage and routing limitations below still apply.
+
 ## 0.4.0-dev, 2026-10-06
 
 - 34 Java tests and 14 Python tests pass. Android lint reports no issues.

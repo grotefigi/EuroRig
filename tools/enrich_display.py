@@ -43,7 +43,7 @@ def enrich(sources,destination):
                 tags=dict(way.tags);kind=tags.get('highway')
                 if not kind:return
                 values=summary(tags,kind)
-                if any(values[:5]) or values[5]&(BLOCKED|UNCERTAIN|2):
+                if any(values[:5]) or values[5]&(BLOCKED|UNCERTAIN|2) or kind in ('track','footway','path','pedestrian','cycleway'):
                     db.execute('INSERT OR IGNORE INTO road_rules VALUES(?,?,?,?,?,?,?,?)',(way.id,*values))
             def node(self,node):
                 tags=dict(node.tags)

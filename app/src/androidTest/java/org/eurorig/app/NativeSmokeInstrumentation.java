@@ -13,11 +13,15 @@ import java.util.zip.*;
 public final class NativeSmokeInstrumentation extends Instrumentation {
     private String packagePath;
     private boolean profilesOnly;
-    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));start();}
+    private boolean cameraOnly;
+    private boolean corridorsOnly;
+    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));cameraOnly="true".equals(arguments.getString("cameraOnly"));corridorsOnly="true".equals(arguments.getString("corridorsOnly"));start();}
     public void onStart(){
         Bundle result=new Bundle();
         try{
-            if(profilesOnly){ProfileRoutingChecks.run(getTargetContext(),getContext());result.putString("stream","PASS: native profile and ADR display checks\n");finish(-1,result);return;}
+            if(corridorsOnly){CorridorChecks.run(getTargetContext());result.putString("stream","PASS: native corridor measurements written; inspect individual outcomes\n");finish(-1,result);return;}
+            if(profilesOnly){TruckMapChecks.run(getTargetContext(),getContext());ProfileRoutingChecks.run(getTargetContext(),getContext());result.putString("stream","PASS: native profile, ADR display and truck map retention checks\n");finish(-1,result);return;}
+            if(cameraOnly){Store.load(getTargetContext());Router.Route route=Store.calculate(Store.graph,Store.start,Store.end,Store.truck);checkCamera(route);result.putString("stream","PASS: actual map viewport, navigation zoom, every route fix follows, pan/rotation, route trail removal and heading arrow pixels\n");finish(-1,result);return;}
             require(!Arrays.asList(getTargetContext().getAssets().list("")).contains("andorra-routing.tar"),"No bundled maps");
             Store.load(getTargetContext());require(Store.graph==null,"First launch has no map");
             Graph display;
@@ -33,11 +37,17 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
                 Graph visible=Store.display.visible(44.41,26.08,44.45,26.12,70000);
                 require(visible.edges.length>100&&visible.nodes.length<40050,"Indexed roads with bounded memory");
                 require(Store.display.visible(0,0,.01,.01,70000).edges.length==0,"Empty viewport outside Romania");
+                Graph overview=Store.display.visible(44.3,25.7,45.7,28.3,1600);
+                boolean northRoad=false;
+                for(Graph.Edge edge:overview.edges)if(overview.nodes[edge.from].lat>45.2){northRoad=true;break;}
+                require(northRoad,"Long route overview includes roads towards Galati, beyond southern motorways");
+                require(Store.coordinate(0,0)<0,"Endpoint picker rejects coordinates outside installed country");
             }
             Router.Route route=Store.nativeRouter.route(a,b,c,d,Truck.standard(),Store.mode,false);
             require(route.nativeGeometry()&&route.metres>500&&route.metres<100000,"Real truck geometry");
             require(route.seconds>0&&route.instruction(0).length()>5,"ETA and maneuvers");
             require(route.graph.nodes.length>8,"Detailed shape");
+            checkCamera(route);
             Progress progress=new Progress(route);int point=Math.min(25,route.graph.nodes.length-2);
             for(int i=0;i<=point;i++){Graph.Node fix=route.graph.nodes[i];require(progress.update(fix.lat,fix.lon).offRoute<5,"Sequential native GPS matching");}
             boolean failed=false;try{Store.nativeRouter.route(0,0,c,d,Truck.standard());}catch(IllegalStateException expected){failed=true;}
@@ -58,10 +68,16 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
                 Graph.Node n=route.graph.nodes[i];fixes.append(n.lat).append(',').append(n.lon).append('\n');
             }
             Files.write(new File(getTargetContext().getFilesDir(),"native-test-fixes.txt").toPath(),fixes.toString().getBytes(StandardCharsets.UTF_8));
-            ProfileRoutingChecks.run(getTargetContext(),getContext());
-            result.putString("stream","PASS: profile modes/dimensions/weight/axles/ADR/delivery checks; empty install, offline truck route, ETA, maneuvers, dense GPS, coverage rejection, transactional import, country index/search\n");
+            TruckMapChecks.run(getTargetContext(),getContext());ProfileRoutingChecks.run(getTargetContext(),getContext());
+            Store.originChosen=true;Store.destinationChosen=true;Store.saveEndpoints(getTargetContext());
+            require(getTargetContext().getSharedPreferences("endpoints",0).edit().putBoolean("origin_chosen",true).putBoolean("destination_chosen",true).commit(),"Fixture endpoints persisted before instrumentation exits");
+            result.putString("stream","PASS: profile modes/dimensions/weight/axles/ADR/delivery checks; empty install, offline truck route, ETA, maneuvers, map camera zoom/follow/rotation, dense GPS, coverage rejection, transactional import, country index/search\n");
             result.putDouble("route_metres",route.metres);result.putInt("shape_points",route.graph.nodes.length);finish(-1,result);
         }catch(Throwable e){result.putString("stream","FAIL: "+android.util.Log.getStackTraceString(e));finish(1,result);}
+    }
+    private void checkCamera(Router.Route route)throws Throwable{
+        Throwable[] failure={null};runOnMainSync(()->{try{CameraChecks.run(getTargetContext(),route);RouteDisplayChecks.run(getTargetContext());}catch(Throwable e){failure[0]=e;}});
+        if(failure[0]!=null)throw failure[0];
     }
     private static void require(boolean value,String message){if(!value)throw new AssertionError(message);}
     private byte[] packageBytes(boolean corrupt)throws IOException{

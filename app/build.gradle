@@ -7,8 +7,8 @@ android {
         applicationId 'org.eurorig.app'
         minSdk 26
         targetSdk 37
-        versionCode 4
-        versionName '0.4.0-dev'
+        versionCode 5
+        versionName '0.5.0-dev'
         buildConfigField 'String', 'MAP_CATALOG_URL', groovy.json.JsonOutput.toJson(providers.gradleProperty('mapCatalogUrl').getOrElse('https://raw.githubusercontent.com/grotefigi/EuroRig/main/maps/catalog.json'))
         testInstrumentationRunner 'org.eurorig.app.NativeSmokeInstrumentation'
     }

@@ -1,0 +1,191 @@
+{
+  "dir": "C:/AI/EuroRig/packs",
+  "label": "gen3current",
+  "corridors": {
+    "galati_nadlac": {
+      "km": 758.1,
+      "min": 700.4,
+      "avg_kmh": 64.9,
+      "path_nodes": 16592,
+      "path_edges": 16591,
+      "settled": 6196788,
+      "class_km": {
+        "motorway": 87.9,
+        "trunk": 16.5,
+        "primary": 268.2,
+        "secondary": 272.4,
+        "tertiary": 101.9,
+        "unclassified": 8.7,
+        "residential": 2.5
+      },
+      "class_min": {
+        "motorway": 3971.2,
+        "trunk": 1017.4,
+        "primary": 13452.6,
+        "secondary": 12554.1,
+        "tertiary": 4387.7,
+        "unclassified": 816.7,
+        "residential": 454.4
+      },
+      "wall_s": 10.1
+    },
+    "galati_bucharest": {
+      "km": 232.6,
+      "min": 217.1,
+      "avg_kmh": 64.3,
+      "path_nodes": 3146,
+      "path_edges": 3145,
+      "settled": 1478729,
+      "class_km": {
+        "trunk": 37.6,
+        "primary": 65.7,
+        "secondary": 126.8,
+        "tertiary": 2.6
+      },
+      "class_min": {
+        "trunk": 2076.2,
+        "primary": 3388.1,
+        "secondary": 5764.8,
+        "tertiary": 125.8
+      },
+      "wall_s": 3.5
+    },
+    "bucharest_brasov": {
+      "km": 186.5,
+      "min": 162.9,
+      "avg_kmh": 68.7,
+      "path_nodes": 5356,
+      "path_edges": 5355,
+      "settled": 1632236,
+      "class_km": {
+        "trunk": 162.9,
+        "primary": 13.9,
+        "secondary": 5.3,
+        "tertiary": 3.9,
+        "residential": 0.5
+      },
+      "class_min": {
+        "trunk": 8252.5,
+        "primary": 853.4,
+        "secondary": 235.9,
+        "tertiary": 200.1,
+        "residential": 65.6
+      },
+      "wall_s": 3.0
+    },
+    "valcea_sibiu": {
+      "km": 105.7,
+      "min": 110.2,
+      "avg_kmh": 57.6,
+      "path_nodes": 4220,
+      "path_edges": 4219,
+      "settled": 590482,
+      "class_km": {
+        "motorway": 21.0,
+        "trunk": 22.3,
+        "primary": 1.7,
+        "secondary": 34.1,
+        "tertiary": 26.4,
+        "residential": 0.2,
+        "service": 0.0
+      },
+      "class_min": {
+        "motorway": 1006.9,
+        "trunk": 1367.2,
+        "primary": 111.3,
+        "secondary": 1821.3,
+        "tertiary": 1273.1,
+        "residential": 32.2,
+        "service": 8.7
+      },
+      "wall_s": 1.1
+    },
+    "bucharest_otopeni": {
+      "km": null,
+      "min": null,
+      "error": "no route"
+    },
+    "cluj_oradea": {
+      "km": 162.2,
+      "min": 140.1,
+      "avg_kmh": 69.5,
+      "path_nodes": 4731,
+      "path_edges": 4730,
+      "settled": 1185244,
+      "class_km": {
+        "trunk": 97.0,
+        "primary": 13.2,
+        "secondary": 31.7,
+        "tertiary": 19.4,
+        "residential": 0.9,
+        "living_street": 0.1,
+        "service": 0.1
+      },
+      "class_min": {
+        "trunk": 4767.7,
+        "primary": 607.6,
+        "secondary": 1344.8,
+        "tertiary": 831.5,
+        "residential": 153.4,
+        "living_street": 48.8,
+        "service": 24.4
+      },
+      "wall_s": 4.0
+    },
+    "piatra_iasi": {
+      "km": 133.1,
+      "min": 125.8,
+      "avg_kmh": 63.5,
+      "path_nodes": 2682,
+      "path_edges": 2681,
+      "settled": 668835,
+      "class_km": {
+        "trunk": 16.0,
+        "primary": 7.3,
+        "secondary": 99.5,
+        "tertiary": 10.3,
+        "service": 0.0
+      },
+      "class_min": {
+        "trunk": 855.6,
+        "primary": 380.3,
+        "secondary": 4477.0,
+        "tertiary": 486.1,
+        "service": 3.5
+      },
+      "wall_s": 2.7
+    },
+    "galati_szeged": {
+      "km": 809.3,
+      "min": 738.1,
+      "avg_kmh": 65.8,
+      "path_nodes": 17006,
+      "settled": 6618791,
+      "crossings": [
+        {
+          "from": "romania",
+          "to": "hungary",
+          "lat": 46.21035,
+          "lon": 20.79605
+        }
+      ],
+      "wall_s": 24.1
+    },
+    "galati_vrsac": {
+      "km": 763.9,
+      "min": 700.1,
+      "avg_kmh": 65.5,
+      "path_nodes": 16702,
+      "settled": 7616851,
+      "crossings": [
+        {
+          "from": "romania",
+          "to": "serbia",
+          "lat": 45.25014,
+          "lon": 21.26528
+        }
+      ],
+      "wall_s": 20.6
+    }
+  }
+}

@@ -2,17 +2,17 @@
 
 Free, open-source truck navigation, made by drivers for drivers.
 
-**0.4.0-dev: Romania is the first country for device testing.** The app installs
+**0.5.0-dev: Romania is the first country for device testing.** The app installs
 with no maps. Download a country once; roads, search, truck routing and GPS then
 run locally. Coverage target: Europe excluding Russia.
 
 [Repository](https://github.com/grotefigi/EuroRig) ·
-[Development APK](https://github.com/grotefigi/EuroRig/releases/tag/v0.4.0-dev) ·
+[Development APK](https://github.com/grotefigi/EuroRig/releases/tag/v0.5.0-dev) ·
 [Country maps and OSM source](https://github.com/grotefigi/EuroRig/releases/tag/maps-current)
 
 ## Install and try Romania
 
-1. Install `EuroRig-0.4.0-dev.apk`. This is a debug APK for testing; EuroRig is
+1. Install `EuroRig-0.5.0-dev.apk`. This is a debug APK for testing; EuroRig is
    not published on the Play Store yet.
 2. Open **Maps → Download Romania**. The public GitHub catalogue needs no
    account. Download size is about 407 MB; reserve at least 2 GB of free space.
@@ -21,7 +21,8 @@ run locally. Coverage target: Europe excluding Russia.
    Choose endpoints with offline search, coordinates or a map tap. Plan a route.
 4. For GPS testing enable precise location, choose **More → Start at GPS**,
    select a destination and replan. Guidance needs a fresh fix within 250 metres
-   of the planned origin. Default endpoints are a test north of Bucharest.
+   of the planned origin. Choose both endpoints explicitly; the app does not
+   start with a hidden sample trip. Selected endpoints survive restarting.
 5. Repeat planning/search/guidance in airplane mode after installing the map.
    Spoken guidance needs an installed offline TTS voice. **More → Mute voice**
    provides visual guidance when a voice is unavailable.
@@ -31,6 +32,11 @@ Romania package includes routing, display and search; no other country is needed
 OSM snapshot: 2026-10-04T20:20:21Z. It has 636 routing tiles, 1,057,239 roads and
 1,747,703 places. Installed data uses about 871 MB plus the saved 407 MB archive.
 Updates temporarily need more space.
+
+**More → Appearance → Dark mode** switches both the map and controls immediately.
+The choice survives restarting. Changing appearance during guidance preserves
+the route, foreground service and camera. Portrait uses map overlays; landscape
+uses a scrollable sidebar. Search stays above the keyboard.
 
 ## Truck profiles, routing and restricted deliveries
 
@@ -62,8 +68,18 @@ is invented from a screenshot. Verified municipal rules and driver reports need
 an independent, source-backed update pipeline.
 
 GPS controls include **Use GPS**, **Overview**, zoom and guidance **Recenter**.
-Dragging pauses following. Recenter resumes it; stale positions and speeds are
-marked unavailable. The map remains north-up; heading arrows use moving GPS fixes.
+Starting guidance zooms to the driver arrow in the lower part of the usable map
+and follows fresh positions. Dragging pauses following. Recenter resumes it; stale positions and speeds are
+marked unavailable. The map remains north-up; an original blue direction arrow
+uses moving GPS fixes. Route color disappears behind matched progress, including
+partial edges; arrival clears it and a new route begins with a full trail.
+
+Truck map detail hides ordinary pedestrian/cycle paths and minor tracks without
+explicit vehicle access evidence. Tagged truck or delivery approaches remain
+visible. Main roads, residential streets and industrial service roads remain,
+including their restriction markings. Small road classification or missing width
+alone cannot establish whether a truck fits. This is a display filter: source
+geometry and restriction evidence remain on disk and routes are still audited.
 
 ## Country downloads
 
@@ -95,6 +111,9 @@ weights, hazmat and toll/ferry/unpaved exclusions. It has no car-route fallback.
 SQLite roads and FTS4 search stay on disk; bounded queries render a viewport.
 GPS uses a foreground service and offline device voice. Favourites, profiles and
 GPX export are local. Failed transactional imports retain the active map.
+
+See [UI audit](docs/UI_AUDIT.md) for exercised controls and remaining gaps, and
+[driver feature priorities](docs/DRIVER_FEATURES.md) for the expanded roadmap.
 
 Use JDK 21, SDK platform 37.0/build-tools 36.0.0, Gradle 9.6.0 and AGP 9.4.0.
 Configure private `local.properties` with `sdk.dir`.

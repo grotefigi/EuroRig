@@ -24,7 +24,8 @@ final class NativeRouter implements AutoCloseable {
             mj.put("tile_extract",tiles.getAbsolutePath());
             mj.put("tile_dir",new File(tiles.getParentFile(),"empty-tiles").getAbsolutePath());
             mj.put("max_cache_size",32*1024*1024);
-            config.getJSONObject("service_limits").put("allow_hard_exclusions",true);
+            config.getJSONObject("service_limits").put("allow_hard_exclusions",true)
+                .put("max_distance_disable_hierarchy_culling",5_000_000);
             config.getJSONObject("service_limits").getJSONObject("trace").put("max_distance",5_000_000).put("max_shape",500000);
             File file=new File(tiles.getParentFile(),"device-config.json");
             Files.write(file.toPath(),config.toString().getBytes(StandardCharsets.UTF_8));
@@ -42,7 +43,7 @@ final class NativeRouter implements AutoCloseable {
             .put("weight",t.weight).put("axle_load",t.axleWeight).put("hazmat",t.hazmat).put("axle_count",t.axles).put("top_speed",t.topSpeed)
             .put("exclude_tolls",t.avoidTolls).put("exclude_ferries",t.avoidFerries).put("exclude_unpaved",t.avoidUnpaved)
             .put("ignore_restrictions",false).put("ignore_access",false).put("ignore_oneways",false);
-        if(mode==RoutingMode.SHORTEST||delivery)truck.put("shortest",true).put("maneuver_penalty",0).put("low_class_penalty",0);
+        if(mode==RoutingMode.SHORTEST||delivery)truck.put("shortest",true).put("disable_hierarchy_pruning",true).put("maneuver_penalty",0).put("low_class_penalty",0);
         else if(mode==RoutingMode.EASIEST)truck.put("maneuver_penalty",2000).put("low_class_penalty",500).put("use_highways",.7);
         else if(mode==RoutingMode.ECONOMICAL)truck.put("use_highways",1).put("low_class_penalty",30000).put("low_class_factor",30).put("service_penalty",30000).put("use_truck_route",1);
         if(delivery)truck.put("hgv_no_access_penalty",30000);
@@ -65,8 +66,12 @@ final class NativeRouter implements AutoCloseable {
                 if(display==null||!display.restrictionEvidence)break;
                 JSONObject leg=response.getJSONObject("trip").getJSONArray("legs").getJSONObject(0);
                 String shape=leg.getString("shape");List<Graph.Node> geometry=decode(shape);
+                JSONObject traceCosting=new JSONObject(query.getJSONObject("costing_options").toString());
+                // Mobile 0.6.3's edge-walk matcher crashes with this route-search option.
+                // Keep physical/access costing intact while using the matcher's default pruning.
+                traceCosting.getJSONObject("truck").remove("disable_hierarchy_pruning");
                 JSONObject trace=new JSONObject().put("encoded_polyline",shape).put("shape_match","edge_walk").put("costing","truck")
-                    .put("costing_options",query.getJSONObject("costing_options"))
+                    .put("costing_options",traceCosting)
                     .put("filters",new JSONObject().put("action","include").put("attributes",new JSONArray().put("edge.way_id").put("edge.begin_shape_index").put("edge.end_shape_index").put("edge.length")));
                 JSONArray traced=new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
                 HashSet<Long> ways=new HashSet<>();for(int i=0;i<traced.length();i++)ways.add(traced.getJSONObject(i).getLong("way_id"));
@@ -114,7 +119,11 @@ final class NativeRouter implements AutoCloseable {
             double seconds=leg.getJSONObject("summary").getDouble("time");
             return new Router.Route(graph,Arrays.asList(edges),instructions,seconds,restrictedMetres);
         }catch(JSONException e){throw new IllegalStateException("Invalid response from offline routing engine",e);}
-        catch(Exception e){throw new IllegalStateException("Offline truck routing: "+e.getMessage(),e);}
+        catch(Exception e){
+            if(e instanceof com.valhalla.valhalla.ValhallaException.Internal&&e.getMessage()!=null&&e.getMessage().contains("code=171,"))
+                throw new IllegalStateException("No usable truck road within 250 m of a selected point in the installed map. Choose a mapped road or the signed truck entrance, and check country coverage.",e);
+            throw new IllegalStateException("Offline truck routing: "+e.getMessage(),e);
+        }
     }
     static List<Graph.Node> decode(String shape) {
         ArrayList<Graph.Node> nodes=new ArrayList<>();long lat=0,lon=0;int[] offset={0};

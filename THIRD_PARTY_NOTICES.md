@@ -28,6 +28,9 @@ licence texts in `app/src/main/assets/licenses`.
   they are not Android runtime dependencies.
 - REA (MIT) is used as a private research tool, not linked into the APK.
 - No Eurowag, RoadLords or Sygic assets or implementations are redistributed.
+- Selected Hermes / EuroAxel benchmark code is MIT (EuroAxel contributors);
+  see `tools/benchmarks/hermes/LICENSE`. Historical corridor data is ODbL 1.0,
+  © OpenStreetMap contributors. This host/test code is not in the APK.
 
 A production release still needs a full dependency/provenance audit and
 reproducible native builds. This development APK uses upstream's published AAR.

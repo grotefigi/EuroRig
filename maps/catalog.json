@@ -10,7 +10,10 @@
       "url": "https://github.com/grotefigi/EuroRig/releases/download/maps-current/Romania-2026-10-04-v2.eurorig",
       "bytes": 407495153,
       "sha256": "889538da880f16f2962dcdd3b1cdb3f6cc725e1692ee2d8614613648c8744bff",
-      "osm_timestamp": "2026-10-04T20:20:21Z"
+      "osm_timestamp": "2026-10-04T20:20:21Z",
+      "source_sha256": "5af1bc2e85cfd6df516173207dd5302dde8b92ea05e59a3beaab27893c605bf1",
+      "source_bytes": 329689991,
+      "source_license": "ODbL-1.0"
     }
   ]
 }

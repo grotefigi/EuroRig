@@ -49,12 +49,13 @@ final class DisplayDatabase implements AutoCloseable {
         String[] tokens=Graph.normalize(text).trim().split("[^\\p{L}\\p{N}]+");StringBuilder expression=new StringBuilder();
         for(String token:tokens){if(token.isEmpty())continue;if(expression.length()>0)expression.append(' ');expression.append(token).append('*');}
         ArrayList<Graph.Node> points=new ArrayList<>();if(expression.length()==0)return points;
-        try(Cursor c=database.rawQuery("SELECT p.label,p.lat,p.lon FROM search s JOIN places p ON p.id=s.rowid WHERE s.text MATCH ? LIMIT 30",new String[]{expression.toString()})){
+        try(Cursor c=database.rawQuery("SELECT p.label,p.lat,p.lon FROM search s JOIN places p ON p.id=s.rowid WHERE s.text MATCH ? ORDER BY CASE p.kind WHEN 'city' THEN 0 WHEN 'town' THEN 1 WHEN 'village' THEN 2 ELSE 3 END, length(p.label) LIMIT 30",new String[]{expression.toString()})){
             while(c.moveToNext())points.add(new Graph.Node(c.getDouble(1),c.getDouble(2),c.getString(0)));
         }return points;
     }
-    static int level(double pixels){return pixels<3500?1:pixels<6500?2:pixels<10000?3:pixels<18000?5:6;}
+    static int level(double pixels){return pixels<6500?2:pixels<10000?3:pixels<18000?5:6;}
     synchronized Graph visible(double south,double west,double north,double east,double pixels){
+        Truck truck=Store.truck;
         int level=level(pixels);
         int a=(int)Math.floor(south/.02),b=(int)Math.floor(west/.02),c=(int)Math.floor(north/.02),d=(int)Math.floor(east/.02);
         String selection="";ArrayList<String> args=new ArrayList<>();
@@ -76,8 +77,13 @@ final class DisplayDatabase implements AutoCloseable {
         ArrayList<Graph.Node> nodes=new ArrayList<>();ArrayList<Graph.Edge> edges=new ArrayList<>();
         String ruleColumns=restrictionEvidence?",coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0),coalesce(q.tags,'{}')":"";
         String tables=restrictionEvidence?"roads r LEFT JOIN road_rules q ON q.way=r.id":"roads r";
-        try(Cursor rows=database.rawQuery("SELECT r.id,r.name,r.kind,r.shape"+ruleColumns+" FROM "+tables+" WHERE "+selection+"r.level<=? AND r.north>=? AND r.south<=? AND r.east>=? AND r.west<=? ORDER BY r.level LIMIT 6000",args.toArray(new String[0]))){
+        // Major connecting roads remain visible in route overviews within a bounded memory budget.
+        try(Cursor rows=database.rawQuery("SELECT r.id,r.name,r.kind,r.shape"+ruleColumns+" FROM "+tables+" WHERE "+selection+"r.level<=? AND r.north>=? AND r.south<=? AND r.east>=? AND r.west<=? ORDER BY r.level LIMIT 20000",args.toArray(new String[0]))){
             while(rows.moveToNext()){
+                Map<String,String> tags=restrictionEvidence?parseTags(rows.getString(10)):Collections.emptyMap();
+                // Older enriched packages omitted rules for explicitly HGV-allowed paths.
+                boolean legacyTruckAccess=restrictionEvidence&&(rows.getInt(9)&Graph.BLOCKED)==0;
+                if(!TruckMap.visible(rows.getString(2),tags)&&!legacyTruckAccess)continue;
                 List<Graph.Node> decoded=NativeRouter.decode(rows.getString(3));
                 ArrayList<Graph.Node> shape=new ArrayList<>();Graph.Node previous=decoded.get(0);shape.add(previous);
                 double scale=Math.cos(Math.toRadians((south+north)/2));
@@ -86,7 +92,7 @@ final class DisplayDatabase implements AutoCloseable {
                 int start=nodes.size();String label=rows.getString(1);int middle=shape.size()/2;
                 for(int i=0;i<shape.size();i++){Graph.Node point=shape.get(i);nodes.add(new Graph.Node(point.lat,point.lon,i==middle?label:""));}
                 double height=restrictionEvidence?rows.getDouble(4):0,width=restrictionEvidence?rows.getDouble(5):0,length=restrictionEvidence?rows.getDouble(6):0,weight=restrictionEvidence?rows.getDouble(7):0,axle=restrictionEvidence?rows.getDouble(8):0;int flags=restrictionEvidence?rows.getInt(9):0;
-                if((flags&Graph.HAZMAT)!=0&&new RestrictionRule(height,width,length,weight,axle,flags,parseTags(rows.getString(10))).hazardViolation(Store.truck)==null)flags&=~Graph.HAZMAT;
+                if((flags&Graph.HAZMAT)!=0&&new RestrictionRule(height,width,length,weight,axle,flags,tags).hazardViolation(truck)==null)flags&=~Graph.HAZMAT;
                 for(int i=0;i<shape.size()-1;i++)edges.add(new Graph.Edge(start+i,start+i+1,rows.getLong(0),label,rows.getString(2),height,width,length,weight,axle,flags,50));
             }
         }
