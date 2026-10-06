@@ -12,8 +12,10 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
-      - name: Install Android build components
-        run: sdkmanager "platforms;android-37.0" "build-tools;36.0.0"
+      - name: Verify preinstalled Android build components
+        run: |
+          test -f "$ANDROID_HOME/platforms/android-37.0/android.jar"
+          test -f "$ANDROID_HOME/build-tools/36.0.0/aapt2"
       - name: Configure local SDK
         run: printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
       - name: Install display compiler test dependency
