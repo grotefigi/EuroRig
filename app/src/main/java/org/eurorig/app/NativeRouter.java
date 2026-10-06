@@ -13,6 +13,8 @@ import java.util.*;
 final class NativeRouter implements AutoCloseable {
     private final Valhalla engine;
     NativeRouter(Context context,File tiles) throws IOException {
+        try{RegionPackages.validateTar(tiles);}
+        catch(IOException e){throw new IOException("Installed routing map is missing or damaged. Download or import the country map again.",e);}
         if(!android.os.Process.is64Bit()&&tiles.length()>1_500_000_000L)throw new IOException("Use a routing extract below 1.5 GB on a 32-bit device");
         try(InputStream in=context.getAssets().open("valhalla-default.json")) {
             ByteArrayOutputStream bytes=new ByteArrayOutputStream();byte[] buffer=new byte[8192];int n;
@@ -66,20 +68,15 @@ final class NativeRouter implements AutoCloseable {
                 if(display==null||!display.restrictionEvidence)break;
                 JSONObject leg=response.getJSONObject("trip").getJSONArray("legs").getJSONObject(0);
                 String shape=leg.getString("shape");List<Graph.Node> geometry=decode(shape);
-                JSONObject traceCosting=new JSONObject(query.getJSONObject("costing_options").toString());
-                // Mobile 0.6.3's edge-walk matcher crashes with this route-search option.
-                // Keep physical/access costing intact while using the matcher's default pruning.
-                traceCosting.getJSONObject("truck").remove("disable_hierarchy_pruning");
                 JSONObject trace=new JSONObject().put("encoded_polyline",shape).put("shape_match","edge_walk").put("costing","truck")
-                    .put("costing_options",traceCosting)
+                    .put("costing_options",traceCosting(query))
                     .put("filters",new JSONObject().put("action","include").put("attributes",new JSONArray().put("edge.way_id").put("edge.begin_shape_index").put("edge.end_shape_index").put("edge.length")));
                 JSONArray traced=new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
                 HashSet<Long> ways=new HashSet<>();for(int i=0;i<traced.length();i++)ways.add(traced.getJSONObject(i).getLong("way_id"));
-                Map<Long,RestrictionRule> rules=display.rulesFor(ways);auditedRules=rules;auditedWays=new long[geometry.size()-1];boolean rejected=false;restrictedMetres=0;boolean originEgress=true;
+                Map<Long,RestrictionRule> rules=display.rulesFor(ways);auditedRules=rules;auditedWays=auditedWays(traced,geometry.size());boolean rejected=false;restrictedMetres=0;boolean originEgress=true;
                 for(int i=0;i<traced.length();i++){
                     JSONObject edge=traced.getJSONObject(i);int begin=edge.getInt("begin_shape_index"),end=edge.getInt("end_shape_index");
-                    if(begin<0||end<begin||end>=geometry.size())throw new IllegalStateException("Invalid audited route geometry");
-                    long way=edge.getLong("way_id");for(int index=begin;index<end;index++)auditedWays[index]=way;
+                    long way=edge.getLong("way_id");
                     int middle=(begin+end)/2;Graph.Node a=geometry.get(middle),b=geometry.get(Math.min(end,middle+1));
                     // Exclude inside the failed edge, not its junction shared by a valid detour.
                     Graph.Node point=new Graph.Node((a.lat+b.lat)/2,(a.lon+b.lon)/2,"");RestrictionRule rule=rules.get(way);
@@ -124,6 +121,27 @@ final class NativeRouter implements AutoCloseable {
                 throw new IllegalStateException("No usable truck road within 250 m of a selected point in the installed map. Choose a mapped road or the signed truck entrance, and check country coverage.",e);
             throw new IllegalStateException("Offline truck routing: "+e.getMessage(),e);
         }
+    }
+    static JSONObject traceCosting(JSONObject query)throws JSONException{
+        JSONObject costing=new JSONObject(query.getJSONObject("costing_options").toString());
+        // Mobile 0.6.3's edge-walk matcher crashes with this route-search option.
+        // Keep physical/access costing intact while using the matcher's default pruning.
+        costing.getJSONObject("truck").remove("disable_hierarchy_pruning");
+        return costing;
+    }
+    static long[] auditedWays(JSONArray traced,int points)throws JSONException{
+        if(points<2)throw new IllegalStateException("Route contains no audited geometry");
+        long[] ways=new long[points-1];
+        for(int i=0;i<traced.length();i++){
+            JSONObject edge=traced.getJSONObject(i);int begin=edge.getInt("begin_shape_index"),end=edge.getInt("end_shape_index");long way=edge.getLong("way_id");
+            if(begin<0||end<begin||end>=points||way<=0)throw new IllegalStateException("Invalid audited route geometry");
+            for(int index=begin;index<end;index++){
+                if(ways[index]!=0&&ways[index]!=way)throw new IllegalStateException("Conflicting audited route geometry");
+                ways[index]=way;
+            }
+        }
+        for(long way:ways)if(way==0)throw new IllegalStateException("Restriction audit did not cover the whole route. No verified truck route is available.");
+        return ways;
     }
     static List<Graph.Node> decode(String shape) {
         ArrayList<Graph.Node> nodes=new ArrayList<>();long lat=0,lon=0;int[] offset={0};

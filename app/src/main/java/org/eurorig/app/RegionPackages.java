@@ -61,7 +61,6 @@ final class RegionPackages {
                 String expected=manifest.getJSONObject("sha256").getString(name);
                 if(!digest(new File(dir,name)).equalsIgnoreCase(expected))throw new IOException("Region checksum mismatch: "+name);
             }
-            validateTar(new File(dir,"routing.tar"));
             Graph graph;
             if(format==2){candidateDisplay=new DisplayDatabase(new File(dir,displayFile));graph=candidateDisplay.endpoints;}
             else try(InputStream in=new FileInputStream(new File(dir,displayFile))){graph=Graph.read(in);}
@@ -76,7 +75,7 @@ final class RegionPackages {
         }catch(JSONException|NoSuchAlgorithmException e){throw new IOException("Invalid region manifest",e);}
         finally {if(candidate!=null)candidate.close();if(candidateDisplay!=null)candidateDisplay.close();}
     }
-    private static void validateTar(File file)throws IOException{
+    static void validateTar(File file)throws IOException{
         try(RandomAccessFile tar=new RandomAccessFile(file,"r")){
             byte[] header=new byte[512];int tiles=0,entries=0;boolean terminated=false;
             while(tar.getFilePointer()+512<=tar.length()){

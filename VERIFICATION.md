@@ -3,6 +3,12 @@
 ## 0.5.0-dev, 2026-10-06
 
 - 37 Java tests and 17 Python tests pass; Android lint reports no issues.
+- Follow-up peer-review checks require complete route-segment audit coverage;
+  deliberately truncated, missing-ID, invalid-range and conflicting traces are
+  rejected. Complete shared-junction/zero-length-edge traces pass. The trace copy
+  preserves every costing option except the native crash trigger. Missing and
+  empty routing archives are rejected before native initialization. API 26 and
+  API 37 profile instrumentation and the 40-outcome corpus pass these changes.
 - Joint Hermes/DeepSeek corpus testing now runs EuroRig's native Android router
   and restriction audit. API 26 and API 37 each produce 28 routes and 12 expected
   rejections over ten cases/four modes, with physical ETA and snap checks.

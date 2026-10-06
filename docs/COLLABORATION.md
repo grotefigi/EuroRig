@@ -34,6 +34,25 @@ fixture succeeds and is not labelled a verified truck delivery entrance.
 The app now explains the cutoff and asks for a mapped road/signed truck entrance.
 Published PBF hash metadata was added to the catalogue.
 
+Peer review exposed a missing audit-coverage invariant. The adapter now requires
+a positive OSM way ID for every route segment and rejects missing, conflicting
+or invalid trace ranges before applying restrictions. Shared junctions and
+zero-length edges are allowed without excusing uncovered segments. Regression
+checks also preserve the separate trace costing and every other truck option.
+The existing tile-archive validator now runs before every engine initialization,
+so a missing or structurally damaged saved map requests a new download instead
+of being mistaken for an endpoint snap failure. Import SHA-256 checks remain.
+
+The corpus's `DEFAULT` is a research baseline, not a fourth user preference:
+the app starts in Economical. An API 26 experiment with a 32 MiB cache measured
+fully audited unpruned DEFAULT routes, not only host candidates. This remains
+experimental; Shortest and delivery retain the shipped unpruned search. Other
+modes keep their cost preferences pending broader device/performance evidence.
+Galați–Bucharest measured 243.9613 to 229.4597 km, 232.0808 to 218.1464 minutes
+and 610 to 1,777 ms. Galați–Nădlac measured 761.7399 to 755.3023 km, 737.1112
+to 730.9786 minutes and 864 to 2,809 ms, with identical snapped endpoints.
+These are single emulator samples, not low-end hardware performance guarantees.
+
 The ten-case corpus covers four modes: 28 route outcomes and 12 expected
 rejections. Hard truck/ADR/delivery limits are tested separately in the original
 synthetic native networks in every mode. Final device evidence is in
