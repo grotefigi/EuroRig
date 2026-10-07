@@ -1,9 +1,9 @@
 # Region package format
 
 The `.eurorig` package is the unit a driver downloads. This documents what is inside each format, the
-per-tile evidence index, and the invariants the packager enforces. Nothing here describes activation on
-a device: formats 1 and 2 are what the app consumes today, and format 3 is described and gated but not
-yet consumed.
+per-tile evidence index, and the invariants the packager and app enforce. The app consumes formats 1,
+2 and canonical format 3 with a version-1 tile index. Compressed indices and country-set activation
+are not enabled.
 
 Written from `tools/package_region.py` (packager) and `tools/check_qa_package.py` (host gate).
 
@@ -107,10 +107,12 @@ writes the verdict as JSON, and a receipt that cannot be written does not change
 
 ## Not true yet
 
-- The app does not read format 3, and nothing activates a package: activation needs matching routing,
-  display, search and restriction evidence, or it must refuse.
-- `NativeRouter` accepts a TAR only; composed sets need an explicit `tile_dir` adapter with its own
-  tests. That work is owned elsewhere and is not in this document's scope.
+- Format-3 compressed tile indices are not consumed. Canonical version-1 indices are checked against
+  the exact schema, manifest country/generation, declared count and every TAR tile's bytes/hash before
+  activation. Failed imports preserve the old map. The index is verified again when reopening it;
+  a missing or changed installed index is refused.
+- `NativeRouter` has a tested directory adapter, but country-set installation and compressed-package
+  validation are not connected to it. Legacy and canonical format-3 imports still use the TAR adapter.
 - Composition must not assume per-country `ATTACH`: SQLite's attached-database limit is finite and
   cannot span all of Europe. Bounded connections or merged queries are the alternative to test.
 - Cleanup and rollback must never leave an installed country unreachable: removal preserves the

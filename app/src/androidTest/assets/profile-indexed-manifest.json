@@ -1,0 +1,17 @@
+{
+  "format": 3,
+  "engine": "valhalla",
+  "native_version": "0.6.3",
+  "name": "Original indexed fixture",
+  "routing_source": "Original EuroRig test network",
+  "routing_date": "2026-10-06",
+  "attribution": "© OpenStreetMap contributors",
+  "license": "ODbL-1.0",
+  "country": "RO",
+  "generation_id": "0000000000000001",
+  "sha256": {
+    "routing.tar": "7d938dc8ca457a2d4e04478c43231aa92aca6c8e6cfd5fc843b4f480a27c0fd1",
+    "display.sqlite": "90ffb6f6e0775c5c4b3b2f13e43a14c7e6036b70b7be3e79e54641f235bfb976",
+    "tiles.sqlite": "bbb42bc940b639be4fc12ce377fb8ba0ec916ec8f822186bba70d9774e16d008"
+  }
+}

@@ -1,5 +1,28 @@
 # Verification
 
+## Canonical format-3 country installation, 2026-10-08
+
+- The app now consumes the existing `tiles.sqlite` version-1 package index.
+  It verifies the index's payload checksum, exact schema, country/generation,
+  nonempty row count, canonical names and every TAR tile's size and SHA-256 before
+  selecting the candidate. Reopening checks the installed index and tile claims.
+- A host-gated original three-tile fixture activates and reopens on API 26.
+  Native truck routes, height refusals and ADR audits pass in all three preferences.
+  Ten invalid imports preserve the selected map and live router: wrong tile hash,
+  count, country, generation, path, schema, missing tile, unsupported index version,
+  index checksum and mismatched package format. Missing or changed installed indices
+  are refused on reopening; restoring the verified index restores use.
+- Read-only candidate checks on API 26 and physical API 36 exercise six mutations
+  against their specific expected error gates and a missing installed index. They
+  never activate the fixture on the tablet. Activation instrumentation refuses
+  physical hardware and is restricted to dedicated emulators.
+- The physical Romania corpus retains all 40 baseline outcomes (28 routes,
+  12 refusals), with ETA/snap bounds and camera/heading/trail checks passing.
+  Tablet preferences, saved endpoints and existing map hashes are unchanged.
+- Debug and test APK builds and Android lint pass. Public Romania remains format 2;
+  compressed indices, country-set activation and the 20 GB Europe budget are not
+  verified or shipped by this change.
+
 ## Map view reuse, 2026-10-08
 
 - The previous APK reproducibly left roads blank after the same attached map view

@@ -17,12 +17,14 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
     private boolean cameraCorpus;
     private boolean gzipOnly;
     private boolean mapLifecycleOnly;
+    private boolean indexedOnly;
     private boolean corridorsOnly;
     private String qaRegion;
-    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));cameraOnly="true".equals(arguments.getString("cameraOnly"));cameraCorpus="true".equals(arguments.getString("cameraCorpus"));gzipOnly="true".equals(arguments.getString("gzipOnly"));mapLifecycleOnly="true".equals(arguments.getString("mapLifecycleOnly"));corridorsOnly="true".equals(arguments.getString("corridorsOnly"));qaRegion=arguments.getString("qaRegion");start();}
+    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));cameraOnly="true".equals(arguments.getString("cameraOnly"));cameraCorpus="true".equals(arguments.getString("cameraCorpus"));gzipOnly="true".equals(arguments.getString("gzipOnly"));mapLifecycleOnly="true".equals(arguments.getString("mapLifecycleOnly"));indexedOnly="true".equals(arguments.getString("indexedOnly"));corridorsOnly="true".equals(arguments.getString("corridorsOnly"));qaRegion=arguments.getString("qaRegion");start();}
     public void onStart(){
         Bundle result=new Bundle();
         try{
+            if(indexedOnly){IndexedPackageChecks.run(getTargetContext(),packagePath);result.putString("stream","PASS: format3 activation/reopen, truck and ADR routes; ten invalid imports preserve active map\n");finish(-1,result);return;}
             if(mapLifecycleOnly){MapLifecycleChecks.run(this);result.putString("stream","PASS: attached map reloads after detach/reuse; obsolete callbacks preserve current pending query\n");finish(-1,result);return;}
             if(gzipOnly){GzipTileChecks.run(getTargetContext(),getContext());result.putString("stream","PASS: JNI .gph.gz fixture parity; .gz and empty controls refuse routes; tile bytes retained\n");finish(-1,result);return;}
             if(corridorsOnly){CorridorChecks.run(getTargetContext(),qaRegion);result.putString("stream","PASS: native corridor measurements written; inspect individual outcomes\n");finish(-1,result);return;}

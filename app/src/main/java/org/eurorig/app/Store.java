@@ -39,6 +39,7 @@ final class Store {
                 String selection=context.getSharedPreferences("settings",0).getString("region","");
                 if(!selection.matches("[0-9a-f-]{36}"))throw new IOException("Invalid saved region selection");
                 File region=new File(context.getFilesDir(),"regions/"+selection);
+                TileIndex.validateInstalled(region);
                 if(new File(region,"display.sqlite").exists()){display=new DisplayDatabase(new File(region,"display.sqlite"));graph=display.endpoints;}
                 else try(InputStream in=new FileInputStream(new File(region,"display.europack"))){graph=Graph.read(in);}
                 nativeRouter=new NativeRouter(context,new File(region,"routing.tar"));

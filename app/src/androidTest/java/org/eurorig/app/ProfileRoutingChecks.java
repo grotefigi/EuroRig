@@ -11,6 +11,7 @@ import java.util.*;
 /** Original synthetic networks isolate hard limits from route preferences. */
 final class ProfileRoutingChecks {
     static void run(Context app,Context tests)throws Exception{
+        TileIndexChecks.run(app,tests);
         checkAudit();
         checkCoverage();
         checkCoverageMessages(app,tests);

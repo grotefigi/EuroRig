@@ -29,12 +29,12 @@ final class RegionPackages {
             ZipEntry entry;
             while((entry=zip.getNextEntry())!=null){
                 String name=entry.getName();
-                if(!Arrays.asList("routing.tar","display.europack","display.sqlite","manifest.json").contains(name)||entry.isDirectory()||!seen.add(name))
+                if(!Arrays.asList("routing.tar","display.europack","display.sqlite","tiles.sqlite","manifest.json").contains(name)||entry.isDirectory()||!seen.add(name))
                     throw new IOException("Unexpected or duplicate region entry: "+name);
-                copy(zip,new File(dir,name),name.equals("routing.tar")?MAX_TILES:name.equals("display.sqlite")?16L*1024*1024*1024:name.equals("display.europack")?MAX_DISPLAY:65536);
+                copy(zip,new File(dir,name),name.equals("routing.tar")?MAX_TILES:name.equals("display.sqlite")?16L*1024*1024*1024:name.equals("display.europack")||name.equals("tiles.sqlite")?MAX_DISPLAY:65536);
                 zip.closeEntry();
             }
-            if(seen.size()!=3||!seen.contains("manifest.json")||!seen.contains("routing.tar"))throw new IOException("A region needs a manifest, routing tiles and one display map");
+            if(!seen.contains("manifest.json")||!seen.contains("routing.tar")||seen.contains("display.sqlite")==seen.contains("display.europack"))throw new IOException("A region needs a manifest, routing tiles and one display map");
             return activate(c,dir);
         }catch(IOException|RuntimeException|LinkageError e){cleanup(dir);throw e;}
     }
@@ -59,15 +59,17 @@ final class RegionPackages {
         try {
             JSONObject manifest=new JSONObject(new String(Files.readAllBytes(new File(dir,"manifest.json").toPath()),StandardCharsets.UTF_8));
             int format=manifest.getInt("format");
-            if((format!=1&&format!=2)||!manifest.getString("engine").equals("valhalla"))throw new IOException("Unsupported region format");
+            if((format!=1&&format!=2&&format!=3)||!manifest.getString("engine").equals("valhalla"))throw new IOException("Unsupported region format");
             if(!manifest.getString("native_version").equals("0.6.3"))throw new IOException("Region targets a different native engine version");
-            String displayFile=format==2?"display.sqlite":"display.europack";
-            for(String name:new String[]{"routing.tar",displayFile}){
+            String displayFile=format>=2?"display.sqlite":"display.europack";
+            if(new File(dir,"tiles.sqlite").exists()!=(format==3))throw new IOException("Tile index does not match region format");
+            for(String name:format==3?new String[]{"routing.tar",displayFile,"tiles.sqlite"}:new String[]{"routing.tar",displayFile}){
                 String expected=manifest.getJSONObject("sha256").getString(name);
                 if(!digest(new File(dir,name)).equalsIgnoreCase(expected))throw new IOException("Region checksum mismatch: "+name);
             }
+            if(format==3)TileIndex.validate(new File(dir,"routing.tar"),new File(dir,"tiles.sqlite"),manifest);
             Graph graph;
-            if(format==2){candidateDisplay=new DisplayDatabase(new File(dir,displayFile));graph=candidateDisplay.endpoints;}
+            if(format>=2){candidateDisplay=new DisplayDatabase(new File(dir,displayFile));graph=candidateDisplay.endpoints;}
             else try(InputStream in=new FileInputStream(new File(dir,displayFile))){graph=Graph.read(in);}
             if(graph.demo)throw new IOException("Native regions must contain real map data");
             candidate=new NativeRouter(c,new File(dir,"routing.tar"));
@@ -160,18 +162,18 @@ final class RegionPackages {
         });
         if(count[0]==0)throw new IOException("Empty tile directory");
     }
-    private static long octal(byte[] header,int start,int length)throws IOException{
+    static long octal(byte[] header,int start,int length)throws IOException{
         String value=new String(header,start,length,StandardCharsets.US_ASCII).replace("\u0000","").trim();
         if(value.isEmpty())return 0;
         try{return Long.parseLong(value,8);}catch(NumberFormatException e){throw new IOException("Invalid archive length",e);}
     }
-    private static String digest(File file)throws IOException,NoSuchAlgorithmException{
+    static String digest(File file)throws IOException,NoSuchAlgorithmException{
         MessageDigest digest=MessageDigest.getInstance("SHA-256");byte[] b=new byte[65536];int n;
         try(InputStream in=new FileInputStream(file)){while((n=in.read(b))!=-1)digest.update(b,0,n);}
         StringBuilder hex=new StringBuilder();for(byte v:digest.digest())hex.append(String.format(Locale.ROOT,"%02x",v&255));return hex.toString();
     }
     private static void cleanup(File dir){
         // Only internally generated UUID directories and fixed filenames are removed.
-        for(String name:new String[]{"routing.tar","display.europack","display.sqlite","manifest.json","device-config.json"})new File(dir,name).delete();dir.delete();
+        for(String name:new String[]{"routing.tar","display.europack","display.sqlite","tiles.sqlite","manifest.json","device-config.json"})new File(dir,name).delete();dir.delete();
     }
 }

@@ -15,7 +15,8 @@ contains, keeps the coherent build's generation_id unchanged, and streams every 
 claimed hash. The per-tile index lives in its own hashed file because the app manifest is capped at
 65536 bytes; a whole-country package cannot carry per-tile evidence in the manifest itself.
 
-Nothing here activates a package on a device: format 3 is described and gated, not yet consumed.
+The app consumes canonical format-3 packages with this version-1 index. Compressed indices and
+country-set activation remain separate work; this tool does not certify native truck legality.
 """
 import argparse
 import hashlib
