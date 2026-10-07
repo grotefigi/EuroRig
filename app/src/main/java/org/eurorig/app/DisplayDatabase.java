@@ -10,12 +10,16 @@ import java.util.*;
 /** Read-only indexed roads and full-text search; never supplies routing decisions. */
 final class DisplayDatabase implements AutoCloseable {
     private final SQLiteDatabase database;
+    private final List<File> partitions;
+    private final List<double[]> partitionBounds;
+    private final LinkedHashMap<File,DisplayDatabase> openPartitions=new LinkedHashMap<>(4,.75f,true);
     final boolean restrictionEvidence;
     private final boolean spatialIndex;
     final String name,attribution,date;
     final double[] bounds;
     final Graph endpoints;
     DisplayDatabase(File file)throws IOException{
+        partitions=Collections.emptyList();partitionBounds=Collections.emptyList();
         SQLiteDatabase opened=null;
         try{
             opened=SQLiteDatabase.openDatabase(file.getAbsolutePath(),null,SQLiteDatabase.OPEN_READONLY|SQLiteDatabase.NO_LOCALIZED_COLLATORS);
@@ -37,6 +41,58 @@ final class DisplayDatabase implements AutoCloseable {
         }catch(JSONException|RuntimeException e){if(opened!=null)opened.close();throw new IOException("Invalid display database: "+e.getMessage(),e);}
         catch(IOException e){if(opened!=null)opened.close();throw e;}
     }
+    /** Country queries share a four-connection cache, independent of SQLite's ATTACH limit. */
+    DisplayDatabase(List<File> files,boolean verifyDuplicates)throws IOException{
+        if(files.isEmpty()||files.size()>64)throw new IOException("Invalid installed country count");
+        database=null;partitions=Collections.unmodifiableList(new ArrayList<>(files));
+        partitionBounds=new ArrayList<>();spatialIndex=false;
+        StringJoiner names=new StringJoiner(" · ");String firstDate=null,credit=null;Graph first=null;
+        double[] combined={90,180,-90,-180};
+        for(int i=0;i<files.size();i++)try(DisplayDatabase part=new DisplayDatabase(files.get(i))){
+            if(!part.restrictionEvidence)throw new IOException("Every composed country needs restriction evidence");
+            if(verifyDuplicates)for(int j=0;j<i;j++)part.checkDuplicateEvidence(files.get(j));
+            names.add(part.name);partitionBounds.add(part.bounds);
+            combined[0]=Math.min(combined[0],part.bounds[0]);combined[1]=Math.min(combined[1],part.bounds[1]);
+            combined[2]=Math.max(combined[2],part.bounds[2]);combined[3]=Math.max(combined[3],part.bounds[3]);
+            if(first==null){first=part.endpoints;firstDate=part.date;credit=part.attribution;}
+            else if(!firstDate.equals(part.date))firstDate="Multiple snapshots";
+        }
+        name=names.toString();bounds=combined;date=firstDate;attribution=credit;restrictionEvidence=true;
+        endpoints=new Graph(name,attribution,date,false,first.nodes,new Graph.Edge[0],Collections.emptyList());
+    }
+    private DisplayDatabase partition(File file){
+        DisplayDatabase opened=openPartitions.get(file);
+        if(opened!=null)return opened;
+        if(openPartitions.size()==4){Iterator<DisplayDatabase> values=openPartitions.values().iterator();values.next().close();values.remove();}
+        try{opened=new DisplayDatabase(file);}catch(IOException e){throw new IllegalStateException("Installed country evidence cannot be read",e);}
+        openPartitions.put(file,opened);return opened;
+    }
+    /** Attach one peer only during installation, and compare shared identities without copying rows. */
+    private void checkDuplicateEvidence(File file)throws IOException{
+        try{
+            database.execSQL("ATTACH DATABASE ? AS peer",new Object[]{file.getAbsolutePath()});
+            try{
+                for(String[] table:new String[][]{
+                    {"roads","id","name,kind,level,large,south,west,north,east,shape"},
+                    {"places","id","label,lat,lon,kind"},
+                    {"node_rules","node","lat,lon,height,width,length,weight,axle,flags,tags"}}){
+                    StringJoiner differences=new StringJoiner(" OR ");
+                    for(String column:table[2].split(","))differences.add("NOT(a."+column+" IS b."+column+")");
+                    try(Cursor rows=database.rawQuery("SELECT 1 FROM main."+table[0]+" a JOIN peer."+table[0]+" b ON a."+table[1]+"=b."+table[1]+" WHERE "+differences+" LIMIT 1",null)){
+                        if(rows.moveToFirst())throw new IOException("Conflicting country evidence in "+table[0]);
+                    }
+                }
+                StringJoiner differences=new StringJoiner(" OR ");
+                for(String column:new String[]{"way","height","width","length","weight","axle","flags","tags"})differences.add("NOT(a."+column+" IS b."+column+")");
+                try(Cursor rows=database.rawQuery("SELECT 1 FROM main.roads r JOIN peer.roads s ON r.id=s.id LEFT JOIN main.road_rules a ON a.way=r.id LEFT JOIN peer.road_rules b ON b.way=s.id WHERE "+differences+" LIMIT 1",null)){
+                    if(rows.moveToFirst())throw new IOException("Conflicting country restriction evidence");
+                }
+                try(Cursor rows=database.rawQuery("SELECT 1 FROM main.search a JOIN peer.search b ON a.rowid=b.rowid WHERE NOT(a.text IS b.text) LIMIT 1",null)){
+                    if(rows.moveToFirst())throw new IOException("Conflicting country search evidence");
+                }
+            }finally{database.execSQL("DETACH DATABASE peer");}
+        }catch(RuntimeException e){throw new IOException("Cannot verify shared country evidence",e);}
+    }
     private boolean hasTable(String name){
         try(Cursor c=database.rawQuery("SELECT 1 FROM sqlite_master WHERE name=?",new String[]{name})){return c.moveToFirst();}
     }
@@ -46,6 +102,15 @@ final class DisplayDatabase implements AutoCloseable {
         }
     }
     synchronized List<Graph.Node> search(String text){
+        if(!partitions.isEmpty()){
+            ArrayList<List<Graph.Node>> matches=new ArrayList<>();for(File file:partitions)matches.add(partition(file).search(text));
+            ArrayList<Graph.Node> result=new ArrayList<>();HashSet<String> seen=new HashSet<>();
+            for(int rank=0;rank<30&&result.size()<30;rank++)for(List<Graph.Node> match:matches){
+                if(rank<match.size()){Graph.Node point=match.get(rank);if(seen.add(point.lat+","+point.lon+","+point.label))result.add(point);}
+                if(result.size()==30)break;
+            }
+            return result;
+        }
         String[] tokens=Graph.normalize(text).trim().split("[^\\p{L}\\p{N}]+");StringBuilder expression=new StringBuilder();
         for(String token:tokens){if(token.isEmpty())continue;if(expression.length()>0)expression.append(' ');expression.append(token).append('*');}
         ArrayList<Graph.Node> points=new ArrayList<>();if(expression.length()==0)return points;
@@ -55,6 +120,7 @@ final class DisplayDatabase implements AutoCloseable {
     }
     static int level(double pixels){return pixels<6500?2:pixels<10000?3:pixels<18000?5:6;}
     synchronized Graph visible(double south,double west,double north,double east,double pixels){
+        if(!partitions.isEmpty())return compositeVisible(south,west,north,east,pixels);
         Truck truck=Store.truck;
         int level=level(pixels);
         int a=(int)Math.floor(south/.02),b=(int)Math.floor(west/.02),c=(int)Math.floor(north/.02),d=(int)Math.floor(east/.02);
@@ -109,6 +175,15 @@ final class DisplayDatabase implements AutoCloseable {
     }
     synchronized Map<Long,RestrictionRule> rulesFor(Collection<Long> ways){
         HashMap<Long,RestrictionRule> result=new HashMap<>();if(!restrictionEvidence)return result;
+        if(!partitions.isEmpty()){
+            for(File file:partitions)for(Map.Entry<Long,RestrictionRule> entry:partition(file).rulesFor(ways).entrySet()){
+                RestrictionRule prior=result.putIfAbsent(entry.getKey(),entry.getValue()),next=entry.getValue();
+                if(prior!=null&&(prior.height!=next.height||prior.width!=next.width||prior.length!=next.length
+                    ||prior.weight!=next.weight||prior.axle!=next.axle||prior.flags!=next.flags||!prior.tags.equals(next.tags)))
+                    throw new IllegalStateException("Conflicting installed truck restriction evidence");
+            }
+            return result;
+        }
         ArrayList<Long> ids=new ArrayList<>(ways);
         for(int offset=0;offset<ids.size();offset+=400){
             int count=Math.min(400,ids.size()-offset);String[] args=new String[count];StringJoiner placeholders=new StringJoiner(",");
@@ -127,5 +202,26 @@ final class DisplayDatabase implements AutoCloseable {
         catch(JSONException bad){throw new IllegalStateException("Invalid mapped restriction evidence",bad);}
         return tags;
     }
-    public synchronized void close(){database.close();}
+    private Graph compositeVisible(double south,double west,double north,double east,double pixels){
+        ArrayList<Graph.Node> nodes=new ArrayList<>();ArrayList<Graph.Edge> edges=new ArrayList<>();HashSet<Long> seenWays=new HashSet<>();HashSet<String> seenLabels=new HashSet<>();
+        for(int p=0;p<partitions.size()&&nodes.size()<60000;p++){
+            double[] box=partitionBounds.get(p);if(box[2]<south||box[0]>north||box[3]<west||box[1]>east)continue;
+            Graph graph=partition(partitions.get(p)).visible(south,west,north,east,pixels);
+            int[] mapped=new int[graph.nodes.length];Arrays.fill(mapped,-1);boolean[] roadNode=new boolean[graph.nodes.length];HashSet<Long> local=new HashSet<>();
+            for(Graph.Edge edge:graph.edges){
+                roadNode[edge.from]=true;roadNode[edge.to]=true;if(seenWays.contains(edge.way))continue;
+                if(nodes.size()+2>60000)break;
+                if(mapped[edge.from]<0){mapped[edge.from]=nodes.size();nodes.add(graph.nodes[edge.from]);}
+                if(mapped[edge.to]<0){mapped[edge.to]=nodes.size();nodes.add(graph.nodes[edge.to]);}
+                edges.add(new Graph.Edge(mapped[edge.from],mapped[edge.to],edge.way,edge.name,edge.kind,
+                    edge.height,edge.width,edge.length,edge.weight,edge.axle,edge.flags,edge.speed));local.add(edge.way);
+            }
+            seenWays.addAll(local);
+            for(int i=0;i<graph.nodes.length&&nodes.size()<60000;i++)if(!roadNode[i]){
+                Graph.Node point=graph.nodes[i];if(seenLabels.add(point.lat+","+point.lon+","+point.label))nodes.add(point);
+            }
+        }
+        return new Graph(name,attribution,date,false,nodes.toArray(new Graph.Node[0]),edges.toArray(new Graph.Edge[0]),Collections.emptyList());
+    }
+    public synchronized void close(){if(database!=null)database.close();for(DisplayDatabase part:openPartitions.values())part.close();openPartitions.clear();}
 }

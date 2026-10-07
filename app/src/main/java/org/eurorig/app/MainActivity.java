@@ -101,7 +101,7 @@ public final class MainActivity extends Activity {
         view.setCompoundDrawablePadding(dp(4));
         view.setCompoundDrawablesRelative(above?null:drawable,above?drawable:null,null,null);
     }
-    private void tappableLabel(TextView view){
+    private void tappableLabel(View view){
         view.setFocusable(true);feedback(view,PANEL,true);
         view.setAccessibilityDelegate(new View.AccessibilityDelegate(){public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.setClassName(Button.class.getName());}});
     }
@@ -350,7 +350,7 @@ public final class MainActivity extends Activity {
                 else{Graph g=Store.graph;if(g==null){error("No maps installed yet.");return;}
                     new AlertDialog.Builder(this).setTitle(g.name).setMessage(g.date+"\n"+g.attribution+"\n\nOffline truck routes, roads and place search. Only the selected country's coverage is active in this development build. Seamless cross-border routing is still being developed.\n\nCheck road signs. Truck-law validation and time-dependent restrictions are unfinished.").setPositiveButton("Close",null).show();}
         });dialog.show();dialog.getWindow().setLayout(-1,Math.round(getResources().getDisplayMetrics().heightPixels*.8f));
-        Runnable tick=new Runnable(){public void run(){if(dialog.isShowing()){progress.setText(MapDownloadService.status);main.postDelayed(this,1000);}}};main.post(tick);dialog.setOnDismissListener(d->main.removeCallbacks(tick));
+        Runnable tick=new Runnable(){public void run(){if(dialog.isShowing()){if(!TextUtils.equals(progress.getText(),MapDownloadService.status))progress.setText(MapDownloadService.status);main.postDelayed(this,1000);}}};main.post(tick);dialog.setOnDismissListener(d->main.removeCallbacks(tick));
     }
     private void download(String country){
         if(MapDownloadService.running){Toast.makeText(this,"A download is already running. Pause it before starting another.",Toast.LENGTH_LONG).show();return;}
@@ -364,10 +364,53 @@ public final class MainActivity extends Activity {
         Toast.makeText(this,"Loading available countries…",Toast.LENGTH_SHORT).show();
         Store.mapWorker.execute(()->{try{
             org.json.JSONObject catalogue=new org.json.JSONObject(new String(new org.eurorig.maps.DownloadClient(BuildConfig.DEBUG).catalog(url),StandardCharsets.UTF_8));
-            org.json.JSONArray entries=catalogue.getJSONArray("maps");String[] names=new String[entries.length()],ids=new String[entries.length()];
-            for(int i=0;i<names.length;i++){org.json.JSONObject entry=entries.getJSONObject(i);names[i]=entry.getString("name")+" · "+Math.round(entry.getLong("bytes")/1048576.0)+" MB";ids[i]=entry.getString("id");}
-            main.post(()->{if(!isDestroyed())new AlertDialog.Builder(this).setTitle("Download a country").setItems(names,(d,w)->download(ids[w])).setNegativeButton("Close",null).show();});
+            if(catalogue.getInt("format")!=1||!catalogue.getString("native_version").equals("0.6.3"))throw new IOException("Unsupported map catalogue");
+            org.json.JSONArray entries=catalogue.getJSONArray("maps");
+            main.post(()->{if(!isDestroyed())try{showCountryCatalogue(entries,catalogue.optBoolean("europe_complete",false),null);}catch(org.json.JSONException e){error("Invalid country catalogue");}});
         }catch(Exception e){main.post(()->error("Map catalogue: "+e.getMessage()));}});
+    }
+    private static String mapSize(long bytes){return bytes>=1_000_000_000L?String.format(Locale.ROOT,"%.2f GB",bytes/1e9):String.format(Locale.ROOT,"%.1f MB",bytes/1e6);}
+    private void showCountryCatalogue(org.json.JSONArray entries,boolean complete,String regionCountry)throws org.json.JSONException{
+        TreeMap<String,ArrayList<org.json.JSONObject>> groups=new TreeMap<>();HashSet<String> ids=new HashSet<>();
+        if(entries.length()>512)throw new org.json.JSONException("Too many country packages");
+        for(int i=0;i<entries.length();i++){
+            org.json.JSONObject entry=entries.getJSONObject(i);String id=entry.getString("id"),code=CountryFlag.code(id,entry.optString("country",""));
+            if(!id.matches("[a-z][a-z0-9-]{0,63}")||!ids.add(id)||entry.getLong("bytes")<=0||entry.getLong("bytes")>128L*1024*1024*1024)throw new org.json.JSONException("Invalid country metadata");
+            if(entry.has("country")&&!entry.getString("country").matches("[A-Z]{2}"))throw new org.json.JSONException("Invalid country code");
+            if(entry.has("region_name")&&(code.isEmpty()||entry.getString("region_name").trim().isEmpty()||entry.getString("region_name").length()>160))throw new org.json.JSONException("Invalid region metadata");
+            if(code.equals("RU")||id.equals("russia")||id.startsWith("russia-"))continue;
+            String name=regionCountry!=null?entry.optString("region_name",entry.getString("name")):entry.getString("name");
+            if(name.trim().isEmpty()||name.length()>160)throw new org.json.JSONException("Invalid country name");
+            if(regionCountry==null&&!code.isEmpty()&&entry.has("region_name"))name=new Locale("",code).getDisplayCountry(Locale.ENGLISH);
+            groups.computeIfAbsent(name,k->new ArrayList<>()).add(entry);
+        }
+        Dialog dialog=new Dialog(this);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout box=vertical();box.setBackgroundColor(palette.surface);box.setPadding(dp(16),dp(16),dp(16),dp(12));
+        ScrollView scroll=new ScrollView(this);scroll.setFillViewport(true);LinearLayout rows=vertical();scroll.addView(rows);box.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        TextView heading=text(regionCountry==null?"Download a country":regionCountry+" regions",22,TEXT);heading.setTypeface(Typeface.DEFAULT,Typeface.BOLD);rows.addView(heading);
+        TextView subtitle=text("Download once. Navigate offline.",14,MUTED);subtitle.setPadding(0,dp(4),0,dp(12));rows.addView(subtitle);
+        TextView progress=text(MapDownloadService.status,14,MUTED);progress.setPadding(0,0,0,dp(12));progress.setVisibility(MapDownloadService.status.equals(MapDownloadService.IDLE)?View.GONE:View.VISIBLE);rows.addView(progress);
+        for(Map.Entry<String,ArrayList<org.json.JSONObject>> group:groups.entrySet()){
+            ArrayList<org.json.JSONObject> maps=group.getValue();org.json.JSONObject first=maps.get(0);String id=first.getString("id"),code=CountryFlag.code(id,first.optString("country",""));
+            boolean regional=regionCountry==null&&(maps.size()>1||first.has("region_name"));long size=0;for(org.json.JSONObject map:maps)size=Math.addExact(size,map.getLong("bytes"));
+            if(regional)for(org.json.JSONObject entry:maps)if(code.isEmpty()||!entry.has("region_name")||!code.equals(CountryFlag.code(entry.getString("id"),entry.optString("country",""))))throw new org.json.JSONException("Conflicting country regions");
+            String name=group.getKey();String detail=mapSize(size)+(regional?" · "+maps.size()+" regions":" download");
+            if(!regional&&Store.graph!=null&&Store.graph.name.equals(first.optString("name")))detail="Installed · "+detail;
+            LinearLayout row=new LinearLayout(this);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(4),dp(12),dp(4),dp(12));row.setMinimumHeight(dp(80));
+            LinearLayout identity=new LinearLayout(this);identity.setGravity(Gravity.CENTER_VERTICAL);identity.setMinimumHeight(dp(56));identity.setPadding(0,dp(4),0,dp(4));
+            identity.addView(new CountryFlag(this,code,palette.accent),new LinearLayout.LayoutParams(dp(40),dp(40)));
+            LinearLayout labels=vertical();labels.setPadding(dp(16),0,dp(8),0);TextView title=text(name,18,TEXT);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);labels.addView(title);labels.addView(text(detail,14,MUTED));labels.setImportantForAccessibility(View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);identity.addView(labels,new LinearLayout.LayoutParams(0,-2,1));row.addView(identity,new LinearLayout.LayoutParams(0,-2,1));
+            Runnable action=()->{dialog.dismiss();if(regional){org.json.JSONArray children=new org.json.JSONArray();for(org.json.JSONObject map:maps)children.put(map);try{showCountryCatalogue(children,complete,name);}catch(org.json.JSONException e){error("Invalid region list");}}else download(id);};
+            ImageButton control=new ImageButton(this);control.setImageResource(regional?R.drawable.ic_chevron:R.drawable.ic_download);control.setImageTintList(ColorStateList.valueOf(palette.accent));control.setPadding(dp(16),dp(16),dp(16),dp(16));control.setScaleType(ImageView.ScaleType.FIT_CENTER);control.setStateListAnimator(null);control.setOnClickListener(v->action.run());feedback(control,palette.surface,false);control.setContentDescription((regional?"Choose regions of ":"Download ")+name);control.setTooltipText(control.getContentDescription());row.addView(control,new LinearLayout.LayoutParams(dp(56),dp(56)));
+            tappableLabel(identity);feedback(identity,palette.surface,false);identity.setContentDescription(name+", "+detail+". "+(regional?"Choose regions":"Download map"));identity.setOnClickListener(v->action.run());rows.addView(row);View divider=new View(this);divider.setBackgroundColor(palette.border);rows.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
+        }
+        if(groups.isEmpty())rows.addView(text("No country packages are published in this catalogue yet.",16,MUTED));
+        if(regionCountry==null&&!complete){TextView notice=text("More countries are being prepared. All-Europe download will become available when the full set is published.",13,MUTED);notice.setPadding(0,dp(8),0,dp(8));rows.addView(notice);}
+        LinearLayout actions=new LinearLayout(this);actions.setBaselineAligned(false);Button all=button(regionCountry==null?"Download all Europe":"Download these regions",()->{dialog.dismiss();download(regionCountry==null?null:"country:"+CountryFlag.code(groups.firstEntry().getValue().get(0).optString("id"),groups.firstEntry().getValue().get(0).optString("country","")));});
+        all.setEnabled(!groups.isEmpty()&&(regionCountry!=null||complete));all.setAlpha(all.isEnabled()?1f:.45f);actions.addView(all,new LinearLayout.LayoutParams(0,-2,1));actions.addView(button(regionCountry==null?"Close":"Back",()->{dialog.dismiss();if(regionCountry!=null)countryCatalogue();}),new LinearLayout.LayoutParams(0,-2,1));box.addView(actions);
+        if(regionCountry!=null)dialog.setOnCancelListener(d->countryCatalogue());
+        dialog.setContentView(box);dialog.show();dialog.getWindow().setLayout(Math.min(getResources().getDisplayMetrics().widthPixels,dp(720)),Math.round(getResources().getDisplayMetrics().heightPixels*.85f));
+        Runnable tick=new Runnable(){public void run(){if(dialog.isShowing()){if(!TextUtils.equals(progress.getText(),MapDownloadService.status)){progress.setText(MapDownloadService.status);progress.setVisibility(MapDownloadService.status.equals(MapDownloadService.IDLE)?View.GONE:View.VISIBLE);}main.postDelayed(this,1000);}}};main.post(tick);dialog.setOnDismissListener(d->main.removeCallbacks(tick));
     }
     private void mapSource(){
         EditText field=new EditText(this);field.setSingleLine();field.setHint("https://…/catalog.json");field.setText(getSharedPreferences("maps",0).getString("catalog",BuildConfig.MAP_CATALOG_URL));

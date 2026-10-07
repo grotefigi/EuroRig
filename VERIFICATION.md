@@ -1,5 +1,61 @@
 # Verification
 
+## Country download menu and storage audit
+
+- 0.6.1-dev is installed on the physical Galaxy Tab S9. The public Romania
+  chooser shows its circular flag, blue action, installed state and actual
+  407.5 MB download size. The unpublished all-Europe action is disabled.
+  Seven map and preference files retained identical SHA-256 hashes across
+  the upgrade. This physical check covers the dark country chooser, not driving.
+- The country chooser passes ten native API 26 layout checks: both themes on
+  375 x 812 dp at 100% and 200% text, 812 x 375 dp at 200%, 1280 x 800 dp,
+  and 800 x 1280 dp at 200%. Action targets remain at least 48 dp and reachable
+  by scrolling. Reduced motion is enabled. Screenshots were reviewed separately.
+- A local synthetic catalogue verifies actual decimal sizes, Russia exclusion,
+  disabled all-Europe downloads, region aggregation/drill-down, both Back actions,
+  empty catalogues and duplicate package rejection. No synthetic maps were
+  downloaded or published. The installed APK hash is retained in the private
+  receipt; interrupted runs were not counted as complete audits.
+- Android 8's emulator graphics stack produced an EGL_BAD_ALLOC abort during an
+  earlier repeated-dialog run. The final run after removing unchanged status
+  redraws passed; display resizing also caused two Launcher3 crashes, explicitly
+  logged and recovered as emulator OS failures. These do not establish physical
+  device performance. The app's crashes are never dismissed by the audit helper.
+- Romania's measured package is 407,495,153 bytes. Its routing/display payloads
+  total 873,488,384 bytes. An experimental copy reduced the display database by
+  85,180,416 bytes while preserving 20 host search queries. That index change is
+  not shipped: composed-country evidence validation and Android 8 compatibility
+  require additional work. The public Romania package remains unchanged.
+- 132 Python tests pass with the optional Osmium dependency enabled. Source
+  fetching tests cover validator changes, interrupted first downloads, retained
+  oversized partials, timeouts and completion without a second download. Package
+  writes preserve an existing package on failure; unexpected tile-index schema
+  objects are rejected. These host checks do not activate European map coverage.
+  Gradle
+  build and lint pass. Country-set activation, rollback/removal, complete
+  European map publication, and real-road testing remain unfinished.
+
+## Country-set foundations
+
+- 72 Python checks pass with the optional Osmium build dependency enabled; 37
+  Java checks pass. Android lint is clean.
+- Actual API 26 instrumentation passes on both x86_64 and 32-bit x86. The directory
+  tile adapter produces the same distances, geometry counts and audited way IDs
+  as TAR routing in every preference. Oversized vehicles and detailed ADR remain
+  checked. Empty directories, unsafe hierarchy, symlinks, overlay extraction and
+  duplicate archive tiles are refused; failed extraction removes its partial output.
+- A composed display layer queries 12 synthetic country databases with a cache
+  limited to four connections, rather than requiring simultaneous SQLite attachments.
+  Search reaches every country; shared geometry draws once and restrictions remain
+  intact. Conflicting shared road data or a missing shared restriction row is refused.
+- The fresh coherent RO/HU/RS API 37 corpus contains 40 explicitly expected
+  outcomes: 36 routes and 4 airport-centre snap refusals. Physical ETA and snap
+  checks pass, with 29 same-endpoint Shortest comparisons and 7 different-snap
+  comparisons retained and excluded. The signed airport-road case routes.
+- These are foundations and emulator checks. Format-3 activation, country-set
+  rollback/removal are not yet exposed to drivers. The separate country chooser
+  is implemented, with only Romania currently published.
+
 ## Routing evidence follow-up
 
 - Android 8/API 26 native profile instrumentation passes explicit Shortest,

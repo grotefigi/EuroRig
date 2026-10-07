@@ -13,7 +13,8 @@ import java.util.*;
 /** User-started map downloads, independent of offline navigation. */
 public final class MapDownloadService extends Service {
     static volatile boolean running;
-    static volatile String status="Country maps are downloaded once, then used offline.";
+    static final String IDLE="Country maps are downloaded once, then used offline.";
+    static volatile String status=IDLE;
     private volatile boolean cancelled;
     private DownloadClient client;
     private long lastNotification;
@@ -32,12 +33,15 @@ public final class MapDownloadService extends Service {
                 JSONObject catalog=new JSONObject(new String(client.catalog(url),StandardCharsets.UTF_8));
                 if(catalog.getInt("format")!=1||!catalog.getString("native_version").equals("0.6.3"))throw new IOException("Unsupported map catalogue");
                 JSONArray maps=catalog.getJSONArray("maps");ArrayList<JSONObject> queue=new ArrayList<>();
+                if(maps.length()>512)throw new IOException("Too many country packages");
                 HashSet<String> ids=new HashSet<>();
                 for(int i=0;i<maps.length();i++){
                     JSONObject entry=maps.getJSONObject(i);String mapId=entry.getString("id");
+                    if(entry.has("country")&&!entry.getString("country").matches("[A-Z]{2}"))throw new IOException("Invalid country code");
                     if(!ids.add(mapId))throw new IOException("Duplicate country in map catalogue");
-                    if(mapId.equals("russia")||mapId.startsWith("russia-"))continue;
-                    if(country==null||country.equals(mapId))queue.add(entry);
+                    String code=CountryFlag.code(mapId,entry.optString("country",""));
+                    if(code.equals("RU")||mapId.equals("russia")||mapId.startsWith("russia-"))continue;
+                    if(country==null||country.equals(mapId)||country.equals("country:"+code))queue.add(entry);
                 }
                 if(country==null&&!catalog.optBoolean("europe_complete",false))throw new IOException("All-Europe maps are not published yet. Download a published country instead.");
                 if(queue.isEmpty())throw new IOException("This country has not been published in the catalogue");

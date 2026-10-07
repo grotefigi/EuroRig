@@ -6,6 +6,11 @@ import org.json.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.LinkOption;
+import java.nio.file.SimpleFileVisitor;
+import java.nio.file.FileVisitResult;
+import java.nio.file.attribute.BasicFileAttributes;
 import java.security.*;
 import java.util.*;
 import java.util.zip.*;
@@ -96,6 +101,64 @@ final class RegionPackages {
             }
             if(tiles==0||!terminated)throw new IOException("Incomplete Valhalla tile archive");
         }
+    }
+    /** Extract only canonical GPH files into a fresh private directory. Never overlays installed tiles. */
+    @android.annotation.SuppressLint("UsableSpace") // Keep a reserve without evicting other apps' caches.
+    static void extractTiles(File archive,File directory)throws IOException{
+        validateTar(archive);
+        if(directory.exists()||!directory.mkdirs())throw new IOException("Tile staging directory must be new");
+        boolean complete=false;
+        try(RandomAccessFile tar=new RandomAccessFile(archive,"r")){
+            byte[] header=new byte[512],buffer=new byte[65536];Set<String> names=new HashSet<>();
+            while(tar.getFilePointer()+512<=tar.length()){
+                tar.readFully(header);boolean zero=true;for(byte b:header)if(b!=0){zero=false;break;}
+                if(zero)break;
+                long size=octal(header,124,12),next=tar.getFilePointer()+((size+511)/512)*512;
+                String name=new String(header,0,100,StandardCharsets.US_ASCII).split("\u0000",2)[0];
+                if(name.endsWith(".gph")){
+                    if(name.startsWith("./"))name=name.substring(2);
+                    if(!tilePath(name)||!names.add(name))throw new IOException("Unsafe or duplicate tile path");
+                    File out=new File(directory,name);
+                    if(!out.getParentFile().isDirectory()&&!out.getParentFile().mkdirs())throw new IOException("Cannot create tile hierarchy");
+                    try(OutputStream stream=new FileOutputStream(out)){
+                        for(long remaining=size;remaining>0;){
+                            int n=(int)Math.min(buffer.length,remaining);tar.readFully(buffer,0,n);
+                            if(directory.getUsableSpace()<200L*1024*1024)throw new IOException("Not enough free storage for tiles");
+                            stream.write(buffer,0,n);remaining-=n;
+                        }
+                    }
+                }
+                tar.seek(next);
+            }
+            validateTileDirectory(directory);complete=true;
+        }finally{
+            if(!complete)Files.walkFileTree(directory.toPath(),new SimpleFileVisitor<Path>(){
+                public FileVisitResult visitFile(Path path,BasicFileAttributes attrs)throws IOException{Files.delete(path);return FileVisitResult.CONTINUE;}
+                public FileVisitResult postVisitDirectory(Path path,IOException error)throws IOException{Files.delete(path);return FileVisitResult.CONTINUE;}
+            });
+        }
+    }
+    static boolean tilePath(String name){return name.length()<=64&&name.matches("[012]/(?:[0-9]{3}/)*[0-9]{3}\\.gph");}
+    /** Structural validation only. Composition must separately check generation and per-tile hashes. */
+    static void validateTileDirectory(File directory)throws IOException{
+        Path root=directory.toPath();
+        if(!Files.isDirectory(root,LinkOption.NOFOLLOW_LINKS))throw new IOException("Missing tile directory");
+        final int[] count={0};
+        Files.walkFileTree(root,new SimpleFileVisitor<Path>(){
+            public FileVisitResult preVisitDirectory(Path path,BasicFileAttributes attrs)throws IOException{
+                String relative=root.relativize(path).toString().replace(File.separatorChar,'/');
+                if(!relative.isEmpty()&&(relative.length()>60||!relative.matches("[012](?:/[0-9]{3})*")))throw new IOException("Invalid tile hierarchy");
+                return FileVisitResult.CONTINUE;
+            }
+            public FileVisitResult visitFile(Path path,BasicFileAttributes attrs)throws IOException{
+                String relative=root.relativize(path).toString().replace(File.separatorChar,'/');
+                if(!attrs.isRegularFile()||!tilePath(relative)||attrs.size()<272||++count[0]>2000000)
+                    throw new IOException("Invalid graph tile file");
+                if(!android.os.Process.is64Bit()&&attrs.size()>1_500_000_000L)throw new IOException("Graph tile exceeds 32-bit device limit");
+                return FileVisitResult.CONTINUE;
+            }
+        });
+        if(count[0]==0)throw new IOException("Empty tile directory");
     }
     private static long octal(byte[] header,int start,int length)throws IOException{
         String value=new String(header,start,length,StandardCharsets.US_ASCII).replace("\u0000","").trim();

@@ -19,9 +19,13 @@ final class NativeRouter implements AutoCloseable {
     private int auditAttempts;
     private JSONArray auditExcluded=new JSONArray();
     NativeRouter(Context context,File tiles) throws IOException {
-        try{RegionPackages.validateTar(tiles);}
+        this(context,tiles,false);
+    }
+    /** Internal directory path for a verified staged tile set; legacy packages still use TARs. */
+    NativeRouter(Context context,File tiles,boolean directory) throws IOException {
+        try{if(directory)RegionPackages.validateTileDirectory(tiles);else RegionPackages.validateTar(tiles);}
         catch(IOException e){throw new IOException("Installed routing map is missing or damaged. Download or import the country map again.",e);}
-        if(!android.os.Process.is64Bit()&&tiles.length()>1_500_000_000L)throw new IOException("Use a routing extract below 1.5 GB on a 32-bit device");
+        if(!directory&&!android.os.Process.is64Bit()&&tiles.length()>1_500_000_000L)throw new IOException("Use a routing extract below 1.5 GB on a 32-bit device");
         JSONObject manifest=readManifest(tiles.getParentFile());
         coverageName=manifest==null?"":manifest.optString("name","");
         coverageBbox=coverageBounds(manifest==null?null:manifest.optJSONObject("coverage"));
@@ -35,8 +39,8 @@ final class NativeRouter implements AutoCloseable {
             // ever needs country borders or timezones, the answer is a validated relative path inside the
             // package rather than a blind re-add of these keys.
             for(String key:new String[]{"tile_url","traffic_extract","admin","timezone","landmarks","transit_dir","transit_feeds_dir"})mj.remove(key);
-            mj.put("tile_extract",tiles.getAbsolutePath());
-            mj.put("tile_dir",new File(tiles.getParentFile(),"empty-tiles").getAbsolutePath());
+            mj.put("tile_extract",directory?"":tiles.getAbsolutePath());
+            mj.put("tile_dir",directory?tiles.getAbsolutePath():new File(tiles.getParentFile(),"empty-tiles").getAbsolutePath());
             mj.put("max_cache_size",32*1024*1024);
             config.getJSONObject("service_limits").put("allow_hard_exclusions",true)
                 .put("max_distance_disable_hierarchy_culling",5_000_000);

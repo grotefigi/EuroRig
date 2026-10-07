@@ -20,12 +20,13 @@ def run(*args, check=True, timeout=30):
 def ui(recover_system_ui=True):
     for attempt in range(3):
         try:
+            run('shell','rm','-f','/sdcard/eurorig-smoke.xml')
             run('shell','uiautomator','dump','/sdcard/eurorig-smoke.xml')
+            tree=ET.fromstring(run('shell','cat','/sdcard/eurorig-smoke.xml'))
             break
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired, ET.ParseError):
             if attempt==2:raise
             time.sleep(.5)
-    tree=ET.fromstring(run('shell','cat','/sdcard/eurorig-smoke.xml'))
     # Cold-booting these isolated images occasionally leaves a System UI ANR.
     # Recover only that OS dialog; never dismiss an EuroRig crash/failure.
     if recover_system_ui and any(n.attrib.get('text')=="System UI isn't responding" for n in tree.iter('node')):
@@ -33,6 +34,11 @@ def ui(recover_system_ui=True):
         x1,y1,x2,y2=map(int,re.findall(r'\d+',close.attrib['bounds']))
         run('shell','input','tap',(x1+x2)//2,(y1+y2)//2)
         print('Recovered emulator System UI cold-boot ANR',flush=True)
+        return ui(False)
+    if recover_system_ui and any(n.attrib.get('text')=='Launcher3 has stopped' and n.attrib.get('package')=='android' for n in tree.iter('node')):
+        run('shell','input','keyevent','BACK')
+        run('shell','am','start','-n','org.eurorig.app/.MainActivity')
+        print('Recovered emulator Launcher3 crash; EuroRig was not the crashed process',flush=True)
         return ui(False)
     return tree
 

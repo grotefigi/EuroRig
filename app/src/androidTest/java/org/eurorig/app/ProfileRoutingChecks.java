@@ -15,6 +15,8 @@ final class ProfileRoutingChecks {
         checkCoverage();
         checkCoverageMessages(app,tests);
         checkMissingDisplayEvidence(app,tests);
+        checkTileDirectory(app,tests);
+        checkCompositeDisplay(app,tests);
         File directory=new File(app.getFilesDir(),"profile-qa");if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Cannot create profile QA directory");
         boolean missingRejected=false;
         try(NativeRouter ignored=new NativeRouter(app,new File(directory,"missing.tar"))){throw new AssertionError("Missing routing map initialized");}
@@ -237,6 +239,97 @@ final class ProfileRoutingChecks {
             Files.copy(input,file.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
         }
         return file;
+    }
+    private static void checkTileDirectory(Context app,Context tests)throws Exception{
+        File root=new File(app.getFilesDir(),"directory-qa-"+UUID.randomUUID());
+        if(!root.mkdirs())throw new IOException("Cannot create directory QA storage");
+        File tar=new File(root,"routing.tar"),tiles=new File(root,"tiles");
+        try(InputStream input=tests.getAssets().open("profile-routing.tar")){Files.copy(input,tar.toPath());}
+        File displayFile=copyDisplay(tests,root,"display.sqlite");
+        RegionPackages.extractTiles(tar,tiles);
+        require(RegionPackages.tilePath("2/000/123.gph")&&!RegionPackages.tilePath("../123.gph")
+            &&!RegionPackages.tilePath("2/000/../123.gph")&&!RegionPackages.tilePath("/2/000/123.gph"),
+            "Only canonical relative graph tile paths are accepted");
+        boolean overlay=false;try{RegionPackages.extractTiles(tar,tiles);}catch(IOException expected){overlay=true;}
+        require(overlay,"Extraction refuses to overwrite an existing tile directory");
+        File malformed=new File(root,"malformed");require(malformed.mkdir(),"Malformed fixture created");
+        boolean empty=false;try{RegionPackages.validateTileDirectory(malformed);}catch(IOException expected){empty=true;}
+        require(empty,"An empty directory cannot initialize a router");
+        File bad=new File(malformed,"unknown.gph");Files.write(bad.toPath(),new byte[512]);
+        boolean unsafe=false;try{RegionPackages.validateTileDirectory(malformed);}catch(IOException expected){unsafe=true;}
+        require(unsafe,"An unknown tile hierarchy is rejected");
+        Files.delete(bad.toPath());
+        File link=new File(malformed,"2");android.system.Os.symlink(tiles.getAbsolutePath(),link.getAbsolutePath());
+        boolean linked=false;try{RegionPackages.validateTileDirectory(malformed);}catch(IOException expected){linked=true;}
+        require(linked,"Directory validation never follows symbolic links");Files.delete(link.toPath());
+        // Repeat the first real TAR entry under the same name, keeping valid headers. The new extraction
+        // path must reject ambiguity and remove its incomplete output rather than choosing the last tile.
+        File duplicate=new File(root,"duplicate.tar"),failed=new File(root,"failed");
+        try(RandomAccessFile source=new RandomAccessFile(tar,"r");OutputStream out=new FileOutputStream(duplicate)){
+            byte[] header=new byte[512];source.readFully(header);
+            require(new String(header,0,100,java.nio.charset.StandardCharsets.US_ASCII).split("\u0000",2)[0].endsWith(".gph"),
+                "The duplicate fixture repeats a real graph tile");
+            long size=Long.parseLong(new String(header,124,12,java.nio.charset.StandardCharsets.US_ASCII).replace("\u0000","").trim(),8);
+            byte[] first=new byte[(int)(512+((size+511)/512)*512)];source.seek(0);source.readFully(first);
+            out.write(first);out.write(first);out.write(new byte[1024]);
+        }
+        boolean repeated=false;try{RegionPackages.extractTiles(duplicate,failed);}catch(IOException expected){repeated=true;}
+        require(repeated&&!failed.exists(),"Duplicate archive tiles are refused and partial extraction is removed");
+        DisplayDatabase previous=Store.display;
+        try(DisplayDatabase display=new DisplayDatabase(displayFile);
+            NativeRouter archive=new NativeRouter(app,tar);NativeRouter directory=new NativeRouter(app,tiles,true)){
+            Store.display=display;
+            for(RoutingMode mode:RoutingMode.values()){
+                Router.Route a=archive.route(45,27.001,45,27.015,Truck.standard(),mode,false);
+                Router.Route b=directory.route(45,27.001,45,27.015,Truck.standard(),mode,false);
+                require(Math.abs(a.metres-b.metres)<.001&&a.graph.nodes.length==b.graph.nodes.length,
+                    "Directory and TAR routing agree in "+mode);
+                for(int i=0;i<a.edges.size();i++)require(a.edges.get(i).way==b.edges.get(i).way,"Directory retains audited way IDs");
+                rejected(()->directory.route(45,27.001,45,27.015,truck(5,2.55,16.5,40,11.5),mode,false),
+                    "Directory routing still refuses an oversized truck in "+mode);
+                Truck adr=new Truck(4,2.55,16.5,40,11.5,true,false,true,true,5,80,1,3);
+                Router.Route route=directory.route(45.12,27.001,45.12,27.015,adr,mode,false);
+                require(route.edges.stream().noneMatch(edge->edge.way==20000013L),"Directory routing retains detailed ADR checks");
+            }
+        }finally{Store.display=previous;}
+    }
+    private static void checkCompositeDisplay(Context app,Context tests)throws Exception{
+        File root=new File(app.getFilesDir(),"display-set-qa-"+UUID.randomUUID());
+        if(!root.mkdirs())throw new IOException("Cannot create display set QA storage");
+        ArrayList<File> files=new ArrayList<>();
+        for(int i=0;i<12;i++){
+            File file=copyDisplay(tests,root,"country-"+i+".sqlite");files.add(file);
+            try(SQLiteDatabase db=SQLiteDatabase.openDatabase(file.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+                long id=900000000L+i;
+                db.execSQL("INSERT INTO places(id,label,lat,lon,kind) VALUES(?,?,?,?,?)",new Object[]{id,"Warehouse "+i,45,27.001,"place"});
+                db.execSQL("INSERT INTO search(rowid,text) VALUES(?,?)",new Object[]{id,"warehouse "+i});
+            }
+        }
+        try(DisplayDatabase one=new DisplayDatabase(files.get(0));DisplayDatabase many=new DisplayDatabase(files,true)){
+            require(many.search("Warehouse").size()==12,"Search spans more countries than SQLite's attachment limit");
+            Map<Long,RestrictionRule> rules=many.rulesFor(Arrays.asList(20000003L,20000004L));
+            require(rules.size()==2&&rules.get(20000003L).height==3.5,"Shared rules are deduplicated without losing limits");
+            Graph single=one.visible(44.999,27,45.006,27.02,70000);
+            Graph combined=many.visible(44.999,27,45.006,27.02,70000);
+            require(single.edges.length==combined.edges.length&&combined.nodes.length<=60000,
+                "Shared geometry draws once with a bounded node count");
+        }
+        File conflicting=copyDisplay(tests,root,"conflicting.sqlite");
+        try(SQLiteDatabase db=SQLiteDatabase.openDatabase(conflicting.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            db.execSQL("UPDATE roads SET name=name||' conflict' WHERE id=20000003");
+        }
+        boolean rejected=false;
+        try(DisplayDatabase ignored=new DisplayDatabase(Arrays.asList(files.get(0),conflicting),true)){}
+        catch(IOException expected){rejected=true;}
+        require(rejected,"Countries with conflicting shared geometry are refused before use");
+        File missingRule=copyDisplay(tests,root,"missing-rule.sqlite");
+        try(SQLiteDatabase db=SQLiteDatabase.openDatabase(missingRule.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            db.execSQL("DELETE FROM road_rules WHERE way=20000003");
+        }
+        rejected=false;
+        try(DisplayDatabase ignored=new DisplayDatabase(Arrays.asList(files.get(0),missingRule),true)){}
+        catch(IOException expected){rejected=true;}
+        require(rejected,"A missing shared restriction row conflicts with the contributor carrying it");
     }
     private static JSONObject edge(int begin,int end,long way)throws JSONException{return new JSONObject().put("begin_shape_index",begin).put("end_shape_index",end).put("way_id",way);}
     private static Truck truck(double height,double width,double length,double weight,double axle){return new Truck(height,width,length,weight,axle,false,false,true,true);}
