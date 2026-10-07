@@ -61,7 +61,7 @@ def main():
     s.device = args.device
     if physical:
         services = s.run("shell", "dumpsys", "activity", "services", "org.eurorig.app").decode()
-        if "NavService" in services or "MapDownloadService" in services:
+        if "NavigationService" in services or "MapDownloadService" in services:
             parser.error("Stop guidance and map downloads before physical instrumentation.")
     payload = args.corpus.read_bytes()
     corpus = json.loads(payload)

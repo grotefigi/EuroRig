@@ -82,7 +82,7 @@ class DevicePreflight(unittest.TestCase):
             calls = []
             def run(*args, **kwargs):
                 calls.append(args)
-                return b'ServiceRecord{123 org.eurorig.app/.NavService}'
+                return b'ServiceRecord{123 org.eurorig.app/.NavigationService}'
             arguments = ['measure_corridors.py', str(corpus(root)), '--output', str(Path(root)/'out.json'),
                          '--device', 'tablet', '--physical']
             with mock.patch.object(measure_corridors.s, 'run', run), mock.patch('sys.argv', arguments):

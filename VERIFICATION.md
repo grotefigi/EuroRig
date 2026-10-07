@@ -30,6 +30,18 @@
 - 135 Python checks, 37 Java checks, build and Android lint pass.
   See [device requirements](docs/DEVICE_REQUIREMENTS.md) for tablet priority and
   the persistent 20,000,000,000-byte installed app/map/archive/cache limit.
+- Physical UI checks confirm the truck form opens/cancels, country rows show
+  actual sizes, and dark mode switches off/on and persists while restoring its
+  original state. The offline `Galati` query returns accented Galați results,
+  with Cancel reachable above the visible keyboard. These
+  checks preserve driver settings and endpoints. A hardware GPS request without
+  mock locations timed out with the explicit "Try again outside" message. No
+  accurate hardware fix or physical drive is inferred from that result.
+- New builds use the compatible `matchinfo=fts3` FTS4 option. A private Romania
+  copy saves 22,384,640 bytes (4.64%) and retains 20 host query results. This
+  keeps search text readable, unlike the larger, blocked contentless experiment.
+  API 26 and physical API 36 native tests mix compact/legacy indexes across 12 countries and still reject
+  shared search-text conflicts. The public and active Romania map is unchanged.
 
 ## Country download menu and storage audit
 

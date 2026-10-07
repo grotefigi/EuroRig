@@ -300,13 +300,21 @@ final class ProfileRoutingChecks {
         for(int i=0;i<12;i++){
             File file=copyDisplay(tests,root,"country-"+i+".sqlite");files.add(file);
             try(SQLiteDatabase db=SQLiteDatabase.openDatabase(file.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+                if(i%2==0){
+                    // Rebuild only test copies with the smaller FTS4 option; normalized content stays readable.
+                    db.execSQL("CREATE TABLE qa_search AS SELECT rowid AS id,text FROM search");
+                    db.execSQL("DROP TABLE search");
+                    db.execSQL("CREATE VIRTUAL TABLE search USING fts4(text,tokenize=unicode61,matchinfo=fts3)");
+                    db.execSQL("INSERT INTO search(rowid,text) SELECT id,text FROM qa_search");
+                    db.execSQL("DROP TABLE qa_search");
+                }
                 long id=900000000L+i;
                 db.execSQL("INSERT INTO places(id,label,lat,lon,kind) VALUES(?,?,?,?,?)",new Object[]{id,"Warehouse "+i,45,27.001,"place"});
                 db.execSQL("INSERT INTO search(rowid,text) VALUES(?,?)",new Object[]{id,"warehouse "+i});
             }
         }
         try(DisplayDatabase one=new DisplayDatabase(files.get(0));DisplayDatabase many=new DisplayDatabase(files,true)){
-            require(many.search("Warehouse").size()==12,"Search spans more countries than SQLite's attachment limit");
+            require(many.search("Warehouse").size()==12,"Search spans mixed compact and legacy indexes beyond SQLite's attachment limit");
             Map<Long,RestrictionRule> rules=many.rulesFor(Arrays.asList(20000003L,20000004L));
             require(rules.size()==2&&rules.get(20000003L).height==3.5,"Shared rules are deduplicated without losing limits");
             Graph single=one.visible(44.999,27,45.006,27.02,70000);
@@ -330,6 +338,14 @@ final class ProfileRoutingChecks {
         try(DisplayDatabase ignored=new DisplayDatabase(Arrays.asList(files.get(0),missingRule),true)){}
         catch(IOException expected){rejected=true;}
         require(rejected,"A missing shared restriction row conflicts with the contributor carrying it");
+        File wrongSearch=copyDisplay(tests,root,"wrong-search.sqlite");
+        try(SQLiteDatabase db=SQLiteDatabase.openDatabase(wrongSearch.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            db.execSQL("UPDATE search SET text=text||' conflict' WHERE rowid=(SELECT MIN(rowid) FROM search)");
+        }
+        rejected=false;
+        try(DisplayDatabase ignored=new DisplayDatabase(Arrays.asList(files.get(0),wrongSearch),true)){}
+        catch(IOException expected){rejected=true;}
+        require(rejected,"Compact and legacy indexes still refuse conflicting shared search text");
     }
     private static JSONObject edge(int begin,int end,long way)throws JSONException{return new JSONObject().put("begin_shape_index",begin).put("end_shape_index",end).put("way_id",way);}
     private static Truck truck(double height,double width,double length,double weight,double axle){return new Truck(height,width,length,weight,axle,false,false,true,true);}

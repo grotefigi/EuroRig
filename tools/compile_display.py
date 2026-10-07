@@ -51,7 +51,7 @@ def compile_display(sources,destination,name,seeds=None):
             level INTEGER NOT NULL, large INTEGER NOT NULL, south REAL,west REAL,north REAL,east REAL,shape TEXT NOT NULL);
         CREATE TABLE cells(lat INTEGER,lon INTEGER,road INTEGER,PRIMARY KEY(lat,lon,road)) WITHOUT ROWID;
         CREATE TABLE places(id INTEGER PRIMARY KEY,label TEXT NOT NULL,lat REAL,lon REAL,kind TEXT);
-        CREATE VIRTUAL TABLE search USING fts4(text,tokenize=unicode61);
+        CREATE VIRTUAL TABLE search USING fts4(text,tokenize=unicode61,matchinfo=fts3);
     ''')
     bounds=[90.0,180.0,-90.0,-180.0];missing=0;source_info=[]
     def place(identifier,label,lat,lon,kind):

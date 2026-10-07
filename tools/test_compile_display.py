@@ -45,6 +45,8 @@ class DisplayTests(unittest.TestCase):
                 self.assertEqual(1,db.execute('PRAGMA user_version').fetchone()[0])
                 labels=db.execute('SELECT p.label FROM search s JOIN places p ON p.id=s.rowid WHERE s.text MATCH ?',('bucurest*',)).fetchall()
                 self.assertEqual([('București',)],labels)
+                self.assertEqual([('bucuresti',)],db.execute('SELECT text FROM search WHERE text MATCH ?',('bucurest*',)).fetchall())
+                self.assertEqual([],db.execute("SELECT name FROM sqlite_master WHERE name='search_docsize'").fetchall())
                 self.assertEqual([(44.42,26.1),(44.43,26.11)],decode(db.execute('SELECT shape FROM roads').fetchone()[0]))
             enrich([source],output)
             with closing(sqlite3.connect(output)) as db:

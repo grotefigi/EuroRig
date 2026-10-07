@@ -1,5 +1,21 @@
 # Map storage: measured costs, the duplicate search text, and what Europe needs
 
+## Compatible search-index follow-up, 2026-10-07
+
+New country builds use `fts4(text,tokenize=unicode61,matchinfo=fts3)` in
+`compile_display.py`. This removes unused per-document token-length storage,
+while keeping normalized `search.text`, row IDs, prefix matching and the
+composed-country evidence query intact. EuroRig does not call `matchinfo()`.
+This differs from the contentless/external-content experiments below.
+
+A private copy of the Romania display database measured 459,649,024 bytes,
+saving 22,384,640 bytes (4.64%) versus 482,033,664 bytes. Twenty host searches
+returned the same IDs and the SQLite integrity check passed. Native checks mix
+compact and legacy indexes across 12 fictional countries and reject conflicting
+shared search text. The published and installed Romania package is unchanged;
+the compiler option affects future builds. This alone does not meet the 20 GB
+continental installed-storage requirement.
+
 Audit of the private QA maps, **read-only**, 2026-10-07. Nothing here changed a map, a package, a tablet
 or a published artifact. Tool: `tools/audit_map_storage.py` (test: `tools/test_audit_map_storage.py`,
 18 tests). Receipts: `analysis/private/map-storage-{union,romania}.json`,
