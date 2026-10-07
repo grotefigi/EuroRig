@@ -1,6 +1,7 @@
 package org.eurorig.app;
 
 import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
 import org.eurorig.routing.*;
 import org.json.*;
 import java.io.*;
@@ -13,6 +14,7 @@ final class ProfileRoutingChecks {
         checkAudit();
         checkCoverage();
         checkCoverageMessages(app,tests);
+        checkMissingDisplayEvidence(app,tests);
         File directory=new File(app.getFilesDir(),"profile-qa");if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Cannot create profile QA directory");
         boolean missingRejected=false;
         try(NativeRouter ignored=new NativeRouter(app,new File(directory,"missing.tar"))){throw new AssertionError("Missing routing map initialized");}
@@ -158,6 +160,83 @@ final class ProfileRoutingChecks {
     private static String failure(NativeRouter router,double lat,double lon,double endLat,double endLon,Truck truck){
         try{router.route(lat,lon,endLat,endLon,truck,null,false);return "(routed)";}
         catch(IllegalStateException expected){return expected.getMessage()==null?"":expected.getMessage();}
+    }
+    /**
+     * Routing tiles can cover a way that the display evidence does not. This fixture keeps routing intact
+     * and removes the display road coverage, and every mode must then refuse the route: a way missing
+     * from the evidence is unknown, not unrestricted. The intact control proves the trigger is the
+     * removed coverage rather than the routing data.
+     */
+    private static void checkMissingDisplayEvidence(Context app,Context tests)throws Exception{
+        File directory=new File(app.getFilesDir(),"evidence-qa");
+        if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Cannot create evidence QA directory");
+        File tar=new File(directory,"routing.tar");
+        try(InputStream input=tests.getAssets().open("profile-routing.tar")){
+            Files.copy(input,tar.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        File intact=copyDisplay(tests,directory,"display-intact.sqlite");
+        File missingPrimary=copyDisplay(tests,directory,"display-missing-primary.sqlite");
+        File none=copyDisplay(tests,directory,"display-none.sqlite");
+        // Way 20000003 is the shortest link across the parallel pair; remove ONLY its evidence so the
+        // known detour over 20000004 stays evidenced. Nothing else about the graph changes.
+        try(SQLiteDatabase database=SQLiteDatabase.openDatabase(missingPrimary.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            database.execSQL("DELETE FROM roads WHERE id=20000003");
+            database.execSQL("DELETE FROM road_rules WHERE way=20000003");
+        }
+        // No evidence for any routed way: keep exactly one road so the database still opens, then move it
+        // to an id no route uses, so only the road_rules table (the evidence claim itself) survives.
+        try(SQLiteDatabase database=SQLiteDatabase.openDatabase(none.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            database.execSQL("DELETE FROM roads WHERE id NOT IN (SELECT id FROM roads ORDER BY id LIMIT 1)");
+            database.execSQL("UPDATE roads SET id=999999");
+        }
+        Truck legal=new Truck(3,2.2,10,18,7,false,false,true,true);      // satisfies way 20000003's limits
+        Truck hazmat=new Truck(3,2.2,10,18,7,true,false,true,true);      // ADR load, no tunnel code
+        Truck detailed=new Truck(3,2.2,10,18,7,true,false,true,true,5,80,3,3);   // detailed ADR
+        DisplayDatabase previousDisplay=Store.display;NativeRouter previousRouter=Store.nativeRouter;
+        try(DisplayDatabase control=new DisplayDatabase(intact);DisplayDatabase partial=new DisplayDatabase(missingPrimary);
+            DisplayDatabase empty=new DisplayDatabase(none);NativeRouter router=new NativeRouter(app,tar)){
+            require(partial.restrictionEvidence,"The partial fixture still declares restriction evidence");
+            require(empty.restrictionEvidence,"The empty fixture still declares restriction evidence");
+            require(control.endpoints.nodes.length==2&&empty.endpoints.nodes.length==2,
+                "The fixture exposes its two endpoints");
+            double[] from={control.endpoints.nodes[0].lat,control.endpoints.nodes[0].lon};
+            double[] to={control.endpoints.nodes[1].lat,control.endpoints.nodes[1].lon};
+            Store.nativeRouter=router;
+            for(RoutingMode routingMode:RoutingMode.values()){
+                Store.display=control;
+                Router.Route baseline=router.route(from[0],from[1],to[0],to[1],legal,routingMode,false);
+                require(baseline!=null&&baseline.metres>0,"With the display coverage intact the corridor routes in "+routingMode);
+                // The unevidenced way must be excluded and an evidenced detour taken - not routed as
+                // unrestricted, and not treated as a dead end while a legal alternative exists.
+                Store.display=partial;
+                Router.Route detour=router.route(from[0],from[1],to[0],to[1],legal,routingMode,false);
+                require(detour!=null&&detour.metres>0,"A way missing from the evidence must not block an evidenced detour");
+                require(detour.edges.stream().noneMatch(edge->edge.way==20000003L)
+                    &&detour.edges.stream().anyMatch(edge->edge.way==20000004L),
+                    "The returned route uses the evidenced detour instead of the missing way in "+routingMode);
+                require(router.auditAttempts()>=2,"The unevidenced way was excluded and the route retried, not accepted");
+                require(router.auditExcluded().length()>=1,"The excluded attempt recorded the point it avoided");
+                // With no evidence at all there is no legal alternative, in any mode.
+                for(boolean delivery:new boolean[]{false,true})for(Truck mode:new Truck[]{legal,hazmat,detailed}){
+                    Store.display=empty;
+                    String message=null;
+                    try{router.route(from[0],from[1],to[0],to[1],mode,routingMode,delivery);}
+                    catch(IllegalStateException expected){message=expected.getMessage();}
+                    require(message!=null&&router.auditAttempts()>=2&&router.auditExcluded().length()>=1,
+                        "A route with no display evidence must be refused (delivery="+delivery+", hazmat="+mode.hazmat
+                            +", hazards="+mode.hazardousLoad+", tunnel="+mode.tunnelCode+", routing="+routingMode+"): "+message);
+                }
+            }
+        }finally{
+            Store.display=previousDisplay;Store.nativeRouter=previousRouter;
+        }
+    }
+    private static File copyDisplay(Context tests,File directory,String name)throws IOException{
+        File file=new File(directory,name);
+        try(InputStream input=tests.getAssets().open("profile-display.sqlite")){
+            Files.copy(input,file.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        return file;
     }
     private static JSONObject edge(int begin,int end,long way)throws JSONException{return new JSONObject().put("begin_shape_index",begin).put("end_shape_index",end).put("way_id",way);}
     private static Truck truck(double height,double width,double length,double weight,double axle){return new Truck(height,width,length,weight,axle,false,false,true,true);}

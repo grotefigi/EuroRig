@@ -1,5 +1,27 @@
 # Verification
 
+## Routing evidence follow-up
+
+- Android 8/API 26 native profile instrumentation passes explicit Shortest,
+  Easiest and Economical checks against a routing graph whose display evidence
+  is deliberately altered. Removing the primary way selects an evidenced detour;
+  the returned route excludes way 20000003 and includes way 20000004. The audit
+  records a retry and an exclusion. Removing all routed-way evidence refuses
+  routing across all three preferences, with normal, hazmat and detailed ADR
+  profiles, both with and without delivery permission. The intact control routes.
+- Missing evidence uses the existing bounded exclusion loop. Truck restrictions
+  remain enforced; a road with unknown evidence is never accepted as unrestricted.
+  A native no-path refusal can replace the earlier evidence message, so the check
+  verifies refusal plus the actual audit counters rather than one error phrase.
+- Independent private map-generation verification checks 1024 actual tiles.
+  The incompatible fixture is rejected for mixed generations and 636 conflicting
+  shared-tile claims. The compatible control verifies 1024 tiles with no mismatches
+  or unowned tiles. This is a host packaging check, not Android country composition.
+- Country composition, fresh coherent-package Android corridor checks and ferry
+  evidence remain unfinished. These changes do not certify real-road navigation.
+- The standing animation, UI and AI reference catalog is recorded in
+  [implementation references](docs/IMPLEMENTATION_REFERENCES.md).
+
 ## 0.6.0-dev candidate, 2026-10-07
 
 - 37 Java tests and 28 Python tests pass; Android lint reports no issues.

@@ -92,6 +92,11 @@ final class NativeRouter implements AutoCloseable {
                 JSONArray traced=new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
                 HashSet<Long> ways=new HashSet<>();for(int i=0;i<traced.length();i++)ways.add(traced.getJSONObject(i).getLong("way_id"));
                 Map<Long,RestrictionRule> rules=display.rulesFor(ways);auditedRules=rules;auditedWays=auditedWays(traced,geometry.size());boolean rejected=false;restrictedMetres=0;boolean originEgress=true;
+                // A way absent from this map is outside the display evidence altogether: rulesFor LEFT JOINs
+                // the sparse rule table onto roads, so a known road always yields a row and only an unknown
+                // way is missing. Such ways are left to the bounded exclusion/reroute loop below, exactly
+                // like a hard-limit violation, so an entirely evidenced alternative is still found before
+                // the route is refused. The unconditional rule==null reason below is what excludes them.
                 for(int i=0;i<traced.length();i++){
                     JSONObject edge=traced.getJSONObject(i);int begin=edge.getInt("begin_shape_index"),end=edge.getInt("end_shape_index");
                     long way=edge.getLong("way_id");
@@ -100,7 +105,8 @@ final class NativeRouter implements AutoCloseable {
                     Graph.Node point=new Graph.Node((a.lat+b.lat)/2,(a.lon+b.lon)/2,"");RestrictionRule rule=rules.get(way);
                     originEgress=originEgress&&rule!=null&&rule.accessLimited()
                         &&Geo.distance(geometry.get(end).lat,geometry.get(end).lon,lat,lon)<=250;
-                    String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null):rule.violation(truck,delivery,
+                    // Missing evidence excludes the candidate in every mode; never treat it as clear.
+                    String reason=rule==null?"Road has no restriction evidence":rule.violation(truck,delivery,
                         Math.max(Geo.distance(geometry.get(begin).lat,geometry.get(begin).lon,endLat,endLon),Geo.distance(geometry.get(end).lat,geometry.get(end).lon,endLat,endLon)),originEgress);
                     if(reason!=null){failure=reason;excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));rejected=true;break;}
                     if(rule!=null&&rule.accessLimited())restrictedMetres+=edge.getDouble("length")*1000;
