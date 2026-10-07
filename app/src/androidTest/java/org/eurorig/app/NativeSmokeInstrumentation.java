@@ -15,11 +15,12 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
     private boolean profilesOnly;
     private boolean cameraOnly;
     private boolean corridorsOnly;
-    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));cameraOnly="true".equals(arguments.getString("cameraOnly"));corridorsOnly="true".equals(arguments.getString("corridorsOnly"));start();}
+    private String qaRegion;
+    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));cameraOnly="true".equals(arguments.getString("cameraOnly"));corridorsOnly="true".equals(arguments.getString("corridorsOnly"));qaRegion=arguments.getString("qaRegion");start();}
     public void onStart(){
         Bundle result=new Bundle();
         try{
-            if(corridorsOnly){CorridorChecks.run(getTargetContext());result.putString("stream","PASS: native corridor measurements written; inspect individual outcomes\n");finish(-1,result);return;}
+            if(corridorsOnly){CorridorChecks.run(getTargetContext(),qaRegion);result.putString("stream","PASS: native corridor measurements written; inspect individual outcomes\n");finish(-1,result);return;}
             if(profilesOnly){TruckMapChecks.run(getTargetContext(),getContext());ProfileRoutingChecks.run(getTargetContext(),getContext());result.putString("stream","PASS: native profile, ADR display and truck map retention checks\n");finish(-1,result);return;}
             if(cameraOnly){Store.load(getTargetContext());Router.Route route=Store.calculate(Store.graph,Store.start,Store.end,Store.truck);checkCamera(route);result.putString("stream","PASS: actual map viewport, navigation zoom, every route fix follows, pan/rotation, route trail removal and heading arrow pixels\n");finish(-1,result);return;}
             require(!Arrays.asList(getTargetContext().getAssets().list("")).contains("andorra-routing.tar"),"No bundled maps");

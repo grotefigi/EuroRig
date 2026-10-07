@@ -40,9 +40,9 @@ final class RoadMapView extends View {
     Pick pick;
     RoadMapView(Context c) {
         super(c);setContentDescription("Offline road map. Tap a road to choose a route endpoint. Pinch to zoom, drag to pan.");
-        boolean dark=c.getSharedPreferences("settings",0).getBoolean("dark_mode",(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);
-        landColor=dark?0xff162225:0xffe9ece4;casingColor=dark?0xff0b1416:0xffb7c1b7;labelColor=dark?0xffbcd0d0:0xff34464a;attributionColor=dark?0xffa0b4b7:0xff506266;
-        roadColors=dark?new int[]{0xff8cabad,0xffed7070,0xffdda74f,0xff364b50}:new int[]{0xff54696f,0xffe15a56,0xffe6a73c,0xff9eaea0};
+        AppPalette palette=new AppPalette(c);
+        landColor=palette.land;casingColor=palette.casing;labelColor=palette.label;attributionColor=palette.attribution;
+        roadColors=palette.roads;
         scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
             public boolean onScale(ScaleGestureDetector d) { camera.zoom(d.getScaleFactor());invalidate();return true; }
         });

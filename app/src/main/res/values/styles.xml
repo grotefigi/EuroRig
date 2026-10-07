@@ -1,19 +1,29 @@
 <resources>
     <style name="AppTheme" parent="android:style/Theme.Material.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#C4F16D</item>
+        <item name="android:colorAccent">#4C9AFF</item>
+        <item name="android:colorControlHighlight">#40FFFFFF</item>
+        <item name="android:colorButtonNormal">#20242C</item>
+        <item name="android:colorBackground">#191C22</item>
+        <item name="android:textColorPrimary">#F8FAFC</item>
+        <item name="android:textColorSecondary">#9AA3B2</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:statusBarColor">#10191C</item>
-        <item name="android:navigationBarColor">#10191C</item>
+        <item name="android:statusBarColor">#020617</item>
+        <item name="android:navigationBarColor">#020617</item>
         <item name="android:windowActionModeOverlay">true</item>
-        <item name="android:windowBackground">#10191C</item>
+        <item name="android:windowBackground">#020617</item>
     </style>
     <style name="AppThemeLight" parent="android:style/Theme.Material.Light.NoActionBar">
         <item name="android:fontFamily">sans</item>
-        <item name="android:colorAccent">#176BD7</item>
+        <item name="android:colorAccent">#1D4ED8</item>
+        <item name="android:colorControlHighlight">#250F172A</item>
+        <item name="android:colorButtonNormal">#F1F5F9</item>
+        <item name="android:colorBackground">#FFFFFF</item>
+        <item name="android:textColorPrimary">#0F172A</item>
+        <item name="android:textColorSecondary">#475569</item>
         <item name="android:windowLightStatusBar">true</item>
-        <item name="android:statusBarColor">#F7F9FC</item>
-        <item name="android:navigationBarColor">#F7F9FC</item>
-        <item name="android:windowBackground">#F7F9FC</item>
+        <item name="android:statusBarColor">#F1F5F9</item>
+        <item name="android:navigationBarColor">#F1F5F9</item>
+        <item name="android:windowBackground">#F1F5F9</item>
     </style>
 </resources>

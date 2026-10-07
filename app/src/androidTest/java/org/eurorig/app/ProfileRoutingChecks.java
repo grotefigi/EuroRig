@@ -11,6 +11,8 @@ import java.util.*;
 final class ProfileRoutingChecks {
     static void run(Context app,Context tests)throws Exception{
         checkAudit();
+        checkCoverage();
+        checkCoverageMessages(app,tests);
         File directory=new File(app.getFilesDir(),"profile-qa");if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Cannot create profile QA directory");
         boolean missingRejected=false;
         try(NativeRouter ignored=new NativeRouter(app,new File(directory,"missing.tar"))){throw new AssertionError("Missing routing map initialized");}
@@ -64,6 +66,98 @@ final class ProfileRoutingChecks {
             new JSONArray().put(edge(0,4,10)).put(edge(1,2,12))}){
             rejected(()->{try{NativeRouter.auditedWays(bad,5);}catch(JSONException e){throw new IllegalStateException(e);}},"Incomplete or invalid restriction trace must fail closed");
         }
+    }
+    /**
+     * The published coverage box is advisory and never proof of coverage: a malformed box must behave
+     * exactly as undeclared, and an outside destination must be detected as readily as an outside
+     * origin, or a driver whose destination lies beyond the map is told to try a different entrance.
+     */
+    private static void checkCoverage()throws Exception{
+        JSONObject good=new JSONObject().put("tiles",1024)
+            .put("bbox",new JSONArray().put(16.108446).put(42.229789).put(30.278960).put(48.589212));
+        double[] bounds=NativeRouter.coverageBounds(good);
+        require(bounds!=null,"A well-formed coverage box is accepted");
+        require(NativeRouter.withinBounds(bounds,45.435,28.008)&&NativeRouter.withinBounds(bounds,46.253,20.141),
+            "Galati and Szeged lie inside the published box");
+        require(!NativeRouter.withinBounds(bounds,41.0,28.0),"A point south of the box lies outside it");
+        require(NativeRouter.withinBounds(bounds,45.435,28.008)&&!NativeRouter.withinBounds(bounds,41.0,28.0),
+            "An outside destination is detected even when the origin is inside");
+        require(NativeRouter.coverageBounds(new JSONObject())==null,"A package with no coverage declares nothing");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(30.278960).put(48.589212).put(16.108446).put(42.229789)))==null,
+            "Reversed bounds are treated as undeclared");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(-200.0).put(42.229789).put(30.278960).put(48.589212)))==null,
+            "An out-of-range longitude is treated as undeclared");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(16.108446).put(42.229789).put(30.278960).put(95.0)))==null,
+            "An out-of-range latitude is treated as undeclared");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(16.108446).put(42.229789).put(16.108446).put(48.589212)))==null,
+            "A degenerate box is treated as undeclared");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(16.108446).put(42.229789).put(30.278960)))==null,
+            "An incomplete box is treated as undeclared");
+        // org.json refuses NaN and Infinity outright, so a non-numeric component stands in for them.
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put("west").put(42.229789).put(30.278960).put(48.589212)))==null,
+            "A non-numeric bound is treated as undeclared");
+        require(!NativeRouter.withinBounds(null,45.435,28.008),"An undeclared box contains nothing");
+    }
+    /**
+     * Error-message wiring for the published coverage box: the real strings NativeRouter produces,
+     * against the same tiny native fixture the profile checks use, with a temporary manifest written
+     * beside a copy of the tar. Nothing here touches an installed map - every router reads a package
+     * in app-private storage.
+     */
+    private static void checkCoverageMessages(Context app,Context tests)throws Exception{
+        File directory=new File(app.getFilesDir(),"coverage-qa");
+        if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Cannot create coverage QA directory");
+        for(String name:new String[]{"routing.tar","display.sqlite"})
+            try(InputStream input=tests.getAssets().open("profile-"+name)){
+                Files.copy(input,new File(directory,name).toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        Truck truck=truck(4,2.55,16.5,40,11.5);
+        try(NativeRouter declared=coverageRouter(app,directory,new double[]{16.108446,42.229789,30.278960,48.589212})){
+            String message=failure(declared,45,27.001,41,28,truck);
+            require(message.contains("outside the installed map"),
+                "An inside origin with an outside destination is reported as outside the map: "+message);
+            message=failure(declared,41,28,45,27.001,truck);
+            require(message.contains("outside the installed map"),
+                "An outside origin with an inside destination is reported as outside the map: "+message);
+            message=failure(declared,45,27.9,45,27.95,truck);
+            require(message.contains("check country coverage")&&!message.contains("outside the installed map"),
+                "Inside the declared box keeps the conservative road-snap advice: "+message);
+            declared.route(45,27.001,45,27.015,truck,null,false);
+            require(declared.auditAttempts()>0,"A successful route records its own attempts");
+            failure(declared,45,27.9,45,27.95,truck);
+            require(declared.auditAttempts()==1&&declared.auditExcluded().length()==0,
+                "A failing request reports its own audit counters, not the previous call's");
+            failure(declared,45,27.001,45,27.015,truck(4,2.55,16.5,120,11.5));
+            require(declared.auditAttempts()==0&&declared.auditExcluded().length()==0,
+                "A request refused before the engine clears the audit counters");
+        }
+        try(NativeRouter undeclared=new NativeRouter(app,new File(directory,"routing.tar"))){
+            String message=failure(undeclared,45,27.9,45,27.95,truck);
+            require(message.contains("check country coverage"),
+                "A package with no declared coverage keeps the original advice: "+message);
+        }
+    }
+    /** A router whose tar sits beside a manifest declaring the given coverage box. */
+    private static NativeRouter coverageRouter(Context app,File directory,double[] box)throws Exception{
+        File covered=new File(directory,"covered");
+        if(!covered.isDirectory()&&!covered.mkdirs())throw new IOException("Cannot create covered QA directory");
+        Files.copy(new File(directory,"routing.tar").toPath(),new File(covered,"routing.tar").toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        JSONObject manifest=new JSONObject().put("name","Coverage QA")
+            .put("coverage",new JSONObject().put("tiles",1).put("bbox",new JSONArray(box)));
+        Files.write(new File(covered,"manifest.json").toPath(),
+            manifest.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return new NativeRouter(app,new File(covered,"routing.tar"));
+    }
+    private static String failure(NativeRouter router,double lat,double lon,double endLat,double endLon,Truck truck){
+        try{router.route(lat,lon,endLat,endLon,truck,null,false);return "(routed)";}
+        catch(IllegalStateException expected){return expected.getMessage()==null?"":expected.getMessage();}
     }
     private static JSONObject edge(int begin,int end,long way)throws JSONException{return new JSONObject().put("begin_shape_index",begin).put("end_shape_index",end).put("way_id",way);}
     private static Truck truck(double height,double width,double length,double weight,double axle){return new Truck(height,width,length,weight,axle,false,false,true,true);}

@@ -1,5 +1,38 @@
 # Verification
 
+## 0.6.0-dev candidate, 2026-10-07
+
+- 37 Java tests and 28 Python tests pass; Android lint reports no issues.
+- The UI uses paired light/dark semantic colours, original vector controls,
+  native ripple and keyboard focus feedback, and a clear primary route action.
+  Theme switching changes the rendered map, controls and dialogs; the saved
+  selection survives restart and switching during guidance preserves following.
+- API 26 and API 37 each pass the 22-check UI sweep. Additional checks exercise
+  all seven numeric profile fields, six checkboxes, ADR E, precision after restart,
+  invalid-profile preservation, map picking, saved places, endpoint swap, trip-only
+  delivery permission, the live catalogue and licence content. These are emulator
+  checks, not a real driving or spoken-output validation.
+- Native profile, ADR, map-retention, camera, heading-arrow and route-trail checks
+  pass on both versions. API 37 injected GPS checks pass acquisition, following,
+  loss/unavailable speed, recovery, theme switching, edit protection and Stop.
+- Layout and contrast checks pass at 375 x 812, 812 x 375, 1280 x 800 and
+  800 x 1280 dp, including 200% text and disabled animations. Each of 14 main
+  controls is reachable at 48 dp or larger. Seven profile fields, six checkboxes,
+  the ADR selector and four routing preference controls meet the same minimum.
+  Maps actions retain their complete labels at 200% text. Screenshot review caught
+  split navigation labels and a clipped download-status action before fixing them.
+- Native coverage errors now test both endpoints. Missing or malformed bounds
+  remain undeclared, and a bounding rectangle never proves coverage inside it.
+  Real native-fixture checks cover an outside destination, the reversed direction,
+  the conservative interior advice and fresh audit counters after failures.
+- Open Code Review 1.12.12 delegation mode selects files and resolves rules;
+  Codex performs the review locally without a new external LLM endpoint. Peer
+  review and actual device checks supplement it. QA-runner preflight and
+  preference-read bugs found during review are fixed with regression checks.
+- The public Romania map remains unchanged. Coherent cross-border maps and
+  country-union installation remain separate work; no new Europe coverage or
+  real-road certification is claimed by this UI update.
+
 ## 0.5.0-dev, 2026-10-06
 
 - 37 Java tests and 17 Python tests pass; Android lint reports no issues.

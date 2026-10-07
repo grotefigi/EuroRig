@@ -7,6 +7,9 @@ import android.content.pm.PackageManager;
 import android.graphics.Color;
 import android.graphics.Typeface;
 import android.graphics.drawable.GradientDrawable;
+import android.graphics.drawable.RippleDrawable;
+import android.graphics.drawable.StateListDrawable;
+import android.content.res.ColorStateList;
 import android.location.*;
 import android.os.*;
 import android.text.*;
@@ -20,11 +23,13 @@ import java.util.*;
 
 public final class MainActivity extends Activity {
     private int BG,PANEL,TEXT,MUTED,LIME;
+    private AppPalette palette;
     private boolean darkMode;
     private TextView status, profile, endpoints, instruction, stats, speedDisplay;
     private LinearLayout routeCard;
     private Button gpsButton, overviewButton, modeButton;
     private Button zoomInButton,zoomOutButton;
+    private boolean mapGlyphs;
     private boolean guidanceWasActive;
     private Button plan, drive;
     private RoadMapView map;
@@ -67,8 +72,8 @@ public final class MainActivity extends Activity {
     }
     private int dp(float v){return Math.round(v*getResources().getDisplayMetrics().density);}
     private void applyAppearance(){
-        darkMode=getSharedPreferences("settings",0).getBoolean("dark_mode",(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);
-        BG=darkMode?0xff10191c:0xfff7f9fc;PANEL=darkMode?0xff1e2c30:0xffe8eef5;TEXT=darkMode?0xffe4eeee:0xff14242b;MUTED=darkMode?0xff9eb4b9:0xff52646e;LIME=darkMode?0xffc4f16d:0xff176bd7;
+        palette=new AppPalette(this);darkMode=palette.dark;
+        BG=palette.background;PANEL=palette.secondary;TEXT=palette.text;MUTED=palette.muted;LIME=palette.accent;
         setTheme(darkMode?R.style.AppTheme:R.style.AppThemeLight);
         getWindow().setStatusBarColor(BG);getWindow().setNavigationBarColor(BG);
         getWindow().getDecorView().setSystemUiVisibility(darkMode?0:View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR|View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR);
@@ -79,9 +84,28 @@ public final class MainActivity extends Activity {
         toggle.setOnCheckedChangeListener((view,checked)->{dialog.dismiss();getSharedPreferences("settings",0).edit().putBoolean("dark_mode",checked).apply();RoadMapView old=map;boolean initialized=guidanceWasActive;applyAppearance();buildUi();map.setGraph(Store.graph);map.restoreCamera(old);guidanceWasActive=initialized;refresh();});dialog.show();
     }
     private GradientDrawable background(int color,int radius){GradientDrawable d=new GradientDrawable();d.setColor(color);d.setCornerRadius(dp(radius));return d;}
-    private TextView text(String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextColor(color);t.setTextSize(size);t.setFontFeatureSettings("kern");return t;}
+    private TextView text(String value,int size,int color){TextView t=new TextView(this);t.setText(value);t.setTextColor(color);t.setTextSize(size);t.setFontFeatureSettings("kern, tnum");return t;}
     private LinearLayout vertical(){LinearLayout l=new LinearLayout(this);l.setOrientation(LinearLayout.VERTICAL);return l;}
-    private Button button(String value,Runnable action){Button b=new Button(this);b.setText(value);b.setTextSize(13);b.setAllCaps(false);b.setTextColor(TEXT);b.setBackground(background(PANEL,12));b.setPadding(dp(10),0,dp(10),0);b.setMinHeight(dp(48));b.setOnClickListener(v->action.run());return b;}
+    private void feedback(View view,int color,boolean outlined){
+        GradientDrawable normal=background(color,12);if(outlined)normal.setStroke(dp(1),palette.border);
+        GradientDrawable focused=background(color,12);focused.setStroke(dp(2),color==LIME?palette.onAccent:color==palette.danger?Color.WHITE:LIME);
+        StateListDrawable states=new StateListDrawable();states.addState(new int[]{android.R.attr.state_focused},focused);states.addState(new int[]{},normal);
+        view.setBackground(new RippleDrawable(ColorStateList.valueOf(darkMode?0x40ffffff:0x250f172a),states,background(Color.WHITE,12)));
+    }
+    private void actionStyle(Button view,int color,int foreground,boolean outlined){
+        if(Integer.valueOf(color).equals(view.getTag()))return;
+        feedback(view,color,outlined);view.setTextColor(foreground);view.setTag(color);
+    }
+    private void icon(Button view,int resource,boolean above){
+        android.graphics.drawable.Drawable drawable=getDrawable(resource).mutate();drawable.setTint(view.getCurrentTextColor());drawable.setBounds(0,0,dp(20),dp(20));
+        view.setCompoundDrawablePadding(dp(4));
+        view.setCompoundDrawablesRelative(above?null:drawable,above?drawable:null,null,null);
+    }
+    private void tappableLabel(TextView view){
+        view.setFocusable(true);feedback(view,PANEL,true);
+        view.setAccessibilityDelegate(new View.AccessibilityDelegate(){public void onInitializeAccessibilityNodeInfo(View host,android.view.accessibility.AccessibilityNodeInfo info){super.onInitializeAccessibilityNodeInfo(host,info);info.setClassName(Button.class.getName());}});
+    }
+    private Button button(String value,Runnable action){Button b=new Button(this);b.setText(value);b.setTextSize(14);b.setAllCaps(false);b.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));b.setTextColor(TEXT);feedback(b,PANEL,true);b.setStateListAnimator(null);b.setPadding(dp(12),dp(4),dp(12),dp(4));b.setMinWidth(0);b.setMinimumWidth(0);b.setMinHeight(dp(48));b.setOnClickListener(v->action.run());return b;}
     private void buildUi(){
         guidanceWasActive=false;
         FrameLayout root=new FrameLayout(this);root.setBackgroundColor(BG);
@@ -90,29 +114,35 @@ public final class MainActivity extends Activity {
         map=new RoadMapView(this);map.pick=n->{if(editable())choosePoint(n);};map.cameraChanged=this::updateMapControls;
         root.addView(map,new FrameLayout.LayoutParams(-1,-1));
         boolean wide=getResources().getConfiguration().screenWidthDp>getResources().getConfiguration().screenHeightDp;
+        boolean largeText=getResources().getConfiguration().fontScale>1.3;
+        mapGlyphs=largeText||getResources().getConfiguration().screenWidthDp<400;
         int panelWidth=wide?dp(Math.min(330,Math.max(240,getResources().getConfiguration().screenWidthDp*.42f))):-1;
-        LinearLayout top=vertical();top.setPadding(dp(12),dp(8),dp(12),dp(8));top.setBackground(background(BG,18));
+        LinearLayout top=vertical();top.setPadding(dp(12),dp(12),dp(12),dp(12));top.setBackground(background(palette.surface,20));top.setElevation(dp(4));
         FrameLayout.LayoutParams topPosition=new FrameLayout.LayoutParams(panelWidth,-2,Gravity.TOP|Gravity.START);topPosition.setMargins(dp(8),dp(8),dp(8),0);root.addView(top,topPosition);
+        LinearLayout brandRow=new LinearLayout(this);brandRow.setGravity(Gravity.CENTER_VERTICAL);
+        TextView brand=text("EuroRig",19,TEXT);brand.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));brandRow.addView(brand,new LinearLayout.LayoutParams(-2,-2));
+        status=text("Opening maps…",12,MUTED);status.setGravity(Gravity.END);status.setPadding(dp(12),0,0,0);brandRow.addView(status,new LinearLayout.LayoutParams(0,-2,1));top.addView(brandRow);
         routeCard=vertical();top.addView(routeCard);
-        Button search=button("Search destination or coordinates",()->{if(Store.graph==null)mapsDialog();else search(false);});search.setTextSize(15);routeCard.addView(search,new LinearLayout.LayoutParams(-1,dp(52)));
-        LinearLayout profileRow=new LinearLayout(this);
-        profile=text("Your truck",13,LIME);profile.setGravity(Gravity.CENTER_VERTICAL);profile.setPadding(dp(10),0,dp(4),0);profile.setContentDescription("Edit vehicle dimensions and ADR profile");profile.setOnClickListener(v->{if(canChangeMap())truckDialog();});profileRow.addView(profile,new LinearLayout.LayoutParams(0,dp(48),1));
-        modeButton=button("Economical",this::routingOptions);profileRow.addView(modeButton,new LinearLayout.LayoutParams(dp(118),dp(48)));routeCard.addView(profileRow);
-        status=text("Opening maps…",12,MUTED);status.setPadding(dp(8),dp(4),dp(8),dp(4));top.addView(status);
+        Button search=button("Search destination or coordinates",()->{if(Store.graph==null)mapsDialog();else search(false);});search.setTextSize(15);search.setGravity(Gravity.CENTER_VERTICAL|Gravity.START);icon(search,R.drawable.ic_search,false);LinearLayout.LayoutParams searchSize=new LinearLayout.LayoutParams(-1,-2);searchSize.topMargin=dp(12);search.setMinHeight(dp(56));routeCard.addView(search,searchSize);
+        LinearLayout profileRow=new LinearLayout(this);profileRow.setOrientation(largeText?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);
+        profile=text("Your truck",14,TEXT);profile.setGravity(Gravity.CENTER_VERTICAL);profile.setPadding(dp(12),dp(6),dp(4),dp(6));profile.setContentDescription("Edit vehicle dimensions and ADR profile");profile.setOnClickListener(v->{if(canChangeMap())truckDialog();});tappableLabel(profile);LinearLayout.LayoutParams profileSize=new LinearLayout.LayoutParams(largeText?-1:0,-2,largeText?0:1);if(!largeText)profileSize.rightMargin=dp(8);profile.setMinHeight(dp(48));profileRow.addView(profile,profileSize);
+        modeButton=button("Economical",this::routingOptions);LinearLayout.LayoutParams modeSize=new LinearLayout.LayoutParams(largeText?-1:dp(122),-2);if(largeText)modeSize.topMargin=dp(8);profileRow.addView(modeButton,modeSize);LinearLayout.LayoutParams profileRowSize=new LinearLayout.LayoutParams(-1,-2);profileRowSize.topMargin=dp(8);routeCard.addView(profileRow,profileRowSize);
         instruction=text("Choose a destination",18,TEXT);instruction.setTypeface(Typeface.DEFAULT,Typeface.BOLD);instruction.setPadding(dp(8),dp(4),dp(8),dp(4));top.addView(instruction);
-        LinearLayout bottom=vertical();bottom.setPadding(dp(12),dp(8),dp(12),dp(8));bottom.setBackground(background(BG,18));
+        LinearLayout bottom=vertical();bottom.setPadding(dp(12),dp(12),dp(12),dp(4));bottom.setBackground(background(palette.surface,20));bottom.setElevation(dp(4));
         FrameLayout.LayoutParams bottomPosition=new FrameLayout.LayoutParams(panelWidth,-2,Gravity.BOTTOM|Gravity.START);bottomPosition.setMargins(dp(8),0,dp(8),dp(8));root.addView(bottom,bottomPosition);
-        endpoints=text("Choose route endpoints",13,TEXT);endpoints.setGravity(Gravity.CENTER_VERTICAL);endpoints.setPadding(dp(10),dp(4),dp(10),dp(4));endpoints.setBackground(background(PANEL,12));endpoints.setContentDescription("Edit starting point and destination");endpoints.setOnClickListener(v->planner());bottom.addView(endpoints,new LinearLayout.LayoutParams(-1,dp(52)));
+        endpoints=text("Choose route endpoints",14,TEXT);endpoints.setGravity(Gravity.CENTER_VERTICAL);endpoints.setPadding(dp(12),dp(8),dp(12),dp(8));endpoints.setLineSpacing(dp(4),1);endpoints.setMinHeight(dp(56));endpoints.setContentDescription("Edit starting point and destination");endpoints.setOnClickListener(v->planner());tappableLabel(endpoints);bottom.addView(endpoints,new LinearLayout.LayoutParams(-1,-2));
         LinearLayout journey=new LinearLayout(this);journey.setGravity(Gravity.CENTER_VERTICAL);
-        speedDisplay=text("—\nkm/h",30,TEXT);speedDisplay.setTypeface(Typeface.DEFAULT,Typeface.BOLD);speedDisplay.setGravity(Gravity.CENTER);journey.addView(speedDisplay,new LinearLayout.LayoutParams(dp(100),-2));
-        stats=text("Download your first country to begin",13,MUTED);stats.setPadding(dp(8),dp(6),dp(8),dp(6));journey.addView(stats,new LinearLayout.LayoutParams(0,-2,1));bottom.addView(journey);
-        LinearLayout actions=new LinearLayout(this);plan=button("Plan route",this::calculate);drive=button("Start guidance",this::startGuidance);drive.setBackground(background(LIME,12));drive.setTextColor(darkMode?BG:Color.WHITE);
-        LinearLayout.LayoutParams actionSize=new LinearLayout.LayoutParams(0,dp(50),1);actionSize.rightMargin=dp(8);actions.addView(plan,actionSize);actions.addView(drive,new LinearLayout.LayoutParams(0,dp(50),1));bottom.addView(actions);
+        speedDisplay=text("—\nkm/h",30,TEXT);speedDisplay.setTypeface(Typeface.DEFAULT,Typeface.BOLD);speedDisplay.setGravity(Gravity.CENTER);speedDisplay.setBackground(background(PANEL,12));speedDisplay.setMinHeight(dp(80));journey.addView(speedDisplay,new LinearLayout.LayoutParams(dp(100),-2));
+        stats=text("Download your first country to begin",14,MUTED);stats.setPadding(dp(8),dp(8),dp(8),dp(8));journey.addView(stats,new LinearLayout.LayoutParams(0,-2,1));bottom.addView(journey);
+        LinearLayout actions=new LinearLayout(this);plan=button("Plan route",this::calculate);drive=button("Start guidance",this::startGuidance);
+        LinearLayout.LayoutParams actionSize=new LinearLayout.LayoutParams(0,-2,1);actionSize.rightMargin=dp(8);plan.setMinHeight(dp(52));drive.setMinHeight(dp(52));actions.addView(plan,actionSize);actions.addView(drive,new LinearLayout.LayoutParams(0,-2,1));bottom.addView(actions);
         LinearLayout dock=new LinearLayout(this);String[] labels={"Truck","Maps","Route","More"};Runnable[] callbacks={()->{if(canChangeMap())truckDialog();},this::mapsDialog,this::routeDialog,this::moreDialog};
-        for(int i=0;i<labels.length;i++){Button control=button(labels[i],callbacks[i]);control.setBackgroundColor(Color.TRANSPARENT);dock.addView(control,new LinearLayout.LayoutParams(0,dp(48),1));}bottom.addView(dock);
+        int[] dockIcons={R.drawable.ic_vehicle,R.drawable.ic_maps,R.drawable.ic_route,R.drawable.ic_more};
+        for(int i=0;i<labels.length;i++){Button control=button(labels[i],callbacks[i]);feedback(control,palette.surface,false);control.setPadding(dp(4),dp(4),dp(4),dp(4));control.setTextSize(12);icon(control,dockIcons[i],true);dock.addView(control,new LinearLayout.LayoutParams(0,-2,1));}LinearLayout.LayoutParams dockSize=new LinearLayout.LayoutParams(-1,-2);dockSize.topMargin=dp(8);bottom.addView(dock,dockSize);
         LinearLayout controls=vertical();gpsButton=button("Use GPS",this::mapGps);overviewButton=button("Overview",()->{if(Store.route!=null)map.fitRoute(Store.route);else map.fit();updateMapControls();});
-        for(Button control:new Button[]{gpsButton,overviewButton}){LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(dp(88),dp(48));size.bottomMargin=dp(4);controls.addView(control,size);}
-        LinearLayout zoom=new LinearLayout(this);Button plus=button("+",()->map.zoom(1.6)),minus=button("−",()->map.zoom(1/1.6));plus.setContentDescription("Zoom in");minus.setContentDescription("Zoom out");plus.setTextSize(24);minus.setTextSize(24);zoom.addView(plus,new LinearLayout.LayoutParams(dp(48),dp(48)));zoom.addView(minus,new LinearLayout.LayoutParams(dp(48),dp(48)));controls.addView(zoom);
+        for(Button control:new Button[]{gpsButton,overviewButton}){control.setTextSize(mapGlyphs?0:12);LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(dp(mapGlyphs?48:104),dp(48));size.bottomMargin=dp(8);controls.addView(control,size);}
+        if(mapGlyphs){gpsButton.setText("");icon(gpsButton,R.drawable.ic_location,true);overviewButton.setText("");icon(overviewButton,R.drawable.ic_overview,true);}overviewButton.setContentDescription("Overview");
+        LinearLayout zoom=new LinearLayout(this);Button plus=button("+",()->map.zoom(1.6)),minus=button("−",()->map.zoom(1/1.6));plus.setContentDescription("Zoom in");minus.setContentDescription("Zoom out");plus.setTextSize(24);minus.setTextSize(24);LinearLayout.LayoutParams plusSize=new LinearLayout.LayoutParams(dp(48),dp(48));plusSize.rightMargin=dp(8);zoom.addView(plus,plusSize);zoom.addView(minus,new LinearLayout.LayoutParams(dp(48),dp(48)));controls.addView(zoom,new LinearLayout.LayoutParams(-2,-2));
         zoomInButton=plus;zoomOutButton=minus;
         FrameLayout.LayoutParams controlsPosition=new FrameLayout.LayoutParams(-2,-2,Gravity.CENTER_VERTICAL|Gravity.END);controlsPosition.setMargins(0,0,dp(16),0);root.addView(controls,controlsPosition);
         View sidebarView=null;
@@ -125,7 +155,7 @@ public final class MainActivity extends Activity {
         root.getViewTreeObserver().addOnGlobalLayoutListener(()->{
             boolean compact=!wide&&bottom.getTop()-top.getBottom()<dp(180);
             currentMap.setViewport(wide?sidebar.getRight()-currentMap.getLeft()+dp(8):0,wide?0:top.getBottom()-currentMap.getTop()+dp(8),currentMap.getWidth()-(compact?0:dp(112)),wide?currentMap.getHeight():bottom.getTop()-currentMap.getTop()-dp(8));
-            if(compact!=compactControls[0]){compactControls[0]=compact;controls.setOrientation(compact?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);for(Button control:new Button[]{gpsButton,overviewButton}){LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(dp(compact?(control==gpsButton?88:82):88),dp(48));if(compact)size.rightMargin=dp(4);else size.bottomMargin=dp(4);control.setLayoutParams(size);}}
+            if(compact!=compactControls[0]){compactControls[0]=compact;controls.setOrientation(compact?LinearLayout.HORIZONTAL:LinearLayout.VERTICAL);for(Button control:new Button[]{gpsButton,overviewButton}){LinearLayout.LayoutParams size=new LinearLayout.LayoutParams(dp(mapGlyphs?48:104),dp(48));if(compact)size.rightMargin=dp(8);else size.bottomMargin=dp(8);control.setLayoutParams(size);}}
             if(!wide){FrameLayout.LayoutParams position=(FrameLayout.LayoutParams)controls.getLayoutParams();int margin=Math.max(0,compact&&(Store.navigating||simulating)?top.getBottom()-root.getPaddingTop()+dp(8):(top.getBottom()+bottom.getTop()-controls.getHeight())/2-root.getPaddingTop());if(position.gravity!=(Gravity.TOP|Gravity.END)||position.topMargin!=margin){position.gravity=Gravity.TOP|Gravity.END;position.topMargin=margin;controls.setLayoutParams(position);}}
         });
     }
@@ -143,7 +173,7 @@ public final class MainActivity extends Activity {
     }
     private void refresh(){
         Graph g=Store.graph;boolean active=Store.navigating||simulating;
-        boolean compact=getResources().getConfiguration().screenHeightDp<560&&getResources().getConfiguration().screenHeightDp>getResources().getConfiguration().screenWidthDp;
+        boolean compact=(getResources().getConfiguration().screenHeightDp<560||getResources().getConfiguration().fontScale>1.3)&&getResources().getConfiguration().screenHeightDp>getResources().getConfiguration().screenWidthDp;
         instruction.setVisibility(compact&&!active?View.GONE:View.VISIBLE);status.setVisibility(compact&&!active&&!busy&&!MapDownloadService.running?View.GONE:View.VISIBLE);
         routeCard.setVisibility(active?View.GONE:View.VISIBLE);
         speedDisplay.setVisibility(active?View.VISIBLE:View.GONE);
@@ -158,6 +188,8 @@ public final class MainActivity extends Activity {
         }
         plan.setEnabled(!busy&&!Store.installing&&!active);drive.setEnabled(!busy&&!Store.installing&&Store.route!=null);
         plan.setAlpha(plan.isEnabled()?1:.45f);drive.setAlpha(drive.isEnabled()?1:.45f);
+        actionStyle(plan,Store.route==null?LIME:PANEL,Store.route==null?palette.onAccent:TEXT,Store.route!=null);
+        actionStyle(drive,active?palette.danger:Store.route==null?PANEL:LIME,active?Color.WHITE:Store.route==null?TEXT:palette.onAccent,Store.route==null&&!active);
         plan.setText(busy?"Working…":g==null?"Download maps":"Plan route");drive.setText(active?"Stop":g!=null&&g.demo?"Simulate route":"Start guidance");
         modeButton.setText(Store.deliveryAccess?"Delivery":Store.mode.title);modeButton.setContentDescription("Route preferences: "+Store.mode.title+(Store.deliveryAccess?", permitted delivery access":""));
         profile.setText(String.format(Locale.getDefault(),"%.1f t  ·  %.2f m high",Store.truck.weight,Store.truck.height));
@@ -182,7 +214,7 @@ public final class MainActivity extends Activity {
     private void search(boolean starting){
         if(!editable())return;
         LinearLayout box=vertical();box.setPadding(dp(16),dp(8),dp(16),0);
-        EditText query=new EditText(this);query.setSingleLine();query.setHint("Place, street or latitude, longitude");query.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH|android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);box.addView(query);
+        EditText query=new EditText(this);query.setSingleLine();query.setMinHeight(dp(48));query.setHint("Place, street or latitude, longitude");query.setImeOptions(android.view.inputmethod.EditorInfo.IME_ACTION_SEARCH|android.view.inputmethod.EditorInfo.IME_FLAG_NO_EXTRACT_UI);box.addView(query);
         TextView message=text("Search the installed country: "+Store.graph.name,13,MUTED);box.addView(message);
         ListView list=new ListView(this);box.addView(list,new LinearLayout.LayoutParams(-1,0,1));
         ArrayList<Graph.Node> results=new ArrayList<>();java.util.concurrent.atomic.AtomicInteger generation=new java.util.concurrent.atomic.AtomicInteger();Runnable[] pending={null};
@@ -229,12 +261,12 @@ public final class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);LinearLayout box=vertical();box.setPadding(dp(20),dp(8),dp(20),dp(8));scroll.addView(box);
         box.setFocusableInTouchMode(true);box.requestFocus();
         Truck t=Store.truck;String[] names={"Height (m)","Width (m)","Length (m)","Loaded gross weight (t)","Maximum loaded axle weight (t)","Total truck and trailer axles","Maximum speed (km/h)"};double[] values={t.height,t.width,t.length,t.weight,t.axleWeight,t.axles,t.topSpeed};EditText[] fields=new EditText[7];
-        for(int i=0;i<7;i++){box.addView(text(names[i],13,MUTED));fields[i]=new EditText(this);fields[i].setContentDescription(names[i]);fields[i].setSelectAllOnFocus(true);fields[i].setSingleLine();fields[i].setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);fields[i].setText(java.math.BigDecimal.valueOf(values[i]).stripTrailingZeros().toPlainString());box.addView(fields[i]);}
+        for(int i=0;i<7;i++){box.addView(text(names[i],13,MUTED));fields[i]=new EditText(this);fields[i].setContentDescription(names[i]);fields[i].setSelectAllOnFocus(true);fields[i].setSingleLine();fields[i].setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);fields[i].setMinHeight(dp(48));fields[i].setText(java.math.BigDecimal.valueOf(values[i]).stripTrailingZeros().toPlainString());box.addView(fields[i]);}
         String[] options={"General hazardous material","Avoid toll roads","Avoid ferries","Avoid unpaved roads"};boolean[] checks={(t.hazardousLoad&1)!=0,t.avoidTolls,t.avoidFerries,t.avoidUnpaved};CheckBox[] boxes=new CheckBox[4];
-        for(int i=0;i<4;i++){boxes[i]=new CheckBox(this);boxes[i].setText(options[i]);boxes[i].setChecked(checks[i]);box.addView(boxes[i]);}
+        for(int i=0;i<4;i++){boxes[i]=new CheckBox(this);boxes[i].setMinHeight(dp(48));boxes[i].setText(options[i]);boxes[i].setChecked(checks[i]);box.addView(boxes[i]);}
         CheckBox water=new CheckBox(this),explosives=new CheckBox(this);
-        water.setText(R.string.load_water);water.setChecked((t.hazardousLoad&2)!=0);box.addView(water);
-        explosives.setText(R.string.load_explosives);explosives.setChecked((t.hazardousLoad&4)!=0);box.addView(explosives);
+        water.setMinHeight(dp(48));water.setText(R.string.load_water);water.setChecked((t.hazardousLoad&2)!=0);box.addView(water);
+        explosives.setMinHeight(dp(48));explosives.setText(R.string.load_explosives);explosives.setChecked((t.hazardousLoad&4)!=0);box.addView(explosives);
         box.addView(text("ADR tunnel restriction code for this load",13,MUTED));
         Spinner tunnel=new Spinner(this);tunnel.setContentDescription("ADR tunnel restriction code");tunnel.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_spinner_dropdown_item,new String[]{"No tunnel code","B · Exclude B, C, D, E","C · Exclude C, D, E","D · Exclude D, E","E · Exclude E"}));tunnel.setSelection(t.tunnelCode==0?0:t.tunnelCode-1);box.addView(tunnel);
         box.addView(text("Use the code applicable to the actual consignment. Mixed and quantity-dependent codes must be resolved from the transport documents. Mapped unknown tunnel categories are excluded when a code is selected.",12,MUTED));
@@ -251,11 +283,11 @@ public final class MainActivity extends Activity {
         if(!canChangeMap())return;
         LinearLayout box=vertical();box.setPadding(dp(20),dp(8),dp(20),dp(8));RadioGroup choices=new RadioGroup(this);
         for(RoutingMode option:RoutingMode.values()){
-            RadioButton choice=new RadioButton(this);choice.setId(900+option.ordinal());
+            RadioButton choice=new RadioButton(this);choice.setMinHeight(dp(48));choice.setId(900+option.ordinal());
             choice.setText(getString(R.string.routing_choice,option.title,option==RoutingMode.SHORTEST?"Prioritize distance":option==RoutingMode.EASIEST?"Favour fewer turns":"Strongly favour highways"));choices.addView(choice);
         }
         choices.check(900+Store.mode.ordinal());box.addView(choices);
-        CheckBox access=new CheckBox(this);access.setText(R.string.delivery_permission);access.setChecked(Store.deliveryAccess);box.addView(access);
+        CheckBox access=new CheckBox(this);access.setMinHeight(dp(48));access.setText(R.string.delivery_permission);access.setChecked(Store.deliveryAccess);box.addView(access);
         box.addView(text("Delivery access is limited to 2 km from the destination. It uses shortest routing and preserves height, width, length, gross/axle weight, ADR and turn restrictions. Unknown limits, barriers and bridges on restricted access are excluded. Permission applies to this trip on this device.",12,MUTED));
         ScrollView scroll=new ScrollView(this);scroll.addView(box);
         new AlertDialog.Builder(this).setTitle("Route preferences").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{
@@ -306,7 +338,7 @@ public final class MainActivity extends Activity {
         TextView progress=text(MapDownloadService.status,14,TEXT);progress.setPadding(dp(24),dp(12),dp(24),dp(12));
         Dialog dialog=new Dialog(this);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);LinearLayout box=vertical();box.setBackgroundColor(BG);box.setPadding(dp(16),dp(12),dp(16),dp(12));TextView title=text("Offline maps",20,TEXT);box.addView(title);progress.setMaxLines(4);box.addView(progress);
         ListView list=new ListView(this);list.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,new String[]{"Download Romania","Choose another country","Download all Europe","Pause downloads","Downloaded countries","Import country (.eurorig)","Map download source","Installed map details"}));box.addView(list,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout actions=new LinearLayout(this);actions.addView(button("Download status",()->{dialog.dismiss();error(MapDownloadService.status);}),new LinearLayout.LayoutParams(0,dp(48),1));actions.addView(button("Close",dialog::dismiss),new LinearLayout.LayoutParams(0,dp(48),1));box.addView(actions);dialog.setContentView(box);
+        LinearLayout actions=new LinearLayout(this);actions.addView(button("Download status",()->{dialog.dismiss();error(MapDownloadService.status);}),new LinearLayout.LayoutParams(0,-2,1));actions.addView(button("Close",dialog::dismiss),new LinearLayout.LayoutParams(0,-2,1));box.addView(actions);dialog.setContentView(box);
         list.setOnItemClickListener((parent,view,w,id)->{dialog.dismiss();
                 if(w==0)download("romania");
                 else if(w==1)countryCatalogue();
@@ -412,7 +444,8 @@ public final class MainActivity extends Activity {
         overviewButton.setEnabled(hasMap&&!busy);
         zoomInButton.setEnabled(hasMap&&!busy);zoomOutButton.setEnabled(hasMap&&!busy);
         for(Button control:new Button[]{gpsButton,overviewButton,zoomInButton,zoomOutButton})control.setAlpha(control.isEnabled()?1:.45f);
-        gpsButton.setText(active?(map.following()?"Following":"Recenter"):"Use GPS");
+        String locationLabel=active?(map.following()?"Following":"Recenter"):"Use GPS";
+        gpsButton.setText(mapGlyphs?"":locationLabel);gpsButton.setTooltipText(locationLabel);overviewButton.setTooltipText("Overview");
         gpsButton.setContentDescription(active?"Recenter map and follow GPS position":"Use current GPS location as starting point");
     }
     private void mapGps(){
