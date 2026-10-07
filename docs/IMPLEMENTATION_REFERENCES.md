@@ -39,6 +39,7 @@ Use this preference order before inventing a new solution. Reuse existing helper
 - [NanoMaps](https://github.com/sunil-dhaka/NanoMaps): generated street-view reference.
 - [StrictNav](https://github.com/Devansh-Maurya/StrictNav): missed-turn voice feedback reference.
 - [AI-Fuel-Assistant](https://github.com/navrot73-gif/AI-Fuel-Assistant): fuel-aware suggestions and routing ideas.
+- [NanoJev](https://github.com/TianyuCodings/NanoJev): future reference for ranking discrete choices such as parking suggestions or already-valid route alternatives. Its published game-trained Python/CUDA model is not an Android truck router or map-compression solution. Keep it outside the shipping app until local-device cost and useful navigation behavior are measured. It must never authorize a route rejected by the truck rules.
 
 EuroRig must operate fully locally after country downloads. Cloud APIs, required subscriptions and proprietary map services do not satisfy that requirement. AI suggestions must never override vehicle dimensions, loaded weights, access restrictions or ADR checks. Do not invent restrictions or present generated scenery as verified road information.
 

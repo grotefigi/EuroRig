@@ -1,5 +1,36 @@
 # Verification
 
+## Tablet-first checks, 2026-10-07
+
+- The physical Tab S9 (API 36, 0.6.1-dev) passes the installed Romania corpus:
+  40 expected outcomes, comprising 28 routes and 12 refusals. ETA speed bounds
+  and 250 m snap bounds pass. There are 22 same-endpoint Shortest comparisons;
+  six comparisons with different snapped endpoints are retained and excluded.
+- Physical profile instrumentation passes original dimension, weight, ADR,
+  permitted-delivery, missing-evidence, directory and composed-display fixtures.
+  Fixtures verify behavior; they do not establish the legality of real roads.
+- Camera checks use the first successful corpus route without changing saved
+  endpoints: overview clearance, device-density zoom, every route fix follows,
+  manual pan, recenter and rotation pass. Actual map pixels verify heading,
+  stale-location indication, partial-edge trail removal and arrival clearing.
+  Position fixes are simulated inside instrumentation, not a physical drive.
+- Settings, truck preferences, saved endpoints and active Romania payloads
+  retain their bytes/hashes. Physical corridor testing requires explicit
+  `--physical`, refuses running guidance/downloads, and refuses QA map staging.
+  Preference or map changes fail the runner after writing a private receipt.
+- A separate JNI proof passes on physical arm64 API 36 and x86_64 API 26.
+  Literal `.gph.gz` files preserve every fixture tile byte and all 30 native
+  request responses (12 routes, 18 refusals) across three modes and profiles.
+  Bare `.gz` and empty-directory controls return zero routes. This corrects a
+  peer experiment's suffix labels. This proof does not enable compressed
+  production packages, exercise the application's complete audit on compressed
+  data, measure continental performance, or prove the 20 GB installed budget.
+  The fictional fixture shrinks from 4,688 to 1,375 bytes; that ratio must not
+  be extrapolated to real countries. The shipping Romania map is unchanged.
+- 135 Python checks, 37 Java checks, build and Android lint pass.
+  See [device requirements](docs/DEVICE_REQUIREMENTS.md) for tablet priority and
+  the persistent 20,000,000,000-byte installed app/map/archive/cache limit.
+
 ## Country download menu and storage audit
 
 - 0.6.1-dev is installed on the physical Galaxy Tab S9. The public Romania

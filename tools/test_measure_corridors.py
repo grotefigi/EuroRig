@@ -75,7 +75,30 @@ class DevicePreflight(unittest.TestCase):
         with tempfile.TemporaryDirectory() as root:
             calls = self.observe(root)
         self.assertEqual(calls[0][0], "emulator-5558", "the device must be set before the first command")
-        self.assertEqual(calls[0][1][0], "install")
+        self.assertEqual(calls[0][1][:4], ("shell", "run-as", "org.eurorig.app", "cat"))
+
+    def test_physical_testing_refuses_active_guidance_before_mutating_device(self):
+        with tempfile.TemporaryDirectory() as root:
+            calls = []
+            def run(*args, **kwargs):
+                calls.append(args)
+                return b'ServiceRecord{123 org.eurorig.app/.NavService}'
+            arguments = ['measure_corridors.py', str(corpus(root)), '--output', str(Path(root)/'out.json'),
+                         '--device', 'tablet', '--physical']
+            with mock.patch.object(measure_corridors.s, 'run', run), mock.patch('sys.argv', arguments):
+                with self.assertRaises(SystemExit) as error:
+                    measure_corridors.main()
+            self.assertEqual(error.exception.code, 2)
+            self.assertEqual(calls, [('shell', 'dumpsys', 'activity', 'services', 'org.eurorig.app')])
+
+    def test_physical_testing_refuses_qa_staging_without_any_device_command(self):
+        with tempfile.TemporaryDirectory() as root:
+            arguments = ['measure_corridors.py', str(corpus(root)), '--output', str(Path(root)/'out.json'),
+                         '--device', 'tablet', '--physical', '--qa-region', str(qa_region(root))]
+            with mock.patch.object(measure_corridors.s, 'run') as run, mock.patch('sys.argv', arguments):
+                with self.assertRaises(SystemExit):
+                    measure_corridors.main()
+            run.assert_not_called()
 
 
 class PreferenceReads(unittest.TestCase):
@@ -125,6 +148,31 @@ class PreferenceReads(unittest.TestCase):
 
 
 class FreshInstallRun(unittest.TestCase):
+    def test_camera_checks_do_not_use_saved_endpoints_and_keep_failure_receipt(self):
+        with tempfile.TemporaryDirectory() as root:
+            source=corpus(root);input_payload=json.loads(source.read_bytes());output=Path(root)/'out.json'
+            installed=False;commands=[]
+            def run(*args,**kwargs):
+                nonlocal installed
+                commands.append(args)
+                if args[0]=='install':installed=True
+                if 'shared_prefs/endpoints.xml' in args:
+                    return b'<map changed="true"/>' if installed else b'<map changed="false"/>'
+                if 'shared_prefs/settings.xml' in args or 'shared_prefs/truck.xml' in args:return b'<map/>'
+                if 'instrument' in args:return b'PASS: camera checks\n'
+                if str(args[-1]).endswith('native-corridor-results.json'):
+                    return json.dumps({'input':input_payload,'results':[]}).encode()
+                return b''
+            arguments=['measure_corridors.py',str(source),'--output',str(output),'--camera']
+            with mock.patch.object(measure_corridors.s,'run',run),mock.patch('sys.argv',arguments):
+                with self.assertRaisesRegex(RuntimeError,'changed endpoints'):
+                    measure_corridors.main()
+            receipt=json.loads(output.read_text(encoding='utf-8'))
+            self.assertTrue(receipt['camera_checks']);self.assertFalse(receipt['endpoints_preserved'])
+            instrument=next(command for command in commands if 'instrument' in command)
+            self.assertIn('cameraCorpus',instrument);self.assertIn('cameraOnly',instrument)
+            self.assertNotIn('corridorsOnly',instrument)
+
     def test_a_fresh_install_without_preference_files_completes(self):
         """The reported failure: the tail read used check=True, so an absent settings.xml aborted the run."""
         with tempfile.TemporaryDirectory() as root:

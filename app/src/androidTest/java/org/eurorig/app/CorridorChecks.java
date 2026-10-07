@@ -10,7 +10,7 @@ import java.nio.file.Files;
 
 /** Measures the shipping router on installed maps without modifying driver settings. */
 final class CorridorChecks {
-    static void run(Context context,String qaRegion)throws Exception{
+    static Router.Route run(Context context,String qaRegion)throws Exception{
         Store.load(context);
         DisplayDatabase previousDisplay=Store.display;NativeRouter previousRouter=Store.nativeRouter;
         DisplayDatabase candidateDisplay=null;NativeRouter candidateRouter=null;
@@ -25,19 +25,20 @@ final class CorridorChecks {
                 Store.display=candidateDisplay;Store.nativeRouter=candidateRouter;
             }
             if(Store.nativeRouter==null||Store.display==null)throw new IllegalStateException("Install a native country map before measuring corridors");
-            measure(context,directory);
+            return measure(context,directory);
         }finally{
             Store.display=previousDisplay;Store.nativeRouter=previousRouter;
             if(candidateRouter!=null)candidateRouter.close();if(candidateDisplay!=null)candidateDisplay.close();
         }
     }
-    private static void measure(Context context,File directory)throws Exception{
+    private static Router.Route measure(Context context,File directory)throws Exception{
         JSONObject input=new JSONObject(read(new File(context.getFilesDir(),"native-corridors.json")));
         JSONObject p=input.getJSONObject("truck");
         Truck truck=new Truck(p.getDouble("height"),p.getDouble("width"),p.getDouble("length"),p.getDouble("weight"),p.getDouble("axle_load"),
             p.getBoolean("hazmat"),p.getBoolean("avoid_tolls"),p.getBoolean("avoid_ferries"),p.getBoolean("avoid_unpaved"),
             p.getInt("axle_count"),p.getDouble("top_speed"),p.getInt("hazardous_load"),p.getInt("tunnel_code"));
         JSONArray results=new JSONArray(),corridors=input.getJSONArray("corridors"),modes=input.getJSONArray("modes");
+        Router.Route firstRoute=null;
         for(int i=0;i<corridors.length();i++)for(int m=0;m<modes.length();m++){
             JSONObject c=corridors.getJSONObject(i);JSONArray a=c.getJSONArray("a"),b=c.getJSONArray("b");
             double lat=a.getDouble(0),lon=a.getDouble(1),endLat=b.getDouble(0),endLon=b.getDouble(1);
@@ -47,6 +48,7 @@ final class CorridorChecks {
             long started=SystemClock.elapsedRealtime();
             try{
                 Router.Route route=Store.nativeRouter.route(lat,lon,endLat,endLon,truck,mode,false);
+                if(firstRoute==null)firstRoute=route;
                 Graph.Node first=route.graph.nodes[0],last=route.graph.nodes[route.graph.nodes.length-1];
                 double originSnap=Geo.distance(lat,lon,first.lat,first.lon),destinationSnap=Geo.distance(endLat,endLon,last.lat,last.lon);
                 double lowerBound=route.metres/(truck.topSpeed/3.6);
@@ -78,6 +80,7 @@ final class CorridorChecks {
             .put("map_manifest",new JSONObject(read(new File(directory,"manifest.json"))))
             .put("results",results);
         Files.write(new File(context.getFilesDir(),"native-corridor-results.json").toPath(),output.toString(2).getBytes(StandardCharsets.UTF_8));
+        return firstRoute;
     }
     private static String read(File file)throws Exception{return new String(Files.readAllBytes(file.toPath()),StandardCharsets.UTF_8);}
 }
