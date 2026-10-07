@@ -1,5 +1,25 @@
 # Verification
 
+## Map view reuse, 2026-10-08
+
+- The previous APK reproducibly left roads blank after the same attached map view
+  was removed from its activity and added again on API 26. Its cached coverage
+  still appeared valid after its road geometry had been discarded.
+- Detachment now clears coverage and pending-query state. Results and errors from
+  an obsolete query generation cannot clear the replacement generation's query.
+  The regression checks actual activity attachment, road reload and two controlled
+  worker barriers; it fails on the previous APK and passes with the fix on API 26
+  and physical arm64 API 36.
+- The test uses a fictional display fixture and fixed 1080 x 1600 view bounds.
+  An initial physical attempt had no layout while the screen was asleep; that
+  harness failure is retained privately. The successful fixed-bounds run is a
+  lifecycle check, not a visual screen inspection or a driving test. Tablet
+  settings, truck preferences, saved endpoints and active map hashes are unchanged.
+- The fix is installed on the Tab S9. Native profile/ADR/map-retention checks on
+  API 26, the routing suite, debug builds and Android lint pass. The independent
+  code review covers all three changed Java files; workflow and evidence documents
+  are reviewed separately. No continent readiness or installed-size fit is claimed.
+
 ## Tablet-first checks, 2026-10-07
 
 - The physical Tab S9 (API 36, 0.6.1-dev) passes the installed Romania corpus:

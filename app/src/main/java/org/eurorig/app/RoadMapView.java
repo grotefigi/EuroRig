@@ -115,7 +115,7 @@ final class RoadMapView extends View {
     void zoom(double factor){camera.zoom(factor);invalidate();}
     void updatePosition(){camera.update(Store.lat,Store.lon);invalidate();}
     protected void onSizeChanged(int w,int h,int ow,int oh){if(ow==0&&Store.nativeRouter==null)fit();}
-    protected void onDetachedFromWindow(){super.onDetachedFromWindow();queryGeneration++;if(background!=null){background.recycle();background=null;}visibleRoads=null;strokeGraph=null;strokes=null;casings=null;paintedRoute=null;routeLines=null;restrictedEdges=null;}
+    protected void onDetachedFromWindow(){super.onDetachedFromWindow();queryGeneration++;loadedLevel=-1;loadingRoads=false;if(background!=null){background.recycle();background=null;}visibleRoads=null;strokeGraph=null;strokes=null;casings=null;paintedRoute=null;routeLines=null;restrictedEdges=null;}
     private float x(double lon){return (float)(originX()+(lon-camera.longitude)*longitudeScale*camera.pixels);}
     private float y(double lat){return (float)(originY()-(lat-camera.latitude)*camera.pixels);}
     protected void onDraw(Canvas c) {
@@ -169,7 +169,7 @@ final class RoadMapView extends View {
     private void requestRoads(){
         final DisplayDatabase display=Store.display;
         if(display==null){visibleRoads=null;queriedDisplay=null;loadedLevel=-1;return;}
-        if(queriedDisplay!=display){visibleRoads=null;loadedLevel=-1;queriedDisplay=display;mapFailure=null;queryGeneration++;}
+        if(queriedDisplay!=display){visibleRoads=null;loadedLevel=-1;loadingRoads=false;queriedDisplay=display;mapFailure=null;queryGeneration++;}
         double scale=Math.cos(Math.toRadians(camera.latitude));
         double halfLat=Math.max(originY(),getHeight()-originY())/camera.pixels,halfLon=Math.max(originX(),getWidth()-originX())/camera.pixels/scale;
         double south=camera.latitude-halfLat,north=camera.latitude+halfLat,west=camera.longitude-halfLon,east=camera.longitude+halfLon;
@@ -185,11 +185,12 @@ final class RoadMapView extends View {
             try{
                 Graph roads=display.visible(s,w,n,e,resolution);
                 post(()->{
+                    if(generation!=queryGeneration)return;
                     loadingRoads=false;
-                    if(generation==queryGeneration&&Store.display==display&&Store.truck==requestedTruck){visibleRoads=roads;loadedSouth=s;loadedWest=w;loadedNorth=n;loadedEast=e;loadedLevel=level;loadedTruck=requestedTruck;}
+                    if(Store.display==display&&Store.truck==requestedTruck){visibleRoads=roads;loadedSouth=s;loadedWest=w;loadedNorth=n;loadedEast=e;loadedLevel=level;loadedTruck=requestedTruck;}
                     invalidate();
                 });
-            }catch(RuntimeException failure){post(()->{loadingRoads=false;if(generation==queryGeneration)mapFailure=failure.getMessage();invalidate();});}
+            }catch(RuntimeException failure){post(()->{if(generation!=queryGeneration)return;loadingRoads=false;mapFailure=failure.getMessage();invalidate();});}
         });
     }
     private void drawStatic(Canvas c){
