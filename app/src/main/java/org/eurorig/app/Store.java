@@ -39,9 +39,14 @@ final class Store {
                 if(!selection.matches("[0-9a-f-]{36}"))throw new IOException("Invalid saved region selection");
                 File region=new File(context.getFilesDir(),"regions/"+selection);
                 boolean directoryTiles=TileIndex.validateInstalled(region);
-                if(new File(region,"display.sqlite").exists()){display=new DisplayDatabase(new File(region,"display.sqlite"));graph=display.endpoints;}
-                else try(InputStream in=new FileInputStream(new File(region,"display.europack"))){graph=Graph.read(in);}
-                nativeRouter=new NativeRouter(context,new File(region,directoryTiles?"tiles":"routing.tar"),directoryTiles,directoryTiles);
+                DisplayDatabase candidateDisplay=null;NativeRouter candidateRouter=null;Graph candidateGraph;
+                try{
+                    if(new File(region,"countries").exists()){candidateDisplay=new DisplayDatabase(CountrySets.displays(region),false);candidateGraph=candidateDisplay.endpoints;}
+                    else if(new File(region,"display.sqlite").exists()){candidateDisplay=new DisplayDatabase(new File(region,"display.sqlite"));candidateGraph=candidateDisplay.endpoints;}
+                    else try(InputStream in=new FileInputStream(new File(region,"display.europack"))){candidateGraph=Graph.read(in);}
+                    candidateRouter=new NativeRouter(context,new File(region,directoryTiles?"tiles":"routing.tar"),directoryTiles,directoryTiles);
+                    display=candidateDisplay;candidateDisplay=null;nativeRouter=candidateRouter;candidateRouter=null;graph=candidateGraph;
+                }finally{RegionPackages.closeRetired(candidateRouter);RegionPackages.closeRetired(candidateDisplay);}
                 RegionPackages.cleanupStale(context);
             }else{
             File file=new File(context.getFilesDir(),"installed.europack");

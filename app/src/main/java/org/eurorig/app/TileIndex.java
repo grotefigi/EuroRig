@@ -17,6 +17,7 @@ final class TileIndex {
         try{
             JSONObject manifest=new JSONObject(new String(java.nio.file.Files.readAllBytes(manifestFile.toPath()),StandardCharsets.UTF_8));
             int format=manifest.getInt("format");
+            if(format==4){CountrySets.validate(directory);return true;}
             if(format<1||format>3||index.exists()!=(format==3))throw new IOException("Installed tile index does not match region format");
             if(!"valhalla".equals(manifest.getString("engine"))||!"0.6.3".equals(manifest.getString("native_version")))
                 throw new IOException("Unsupported installed region engine");
@@ -40,7 +41,17 @@ final class TileIndex {
             throw new IOException("Installed region checksum mismatch: "+name);
     }
     static void validate(File archive,File index,JSONObject manifest)throws IOException{
+        validate(archive,index,manifest,null);
+    }
+    /** Explicit composed-directory path; the caller must verify the complete union and ownership. */
+    static void validateContribution(File tiles,File index,JSONObject manifest,Set<String> union)throws IOException{
+        if(union==null)throw new IOException("Missing composed tile ownership");
+        validate(tiles,index,manifest,union);
+    }
+    private static void validate(File archive,File index,JSONObject manifest,Set<String> union)throws IOException{
         try{
+            if(!java.nio.file.Files.isRegularFile(index.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)||index.length()>128L*1024*1024)
+                throw new IOException("Missing or oversized tile index");
             Object country=manifest.get("country"),generation=manifest.get("generation_id");
             if(!(country instanceof String)||!((String)country).matches("[A-Z]{2}")
                     ||!(generation instanceof String)||!((String)generation).matches("[0-9a-f]{16}"))
@@ -48,9 +59,10 @@ final class TileIndex {
             try(SQLiteDatabase db=SQLiteDatabase.openDatabase(index.getPath(),null,SQLiteDatabase.OPEN_READONLY|SQLiteDatabase.NO_LOCALIZED_COLLATORS)){
                 int version=db.getVersion();
                 if(version!=1&&version!=2)throw new IOException("Unsupported tile index version");
+                if(union!=null&&version!=2)throw new IOException("Composed countries require directory tile indices");
                 int files=0;
                 if(version==1)RegionPackages.validateTar(archive);
-                else files=RegionPackages.validateTileDirectory(archive,true);
+                else if(union==null)files=RegionPackages.validateTileDirectory(archive,true);
                 try(Cursor check=db.rawQuery("PRAGMA quick_check",null)){
                     if(!check.moveToFirst()||!"ok".equals(check.getString(0)))throw new IOException("Damaged tile index");
                 }
@@ -94,11 +106,16 @@ final class TileIndex {
                             if(compressed&&(claims.getType(3)!=Cursor.FIELD_TYPE_STRING||!stored.matches("[0-9a-f]{64}")
                                     ||claims.getType(4)!=Cursor.FIELD_TYPE_INTEGER||claims.getLong(4)<20))throw new IOException("Invalid compressed tile claim");
                             verifyFile(new File(archive,path+(compressed?".gz":"")),hash,claims.getLong(2),stored,compressed?claims.getLong(4):claims.getLong(2));
+                            if(union!=null){
+                                String physical=path+(compressed?".gz":"");
+                                if(union.contains(path+(compressed?"":".gz")))throw new IOException("Conflicting shared tile storage form");
+                                union.add(physical);if(union.size()>2000000)throw new IOException("Too many composed tiles");
+                            }
                         }
                     }
                 }
                 if(rows!=count)throw new IOException("Tile index count mismatch");
-                if(version==2){if(files!=count)throw new IOException("Installed tile files do not match index");return;}
+                if(version==2){if(union==null&&files!=count)throw new IOException("Installed tile files do not match index");return;}
                 Set<String> seen=new HashSet<>();byte[] header=new byte[512],buffer=new byte[65536];
                 try(RandomAccessFile tar=new RandomAccessFile(archive,"r")){
                     while(tar.getFilePointer()+512<=tar.length()){

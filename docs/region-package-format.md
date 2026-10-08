@@ -3,7 +3,8 @@
 The `.eurorig` package is the unit a driver downloads. This documents what is inside each format, the
 per-tile evidence index, and the invariants the packager and app enforce. The app consumes formats 1,
 2 and format 3 with version-1 canonical TARs or verified version-2 tile directories.
-Country-set activation is not enabled.
+Coherent version-2 country imports can compose into an owned installed set. Public country
+distribution and the map-management interface still require further validation.
 
 Written from `tools/package_region.py` (packager) and `tools/check_qa_package.py` (host gate).
 
@@ -130,15 +131,57 @@ Malformed JSON, an unexpected JSON type, a sqlite error and a bad tar are report
 with exit 1**, never as an uncaught traceback. Exit 0 is PASS, 1 is a refusal naming the check; `--out`
 writes the verdict as JSON, and a receipt that cannot be written does not change the verdict.
 
+## Installed country sets
+
+Format **4** is an internal installed layout, not an accepted download ZIP format. It keeps
+`tiles/` with one physical raw or gzip file per canonical identity and `countries/<ISO2>/`
+with each contributor's unchanged `manifest.json`, `tiles.sqlite` and `display.sqlite`.
+The root manifest declares the common generation and an array of
+`{"country":"RO","manifest_sha256":"<64 lowercase hex>"}` claims. Up to64 countries
+may contribute. Every country must use format3 and a version2 index. Legacy single-country
+formats retain their original readers and cannot replace an existing composed set.
+
+Reopening verifies the root and country directories without following symlinks, exact
+contributor membership, each original manifest's identity, matching generation, display/index
+hashes, index schema and row count, every raw/stored tile claim, and equality of the physical
+tile union with contributor ownership. Shared storage-form or hash/size disagreements refuse
+the candidate. The ordinary single-country reader still requires exact file/count equality.
+
+Installation and removal build a new UUID directory, validate the complete candidate and
+composed display evidence, open its native actor, then persist selection. The old selected set
+remains usable on rejected candidates. An uncertain preference-save acknowledgement restores
+the previous in-memory selection and retains both valid sets until reopening verifies the
+durable selection. Removing one contributor retains shared tiles; removing the last owner
+returns to an empty installation. Profile and endpoint preferences are preserved.
+
+Android8 app storage rejected hardlinks in the controlled device check. Owned staging therefore
+copies each tile identity once and requires free space for that candidate while retaining the
+old set, plus200MiB reserve. This protects recovery but does not prove continental peak-space
+requirements or the20,000,000,000-byte total app/maps/archives/cache budget. A whole-Europe build
+still requires a measured storage plan.
+
+Dedicated API26 instrumentation verifies this flow on three original native fixture tiles,
+artificial RO/HU ownership with one shared identity, offline search, all three truck modes,
+height/ADR restrictions, generation/shared-fact/legacy rejection, failed selection recovery,
+engine initialization failure, removal and reopening. This is not real-country, cross-border,
+physical tablet or Europe readiness evidence. Removal is currently an internal worker API;
+the country-management UI is pending.
+
+The original ownership fixture packages can be generated without network access:
+`python tools/build_country_set_fixtures.py <new-directory>`. Existing output paths
+are refused. The fixtures deliberately model ownership partitions, not geographic
+Romania/Hungary coverage; the rehashed shared-conflict package is a negative control.
+
 ## Not true yet
 
-- Country-set installation and full-country compressed distribution are not verified.
+- Real-country sets and full-country compressed distribution are not verified.
   The host tools and app consume version-2 indices. Canonical version-1 indices are checked against
   the exact schema, manifest country/generation, declared count and every TAR tile's bytes/hash before
   activation. Failed imports preserve the old map. The index is verified again when reopening it;
   a missing or changed installed index is refused.
 - `NativeRouter` has a tested directory adapter used by verified version-2 imports.
-  Legacy and canonical version-1 imports keep the TAR adapter. Country-set installation is unfinished.
+  Legacy and canonical version-1 imports keep the TAR adapter. Real-country sets and map-management
+  UI validation remain unfinished.
 - Composition must not assume per-country `ATTACH`: SQLite's attached-database limit is finite and
   cannot span all of Europe. Bounded connections or merged queries are the alternative to test.
 - Cleanup and rollback must never leave an installed country unreachable: removal preserves the

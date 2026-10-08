@@ -41,11 +41,11 @@ final class RegionPackages {
             return activate(c,dir);
         }catch(IOException|RuntimeException|LinkageError e){
             // A post-commit cleanup fault must never remove the selected map.
-            if(!dir.getName().equals(c.getSharedPreferences("settings",0).getString("region","")))cleanup(dir);
+            if(!(e instanceof SelectionFailure)&&!dir.getName().equals(c.getSharedPreferences("settings",0).getString("region","")))cleanup(dir);
             throw e;
         }
     }
-    private static File create(Context c) throws IOException{
+    static File create(Context c) throws IOException{
         File folder=new File(c.getFilesDir(),"regions/"+UUID.randomUUID());
         if(!folder.mkdirs())throw new IOException("Cannot create region storage");return folder;
     }
@@ -61,8 +61,7 @@ final class RegionPackages {
         }
     }
     private static Graph activate(Context c,File dir) throws IOException{
-        NativeRouter candidate=null;
-        DisplayDatabase candidateDisplay=null;
+        File staged=dir;boolean uncertainSelection=false;
         try {
             JSONObject manifest=new JSONObject(new String(Files.readAllBytes(new File(dir,"manifest.json").toPath()),StandardCharsets.UTF_8));
             int format=manifest.getInt("format");
@@ -75,24 +74,82 @@ final class RegionPackages {
                 if(!digest(new File(dir,name)).equalsIgnoreCase(expected))throw new IOException("Region checksum mismatch: "+name);
             }
             boolean directoryTiles=format==3&&TileIndex.version(new File(dir,"tiles.sqlite"))==2;
+            String selectedBefore=c.getSharedPreferences("settings",0).getString("region","");
+            if(!directoryTiles&&c.getSharedPreferences("settings",0).getBoolean("native",false)&&selectedBefore.matches("[0-9a-f-]{36}")
+                    &&CountrySets.manifest(new File(c.getFilesDir(),"regions/"+selectedBefore)).optInt("format")==4)
+                throw new IOException("An older country package cannot replace the installed country set. Use maps from the current Europe release.");
             File routing=new File(dir,directoryTiles?"tiles":"routing.tar");
             if(directoryTiles)extractTiles(new File(dir,"routing.tar"),routing,true);
             if(format==3)TileIndex.validate(routing,new File(dir,"tiles.sqlite"),manifest);
+            if(directoryTiles){
+                Files.delete(new File(dir,"routing.tar").toPath());
+                String previous=c.getSharedPreferences("settings",0).getString("region","");
+                if(c.getSharedPreferences("settings",0).getBoolean("native",false)&&previous.matches("[0-9a-f-]{36}")){
+                    dir=CountrySets.combine(c,new File(c.getFilesDir(),"regions/"+previous),dir);
+                    if(dir!=staged){format=4;routing=new File(dir,"tiles");}
+                }
+            }
+            return select(c,dir,routing,directoryTiles,format,displayFile);
+        }catch(SelectionFailure e){uncertainSelection=true;throw e;}
+        catch(JSONException|NoSuchAlgorithmException e){throw new IOException("Invalid region manifest",e);}
+        finally {
+            if(dir!=staged){cleanup(staged);if(!uncertainSelection&&!dir.getName().equals(c.getSharedPreferences("settings",0).getString("region","")))cleanup(dir);}
+        }
+    }
+    private static Graph select(Context c,File dir,File routing,boolean directoryTiles,int format,String displayFile)throws IOException{
+        NativeRouter candidate=null;DisplayDatabase candidateDisplay=null;
+        try{
             Graph graph;
-            if(format>=2){candidateDisplay=new DisplayDatabase(new File(dir,displayFile));graph=candidateDisplay.endpoints;}
+            if(format==4){candidateDisplay=new DisplayDatabase(CountrySets.displays(dir),true);graph=candidateDisplay.endpoints;}
+            else if(format>=2){candidateDisplay=new DisplayDatabase(new File(dir,displayFile));graph=candidateDisplay.endpoints;}
             else try(InputStream in=new FileInputStream(new File(dir,displayFile))){graph=Graph.read(in);}
             if(graph.demo)throw new IOException("Native regions must contain real map data");
             candidate=new NativeRouter(c,routing,directoryTiles,directoryTiles);
-            if(directoryTiles)Files.delete(new File(dir,"routing.tar").toPath());
             String old=c.getSharedPreferences("settings",0).getString("region","");
-            if(!c.getSharedPreferences("settings",0).edit().putBoolean("native",true).putString("region",dir.getName()).commit())throw new IOException("Could not save region selection");
+            saveSelection(c,dir.getName());
             NativeRouter previousRouter=Store.nativeRouter;DisplayDatabase previousDisplay=Store.display;
             Store.nativeRouter=candidate;candidate=null;Store.display=candidateDisplay;candidateDisplay=null;
             closeRetired(previousRouter);closeRetired(previousDisplay);
             if(old.matches("[0-9a-f-]{36}"))cleanup(new File(c.getFilesDir(),"regions/"+old));
             return graph;
-        }catch(JSONException|NoSuchAlgorithmException e){throw new IOException("Invalid region manifest",e);}
-        finally {if(candidate!=null)candidate.close();if(candidateDisplay!=null)candidateDisplay.close();}
+        }finally{closeRetired(candidate);closeRetired(candidateDisplay);}
+    }
+    /** Worker-thread removal keeps the old set until every remaining country and actor verifies. */
+    static Graph removeCountry(Context c,String code)throws IOException{
+        if(code==null||!code.matches("[A-Z]{2}")||Store.navigating)throw new IOException("Cannot remove this country during guidance");
+        String selected=c.getSharedPreferences("settings",0).getString("region","");
+        if(!selected.matches("[0-9a-f-]{36}"))throw new IOException("Invalid saved country selection");
+        File previous=new File(c.getFilesDir(),"regions/"+selected);TileIndex.validateInstalled(previous);
+        SortedMap<String,File> members=CountrySets.countries(previous);
+        if(members.remove(code)==null)throw new IOException("This country is not installed");
+        if(members.isEmpty()){
+            saveSelection(c,null);
+            NativeRouter retired=Store.nativeRouter;DisplayDatabase retiredDisplay=Store.display;
+            Store.nativeRouter=null;Store.display=null;Store.graph=null;Store.route=null;Store.progressRoute=null;
+            Store.originChosen=false;Store.destinationChosen=false;closeRetired(retired);closeRetired(retiredDisplay);cleanup(previous);return null;
+        }
+        File candidate=CountrySets.create(c,members,CountrySets.manifest(previous).optString("generation_id"));
+        boolean uncertainSelection=false;
+        try{return select(c,candidate,new File(candidate,"tiles"),true,4,null);}
+        catch(SelectionFailure e){uncertainSelection=true;throw e;}
+        finally{if(!uncertainSelection&&!candidate.getName().equals(c.getSharedPreferences("settings",0).getString("region","")))cleanup(candidate);}
+    }
+    private static final class SelectionFailure extends IOException{
+        SelectionFailure(){super("Could not save country selection. Installed maps are retained for recovery.");}
+    }
+    @android.annotation.SuppressLint("ApplySharedPref") // Worker-thread save; a failed acknowledgement may still have changed in-memory preferences.
+    private static void saveSelection(Context c,String region)throws IOException{
+        android.content.SharedPreferences preferences=c.getSharedPreferences("settings",0);
+        boolean hadNative=preferences.contains("native"),oldNative=preferences.getBoolean("native",false);String old=preferences.getString("region",null);
+        android.content.SharedPreferences.Editor next=preferences.edit().putBoolean("native",region!=null);
+        if(region==null)next.remove("region");else next.putString("region",region);
+        if(next.commit())return;
+        android.content.SharedPreferences.Editor restore=preferences.edit();
+        if(hadNative)restore.putBoolean("native",oldNative);else restore.remove("native");
+        if(old==null)restore.remove("region");else restore.putString("region",old);
+        restore.commit();
+        // Keep both valid directories until reopening verifies the durable selection; never guess disk state.
+        throw new SelectionFailure();
     }
     static void validateTar(File file)throws IOException{
         validateTar(file,false);
@@ -207,9 +264,10 @@ final class RegionPackages {
         try(InputStream in=new FileInputStream(file)){while((n=in.read(b))!=-1)digest.update(b,0,n);}
         StringBuilder hex=new StringBuilder();for(byte v:digest.digest())hex.append(String.format(Locale.ROOT,"%02x",v&255));return hex.toString();
     }
-    private static void cleanup(File dir){
+    static void cleanup(File dir){
         // Only internally generated UUID directories and fixed filenames are removed.
         try{deleteTiles(new File(dir,"tiles"));}catch(IOException e){android.util.Log.w("EuroRig","Could not clean staged tiles",e);}
+        try{deleteTiles(new File(dir,"countries"));}catch(IOException e){android.util.Log.w("EuroRig","Could not clean staged countries",e);}
         for(String name:new String[]{"routing.tar","display.europack","display.sqlite","tiles.sqlite","manifest.json","device-config.json"})new File(dir,name).delete();dir.delete();
     }
 }

@@ -1,5 +1,34 @@
 # Verification
 
+## Owned country-set installation and recovery, 2026-10-08
+
+- Actual API26 app installation retains two artificial country contributors from
+  three original native fixture tiles, with one shared tile and exactly three
+  physical files. Offline search, all three routing modes, height and ADR checks
+  pass after activation and cold reopening. Removing one contributor keeps the
+  shared tile and removes its last-owner-only tile; the remaining country routes.
+  Removing the last country returns to an empty installation and releases storage.
+- Different generations, conflicting shared facts and older packages refuse
+  without replacing the selected countries or live actor. An injected preference
+  save that writes a new selection but reports failure restores the previous
+  selection and retains both valid sets. Reopening verifies selection before
+  cleaning the unselected recovery candidate. An injected engine configuration
+  write failure publishes no partial graph/display/router state; restoration reopens.
+- These checks use isolated owned storage and preference names on a dedicated
+  emulator. Persisted driver settings, truck and endpoints compare unchanged.
+  Build, routing checks and Android lint pass. A final real-Romania regression
+  retains40 outcomes (28 routes/12 refusals), geometry within50m and ETA within3s,
+  camera/heading/trail behavior, snap/speed bounds and preferences. The final cold
+  map-open sample is6224ms; this is one emulator sample, not a performance guarantee.
+- Android8 app storage refused hardlinks. Staging copies one file per tile identity
+  while retaining the old set and200MiB reserve. Continental installed/peak space,
+  the20GB total budget, actual geographic cross-border routes, physical tablet
+  behavior and map-management UI remain unverified. Public maps are unchanged.
+- Reproduce ownership fixtures with `python tools/build_country_set_fixtures.py
+  <new-directory>`, stage the five packages to a dedicated emulator's private
+  fixture directory, and run `NativeSmokeInstrumentation` with
+  `countrySetsOnly=true` and `packagePath=<device-fixture-directory>`.
+
 ## Installed payload corruption and startup measurement, 2026-10-08
 
 - The prior APK accepted a changed installed display payload in a read-only
