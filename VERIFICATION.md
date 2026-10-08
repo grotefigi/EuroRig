@@ -631,4 +631,3 @@ preference files exactly. Healthy reopening of the restored map is checked.
 `--prior` verifies the historical mode-loss behavior on the preceding APK.
 This guard test does not provide a user-facing repair workflow for damaged maps
 or validate real driving, tablet recovery or European map storage.
-
