@@ -9,7 +9,7 @@ import java.security.*;
 import java.util.*;
 import java.util.zip.GZIPInputStream;
 
-/** Verify the existing format-3 canonical tile index before the candidate map can activate. */
+/** Verify installed payload identity and the format-3 tile index before reopening a country. */
 final class TileIndex {
     static boolean validateInstalled(File directory)throws IOException{
         File manifestFile=new File(directory,"manifest.json"),index=new File(directory,"tiles.sqlite");
@@ -18,6 +18,9 @@ final class TileIndex {
             JSONObject manifest=new JSONObject(new String(java.nio.file.Files.readAllBytes(manifestFile.toPath()),StandardCharsets.UTF_8));
             int format=manifest.getInt("format");
             if(format<1||format>3||index.exists()!=(format==3))throw new IOException("Installed tile index does not match region format");
+            if(!"valhalla".equals(manifest.getString("engine"))||!"0.6.3".equals(manifest.getString("native_version")))
+                throw new IOException("Unsupported installed region engine");
+            verifyPayload(directory,manifest,format>=2?"display.sqlite":"display.europack");
             if(format==3){
                 if(index.length()>128L*1024*1024||!RegionPackages.digest(index).equalsIgnoreCase(manifest.getJSONObject("sha256").getString("tiles.sqlite")))
                     throw new IOException("Installed tile index checksum mismatch");
@@ -26,8 +29,15 @@ final class TileIndex {
                 validate(new File(directory,directoryTiles?"tiles":"routing.tar"),index,manifest);
                 return directoryTiles;
             }
+            verifyPayload(directory,manifest,"routing.tar");
             return false;
         }catch(JSONException|NoSuchAlgorithmException e){throw new IOException("Invalid installed region manifest",e);}
+    }
+    private static void verifyPayload(File directory,JSONObject manifest,String name)throws IOException,JSONException,NoSuchAlgorithmException{
+        File file=new File(directory,name);
+        if(!java.nio.file.Files.isRegularFile(file.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                ||!RegionPackages.digest(file).equalsIgnoreCase(manifest.getJSONObject("sha256").getString(name)))
+            throw new IOException("Installed region checksum mismatch: "+name);
     }
     static void validate(File archive,File index,JSONObject manifest)throws IOException{
         try{

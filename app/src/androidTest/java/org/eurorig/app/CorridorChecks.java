@@ -11,6 +11,7 @@ import java.nio.file.Files;
 /** Measures the shipping router on installed maps without modifying driver settings. */
 final class CorridorChecks {
     static Router.Route run(Context context,String qaRegion)throws Exception{
+        long openingStarted=SystemClock.elapsedRealtime();
         Store.load(context);
         DisplayDatabase previousDisplay=Store.display;NativeRouter previousRouter=Store.nativeRouter;
         DisplayDatabase candidateDisplay=null;NativeRouter candidateRouter=null;
@@ -25,13 +26,13 @@ final class CorridorChecks {
                 Store.display=candidateDisplay;Store.nativeRouter=candidateRouter;
             }
             if(Store.nativeRouter==null||Store.display==null)throw new IllegalStateException("Install a native country map before measuring corridors");
-            return measure(context,directory);
+            return measure(context,directory,SystemClock.elapsedRealtime()-openingStarted);
         }finally{
             Store.display=previousDisplay;Store.nativeRouter=previousRouter;
             if(candidateRouter!=null)candidateRouter.close();if(candidateDisplay!=null)candidateDisplay.close();
         }
     }
-    private static Router.Route measure(Context context,File directory)throws Exception{
+    private static Router.Route measure(Context context,File directory,long openingMillis)throws Exception{
         JSONObject input=new JSONObject(read(new File(context.getFilesDir(),"native-corridors.json")));
         JSONObject p=input.getJSONObject("truck");
         Truck truck=new Truck(p.getDouble("height"),p.getDouble("width"),p.getDouble("length"),p.getDouble("weight"),p.getDouble("axle_load"),
@@ -77,6 +78,7 @@ final class CorridorChecks {
         }
         JSONObject output=new JSONObject().put("format",1).put("app_version",BuildConfig.VERSION_NAME)
             .put("native_version","0.6.3").put("api",android.os.Build.VERSION.SDK_INT).put("input",input)
+            .put("map_open_elapsed_ms",openingMillis)
             .put("map_manifest",new JSONObject(read(new File(directory,"manifest.json"))))
             .put("results",results);
         Files.write(new File(context.getFilesDir(),"native-corridor-results.json").toPath(),output.toString(2).getBytes(StandardCharsets.UTF_8));

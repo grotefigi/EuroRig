@@ -1,5 +1,25 @@
 # Verification
 
+## Installed payload corruption and startup measurement, 2026-10-08
+
+- The prior APK accepted a changed installed display payload in a read-only
+  candidate check. That regression fails on the prior APK and passes with the fix.
+  Reopening now verifies the display SHA256 for every supported format and the
+  routing TAR for legacy formats 1/2; format 3 retains its per-tile verification.
+  Missing or changed display/routing payloads refuse, and restored bytes reopen.
+  Engine/native-version claims are checked before a country can reopen.
+- Read-only corruption guards pass on API26 for legacy EuroPack, SQLite format2,
+  canonical format3/v1 and compressed format3/v2. They never replace the selected
+  country. Build, routing tests and Android lint pass.
+- A cold full-Romania API26 run retains all 40 baseline outcomes, camera/heading/
+  trail checks, snap/ETA bounds and preferences. The measured map-open interval is
+  6,871 ms, including payload verification and native/display opening. This is one
+  emulator sample, not a physical-tablet or continental performance guarantee.
+  Instrumentation records this interval separately from corridor routing time.
+- The tablet is unavailable today; the new guard has no physical-device proof yet.
+  Country-set activation, broader lifecycle/stability and Europe storage fit remain
+  required gates. SHA checks do not certify road restrictions or legal accuracy.
+
 ## Full-country compressed Romania and recovery, 2026-10-08
 
 - A private version-2 package carries all 636 tiles from the pinned published
