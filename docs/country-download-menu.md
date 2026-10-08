@@ -12,7 +12,10 @@ Catalogue format 1 remains compatible with the published Romania entry. Optional
 `region_name`; entries for that country become a row with a chevron, the summed
 download size and the number of regions. Region rows show their individual
 download sizes. The Back button and Android Back return to the country list.
-Region IDs remain distinct download IDs; selecting all regions queues those IDs.
+Region IDs remain distinct presentation IDs. The current installer rejects
+regional entries and duplicate country contributors before downloading: they
+would otherwise replace the same country rather than retain all of its regions.
+The first coherent Europe release requires whole-country packages.
 Malformed IDs, duplicate IDs, invalid sizes and conflicting region groups are
 rejected. The chooser accepts at most 512 entries and uses the transport client's
 128 GiB maximum for an individual package.
@@ -50,3 +53,29 @@ map/settings preferences and restores display, font and animation settings.
 Private screenshots and receipts are written to `analysis/private/country-menu`.
 Review the screenshots separately; the automated checks cannot establish visual
 quality or physical-device performance.
+
+## Download queue and retained packages
+
+Every whole country in an accepted queue is installed in order. A verified
+download is marked installed only after its native/display candidate activates.
+Successful service installs remove their redundant archive and ready-file entry;
+failed installations retain the verified package for recovery. Guidance or a map
+change blocks activation, retains the download and stops the remaining queue.
+Downloaded countries shows packages waiting to be installed. Manage installed
+countries shows active offline coverage.
+
+The queue mechanics are checked against original artificial RO/HU tile partitions
+through the actual service and a local HTTP fixture. These are not real country
+coverage. On a dedicated emulator starting with one Romania map and no download
+directory, build fixtures with `tools/build_country_set_fixtures.py`, then run
+`python tools/audit_download_queue.py --device <emulator-serial> --fixtures
+<fixture-directory> --case complete`. Cases `mismatched` and `regional` check
+failure preservation and refusal before transfer. The audit backs up the selected
+map and four preference files, restores them, and keeps receipts private. It uses
+an owned ADB reverse port and removes that mapping afterward. Safety checks remain
+enabled with Python optimization. It never clears app data or operates a tablet.
+
+Manual deferred-package installs still retain their archive, and restarting a
+completed queue can download successful packages again after cleanup. Resume
+bookkeeping, physical testing, real coherent countries and the complete Europe
+installed/temporary storage budgets remain required work.

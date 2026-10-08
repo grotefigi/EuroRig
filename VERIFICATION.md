@@ -1,5 +1,31 @@
 # Verification
 
+## Download queue and archive lifecycle, 2026-10-08
+
+- The prior APK fetched both original RO/HU ownership fixtures but installed only
+  the first, falsely reported the second ready and retained both archives. The
+  actual service now activates every whole country in the queue. The final APK
+  retains both contributors and no redundant successful download archives.
+- A mismatched second generation refuses while keeping the first installed
+  country and the second verified retry package. Regional entries refuse before
+  downloading or replacing maps, because current ownership does not compose
+  separate regions of one country. Guidance/map-change deferral stops the queue
+  and reports a downloaded package rather than claiming it is installed.
+- A public audit runs the actual service and UI against a local original fixture
+  catalogue. Complete, mismatched and regional cases pass on API26; the regional
+  safety checks also run with Python optimization. The selected full Romania map
+  and four preference files restore exactly. No tablet or app-data clear is used.
+  Build, routing tests and Android lint pass. These small artificial partitions
+  do not prove real-country, cross-border, continental or physical operation.
+- Local emulator-network transfers encountered early EOF; the partial transfer
+  and first installed country were preserved. The controlled audit uses an owned
+  ADB reverse port and removes it afterward. This does not establish a production
+  network root cause or verify automatic retry behavior.
+- Manual deferred-package installs still retain archives. Queue restart bookkeeping,
+  real coherent map coverage and installed/temporary Europe storage fit remain
+  unfinished. Public Romania data and the disabled all-Europe publication gate
+  are unchanged.
+
 ## Installed-country controls and replacement guards, 2026-10-08
 
 - A corrupted selected set was replaced and lost on the prior APK. The failing

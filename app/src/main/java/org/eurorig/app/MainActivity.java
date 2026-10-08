@@ -426,7 +426,7 @@ public final class MainActivity extends Activity {
             String[] pair=((String)entry.getValue()).split("\\|",2);if(pair.length!=2)continue;
             File file=new File(getFilesDir(),"downloads/"+pair[1]);if(file.isFile()){names.add(pair[0]);files.add(file);}
         }
-        if(names.isEmpty()){error("No downloaded countries yet. Imported country packages are listed under Installed map details.");return;}
+        if(names.isEmpty()){error("No downloaded packages await installation. Your offline maps are listed under Manage installed countries.");return;}
         new AlertDialog.Builder(this).setTitle("Select offline country").setItems(names.toArray(new String[0]),(d,w)->{
             if(!canChangeMap()||!Store.beginInstall())return;busy=true;refresh();Store.worker.execute(()->{try(InputStream in=new FileInputStream(files.get(w))){Graph g=RegionPackages.install(this,in);main.post(()->installGraph(g));}catch(Exception|LinkageError e){main.post(()->{busy=false;refresh();error("Country installation: "+e.getMessage());});}finally{Store.installing=false;}});
         }).setNegativeButton("Close",null).show();
