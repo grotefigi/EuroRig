@@ -32,7 +32,14 @@ final class CountrySets {
     }
     static SortedMap<String,File> countries(File directory)throws IOException{
         JSONObject descriptor=manifest(directory);SortedMap<String,File> result=new TreeMap<>();
-        if(descriptor.optInt("format")==3){result.put(country(descriptor),directory);return result;}
+        Object declaredFormat=descriptor.opt("format");
+        if(!(declaredFormat instanceof Integer))throw new IOException("Invalid installed country format");
+        int singleFormat=(Integer)declaredFormat;
+        if(singleFormat>=1&&singleFormat<=3){
+            String code=singleFormat==3?country(descriptor):CountryFlag.code(descriptor.optString("name").toLowerCase(Locale.ROOT).replace(' ','-'),descriptor.optString("country",""));
+            if(!code.matches("[A-Z]{2}")||code.equals("RU"))throw new IOException("This older map has no country identity. Import an updated country package to manage it.");
+            result.put(code,directory);return result;
+        }
         try{
             Object format=descriptor.get("format");
             if(!(format instanceof Integer)||((Integer)format)!=4||!"valhalla".equals(descriptor.getString("engine"))
@@ -86,9 +93,10 @@ final class CountrySets {
     }
     /** Returns the incoming single country, or a new owned candidate containing the coherent union. */
     static File combine(Context context,File previous,File incoming)throws IOException{
+        TileIndex.validateInstalled(previous);
         JSONObject next=manifest(incoming),old=manifest(previous);
         if(old.optInt("format")<3||old.optInt("format")==3&&TileIndex.version(new File(previous,"tiles.sqlite"))!=2)return incoming;
-        TileIndex.validateInstalled(previous);SortedMap<String,File> members=countries(previous);String code=country(next);
+        SortedMap<String,File> members=countries(previous);String code=country(next);
         if(!generation(next).equals(generation(old))){
             if(members.size()==1&&members.containsKey(code))return incoming;
             throw new IOException("Country maps use different generations. Install countries from the same Europe release.");

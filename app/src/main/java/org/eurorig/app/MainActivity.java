@@ -337,8 +337,9 @@ public final class MainActivity extends Activity {
     private void mapsDialog(){
         TextView progress=text(MapDownloadService.status,14,TEXT);progress.setPadding(dp(24),dp(12),dp(24),dp(12));
         Dialog dialog=new Dialog(this);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);LinearLayout box=vertical();box.setBackgroundColor(BG);box.setPadding(dp(16),dp(12),dp(16),dp(12));TextView title=text("Offline maps",20,TEXT);box.addView(title);progress.setMaxLines(4);box.addView(progress);
-        ListView list=new ListView(this);list.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,new String[]{"Download Romania","Choose another country","Download all Europe","Pause downloads","Downloaded countries","Import country (.eurorig)","Map download source","Installed map details"}));box.addView(list,new LinearLayout.LayoutParams(-1,0,1));
-        LinearLayout actions=new LinearLayout(this);actions.addView(button("Download status",()->{dialog.dismiss();error(MapDownloadService.status);}),new LinearLayout.LayoutParams(0,-2,1));actions.addView(button("Close",dialog::dismiss),new LinearLayout.LayoutParams(0,-2,1));box.addView(actions);dialog.setContentView(box);
+        if(getResources().getConfiguration().fontScale>1.3)progress.setVisibility(View.GONE);
+        ListView list=new ListView(this);list.setAdapter(new ArrayAdapter<>(this,android.R.layout.simple_list_item_1,new String[]{"Download Romania","Choose another country","Download all Europe","Pause downloads","Downloaded countries","Import country (.eurorig)","Map download source","Installed map details","Manage installed countries"}));box.addView(list,new LinearLayout.LayoutParams(-1,0,1));
+        LinearLayout actions=new LinearLayout(this);actions.addView(button("Status",()->{dialog.dismiss();error(MapDownloadService.status);}),new LinearLayout.LayoutParams(0,-2,1));actions.addView(button("Close",dialog::dismiss),new LinearLayout.LayoutParams(0,-2,1));box.addView(actions);dialog.setContentView(box);
         list.setOnItemClickListener((parent,view,w,id)->{dialog.dismiss();
                 if(w==0)download("romania");
                 else if(w==1)countryCatalogue();
@@ -347,8 +348,9 @@ public final class MainActivity extends Activity {
                 else if(w==4)downloadedCountries();
                 else if(w==5){if(canChangeMap())startActivityForResult(new Intent(Intent.ACTION_OPEN_DOCUMENT).setType("*/*").addCategory(Intent.CATEGORY_OPENABLE),202);}
                 else if(w==6)mapSource();
+                else if(w==8)installedCountries();
                 else{Graph g=Store.graph;if(g==null){error("No maps installed yet.");return;}
-                    new AlertDialog.Builder(this).setTitle(g.name).setMessage(g.date+"\n"+g.attribution+"\n\nOffline truck routes, roads and place search. Only the selected country's coverage is active in this development build. Seamless cross-border routing is still being developed.\n\nCheck road signs. Truck-law validation and time-dependent restrictions are unfinished.").setPositiveButton("Close",null).show();}
+                    new AlertDialog.Builder(this).setTitle(g.name).setMessage(g.date+"\n"+g.attribution+"\n\nOffline truck routes, roads and place search in installed coverage. Cross-border trips require every country along the route from the same Europe map release. Cross-border coverage is still being verified.\n\nCheck road signs. Truck-law validation and time-dependent restrictions are unfinished.").setPositiveButton("Close",null).show();}
         });dialog.show();dialog.getWindow().setLayout(-1,Math.round(getResources().getDisplayMetrics().heightPixels*.8f));
         Runnable tick=new Runnable(){public void run(){if(dialog.isShowing()){if(!TextUtils.equals(progress.getText(),MapDownloadService.status))progress.setText(MapDownloadService.status);main.postDelayed(this,1000);}}};main.post(tick);dialog.setOnDismissListener(d->main.removeCallbacks(tick));
     }
@@ -429,7 +431,52 @@ public final class MainActivity extends Activity {
             if(!canChangeMap()||!Store.beginInstall())return;busy=true;refresh();Store.worker.execute(()->{try(InputStream in=new FileInputStream(files.get(w))){Graph g=RegionPackages.install(this,in);main.post(()->installGraph(g));}catch(Exception|LinkageError e){main.post(()->{busy=false;refresh();error("Country installation: "+e.getMessage());});}finally{Store.installing=false;}});
         }).setNegativeButton("Close",null).show();
     }
-    private void installGraph(Graph g){Store.originChosen=false;Store.destinationChosen=false;Store.graph=g;Store.route=null;Store.start=0;Store.end=Math.min(3,g.nodes.length-1);if(Store.nativeRouter!=null)Store.setRegionEndpoints();Store.lat=Double.NaN;Store.lon=Double.NaN;busy=false;if(!isDestroyed()){map.setGraph(g);refresh();}}
+    private void installedCountries(){
+        if(!getSharedPreferences("settings",0).getBoolean("native",false)){error("No country maps are installed. Download or import a country to navigate offline.");return;}
+        Toast loading=Toast.makeText(this,"Loading installed countries…",Toast.LENGTH_SHORT);loading.show();
+        Store.worker.execute(()->{try{
+            String selected=getSharedPreferences("settings",0).getString("region","");
+            if(!selected.matches("[0-9a-f-]{36}"))throw new IOException("Invalid installed map selection");
+            ArrayList<String[]> countries=new ArrayList<>();
+            for(Map.Entry<String,File> member:CountrySets.countries(new File(getFilesDir(),"regions/"+selected)).entrySet()){
+                org.json.JSONObject source=CountrySets.manifest(member.getValue());String code=member.getKey();
+                countries.add(new String[]{code,new Locale("",code).getDisplayCountry(Locale.ENGLISH),source.optString("routing_date","")});
+            }
+            main.post(()->{loading.cancel();if(!isDestroyed())showInstalledCountries(countries);});
+        }catch(IOException|RuntimeException e){main.post(()->{loading.cancel();if(!isDestroyed())error("Installed countries: "+e.getMessage());});}});
+    }
+    private void showInstalledCountries(List<String[]> countries){
+        Dialog dialog=new Dialog(this);dialog.requestWindowFeature(Window.FEATURE_NO_TITLE);
+        LinearLayout box=vertical();box.setBackgroundColor(palette.surface);box.setPadding(dp(16),dp(16),dp(16),dp(12));
+        boolean largeText=getResources().getConfiguration().fontScale>1.3;
+        TextView title=text("Installed countries",22,TEXT);title.setTypeface(Typeface.DEFAULT,Typeface.BOLD);
+        boolean editable=!busy&&!Store.installing&&!Store.navigating&&!simulating&&!MapDownloadService.running;
+        TextView subtitle=text(editable?"These maps are available offline.":"Stop guidance and pause downloads before removing maps.",14,MUTED);subtitle.setPadding(0,dp(4),0,dp(12));
+        ScrollView scroll=new ScrollView(this);LinearLayout rows=vertical();scroll.addView(rows);
+        LinearLayout heading=largeText?rows:box;heading.addView(title);heading.addView(subtitle);box.addView(scroll,new LinearLayout.LayoutParams(-1,0,1));
+        for(String[] country:countries){
+            LinearLayout row=new LinearLayout(this);row.setOrientation(largeText?LinearLayout.VERTICAL:LinearLayout.HORIZONTAL);row.setGravity(Gravity.CENTER_VERTICAL);row.setPadding(dp(4),dp(12),dp(4),dp(12));row.setMinimumHeight(dp(80));
+            LinearLayout identity=largeText?new LinearLayout(this):row;identity.setGravity(Gravity.CENTER_VERTICAL);if(largeText)row.addView(identity,new LinearLayout.LayoutParams(-1,-2));
+            identity.addView(new CountryFlag(this,country[0],palette.accent),new LinearLayout.LayoutParams(dp(40),dp(40)));
+            LinearLayout labels=vertical();labels.setPadding(dp(16),0,dp(8),0);TextView name=text(country[1],18,TEXT);name.setTypeface(Typeface.DEFAULT,Typeface.BOLD);labels.addView(name);
+            labels.addView(text(country[2].isEmpty()?"Installed":("Updated "+country[2].split("T",2)[0]),14,MUTED));identity.addView(labels,new LinearLayout.LayoutParams(0,-2,1));
+            Button remove=button("Remove",()->{
+                if(!canChangeMap()||MapDownloadService.running){Toast.makeText(this,"Pause downloads before removing a map",Toast.LENGTH_LONG).show();return;}
+                new AlertDialog.Builder(this).setTitle("Remove "+country[1]+"?").setMessage(countries.size()==1?"This is your last country map. Download a country again before using offline navigation.":"You will need to download this country again for offline navigation. Other installed countries remain available.")
+                    .setNegativeButton("Cancel",null).setPositiveButton("Remove",(d,w)->{
+                        if(!canChangeMap()||MapDownloadService.running)return;dialog.dismiss();busy=true;refresh();
+                        Store.worker.execute(()->{try{Graph graph=RegionPackages.removeCountry(this,country[0]);main.post(()->{installGraph(graph);if(!isDestroyed())Toast.makeText(this,country[1]+" removed",Toast.LENGTH_SHORT).show();});}
+                            catch(IOException|RuntimeException|LinkageError e){main.post(()->{busy=false;if(!isDestroyed()){refresh();error("Country removal: "+e.getMessage());}});}});
+                    }).show();
+            });
+            remove.setEnabled(editable);remove.setAlpha(editable?1f:.45f);remove.setContentDescription("Remove offline map of "+country[1]);LinearLayout.LayoutParams removeSize=new LinearLayout.LayoutParams(largeText?-1:-2,-2);if(largeText)removeSize.topMargin=dp(8);row.addView(remove,removeSize);rows.addView(row);
+            View divider=new View(this);divider.setBackgroundColor(palette.border);rows.addView(divider,new LinearLayout.LayoutParams(-1,dp(1)));
+        }
+        if(countries.isEmpty())rows.addView(text("No countries installed.",16,MUTED));
+        LinearLayout actions=new LinearLayout(this);actions.addView(button("Add maps",()->{dialog.dismiss();countryCatalogue();}),new LinearLayout.LayoutParams(0,-2,1));actions.addView(button("Close",dialog::dismiss),new LinearLayout.LayoutParams(0,-2,1));box.addView(actions);
+        dialog.setContentView(box);dialog.show();dialog.getWindow().setLayout(Math.min(getResources().getDisplayMetrics().widthPixels,dp(720)),Math.round(getResources().getDisplayMetrics().heightPixels*.8f));
+    }
+    private void installGraph(Graph g){Store.originChosen=false;Store.destinationChosen=false;Store.graph=g;Store.route=null;Store.start=0;Store.end=g==null?0:Math.min(3,g.nodes.length-1);if(g!=null&&Store.nativeRouter!=null)Store.setRegionEndpoints();Store.lat=Double.NaN;Store.lon=Double.NaN;busy=false;if(!isDestroyed()){map.setGraph(g);refresh();}}
     protected void onActivityResult(int request,int result,Intent data){
         super.onActivityResult(request,result,data);if(result!=RESULT_OK||data==null||data.getData()==null)return;
         final android.net.Uri uri=data.getData();

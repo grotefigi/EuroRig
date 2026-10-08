@@ -1,5 +1,33 @@
 # Verification
 
+## Installed-country controls and replacement guards, 2026-10-08
+
+- A corrupted selected set was replaced and lost on the prior APK. The failing
+  regression is retained privately. The corrected APK validates the selected
+  payload before branching on its format; compressed and older replacements now
+  refuse while preserving the selected countries and live actor.
+- Removal refuses while guidance or another map change owns the guard and releases
+  the guard after completion. New graph/router/display state is published and old
+  routes are cleared before the map-change guard is released. The isolated API26
+  country-set checks pass, including recognized older Romania metadata, unknown
+  older-country refusal, shared ownership, last removal and recovery.
+- The actual installed-country interface passes eight API26 combinations: light
+  and dark, portrait and landscape, normal and 200% text. Remove targets are at
+  least 48 dp. Cancellation retains the selected map. Positive last-country removal
+  releases its storage, shows the empty-map interface and disables guidance.
+  A complete owned backup restores the original map and exact settings, truck
+  and endpoint preferences afterward; the physical tablet is untouched.
+- Visual testing found country labels squeezed by large-text actions and a
+  landscape maps menu with no room for its list. Stacked removal controls,
+  scrollable large-text headings and an accessible Status action fix those flows.
+  Screenshots were inspected in both themes; primary/secondary text contrast
+  exceeds 4.5:1. Build, routing checks and Android lint pass. The final full-Romania
+  regression retains all 40 baseline outcomes (28 routes/12 refusals), camera,
+  heading/trail, snap/speed bounds and preferences. Cold map opening took 7,088 ms
+  in this one emulator sample; this is not a continental performance guarantee.
+- These checks do not verify real driving, spoken guidance, physical-device
+  behavior, continental performance or the 20 GB Europe budget.
+
 ## Owned country-set installation and recovery, 2026-10-08
 
 - Actual API26 app installation retains two artificial country contributors from
@@ -19,11 +47,12 @@
   Build, routing checks and Android lint pass. A final real-Romania regression
   retains40 outcomes (28 routes/12 refusals), geometry within50m and ETA within3s,
   camera/heading/trail behavior, snap/speed bounds and preferences. The final cold
-  map-open sample is6224ms; this is one emulator sample, not a performance guarantee.
+  map-open sample is6358ms; this is one emulator sample, not a performance guarantee.
 - Android8 app storage refused hardlinks. Staging copies one file per tile identity
   while retaining the old set and200MiB reserve. Continental installed/peak space,
   the20GB total budget, actual geographic cross-border routes, physical tablet
-  behavior and map-management UI remain unverified. Public maps are unchanged.
+  behavior remain unverified. Map-management UI evidence appears above; public
+  maps are unchanged.
 - Reproduce ownership fixtures with `python tools/build_country_set_fixtures.py
   <new-directory>`, stage the five packages to a dedicated emulator's private
   fixture directory, and run `NativeSmokeInstrumentation` with
@@ -182,7 +211,7 @@
   the persistent 20,000,000,000-byte installed app/map/archive/cache limit.
 - Physical UI checks confirm the truck form opens/cancels, country rows show
   actual sizes, and dark mode switches off/on and persists while restoring its
-  original state. The offline `Galati` query returns accented Galați results,
+  original state. The offline `Galati` query returns accented GalaÈ›i results,
   with Cancel reachable above the visible keyboard. These
   checks preserve driver settings and endpoints. A hardware GPS request without
   mock locations timed out with the explicit "Try again outside" message. No
@@ -321,8 +350,8 @@
   Disabling route hierarchy pruning fixes the observed distance anomaly; passing
   that search option into edge-walk matching initially caused a native SIGSEGV.
   Only the audit's copy omits the option, preserving every truck/access check.
-  Audited Shortest Galați–Bucharest improves 244.9284 to 226.3575 km, and
-  Galați–Nădlac 741.0014 to 722.3086 km. See [collaboration](docs/COLLABORATION.md).
+  Audited Shortest GalaÈ›iâ€“Bucharest improves 244.9284 to 226.3575 km, and
+  GalaÈ›iâ€“NÄƒdlac 741.0014 to 722.3086 km. See [collaboration](docs/COLLABORATION.md).
 - A redesigned map-first UI, visible-viewport route fit, automatic guidance zoom
   and look-ahead following are exercised on Android 8/API 26 and Android 17/API 37.
   Camera checks cover every route geometry point, pan suspension, recenter and
@@ -334,7 +363,7 @@
 - Dark mode changes both actual map and control colors. Light/dark selection
   survives restart and switching during guidance preserves the foreground service
   and following. Physical Tab S9 appearance switching also passes.
-- The 22-control UI sweeps exercise actual Galați routes in all three preferences,
+- The 22-control UI sweeps exercise actual GalaÈ›i routes in all three preferences,
   search feedback, endpoints/restart, GPX document export, truck form, map metadata,
   system import picker, zoom, About and portrait/landscape. Additional checks cover
   profile precision/invalid values, favourites/map picking, delivery permission

@@ -75,9 +75,11 @@ final class RegionPackages {
             }
             boolean directoryTiles=format==3&&TileIndex.version(new File(dir,"tiles.sqlite"))==2;
             String selectedBefore=c.getSharedPreferences("settings",0).getString("region","");
-            if(!directoryTiles&&c.getSharedPreferences("settings",0).getBoolean("native",false)&&selectedBefore.matches("[0-9a-f-]{36}")
-                    &&CountrySets.manifest(new File(c.getFilesDir(),"regions/"+selectedBefore)).optInt("format")==4)
-                throw new IOException("An older country package cannot replace the installed country set. Use maps from the current Europe release.");
+            if(!directoryTiles&&c.getSharedPreferences("settings",0).getBoolean("native",false)&&selectedBefore.matches("[0-9a-f-]{36}")){
+                File previous=new File(c.getFilesDir(),"regions/"+selectedBefore);TileIndex.validateInstalled(previous);
+                if(CountrySets.manifest(previous).getInt("format")==4)
+                    throw new IOException("An older country package cannot replace the installed country set. Use maps from the current Europe release.");
+            }
             File routing=new File(dir,directoryTiles?"tiles":"routing.tar");
             if(directoryTiles)extractTiles(new File(dir,"routing.tar"),routing,true);
             if(format==3)TileIndex.validate(routing,new File(dir,"tiles.sqlite"),manifest);
@@ -108,7 +110,9 @@ final class RegionPackages {
             String old=c.getSharedPreferences("settings",0).getString("region","");
             saveSelection(c,dir.getName());
             NativeRouter previousRouter=Store.nativeRouter;DisplayDatabase previousDisplay=Store.display;
+            Store.route=null;Store.progressRoute=null;Store.originChosen=false;Store.destinationChosen=false;
             Store.nativeRouter=candidate;candidate=null;Store.display=candidateDisplay;candidateDisplay=null;
+            Store.start=0;Store.end=Math.min(3,graph.nodes.length-1);Store.graph=graph;Store.setRegionEndpoints();
             closeRetired(previousRouter);closeRetired(previousDisplay);
             if(old.matches("[0-9a-f-]{36}"))cleanup(new File(c.getFilesDir(),"regions/"+old));
             return graph;
@@ -116,6 +120,10 @@ final class RegionPackages {
     }
     /** Worker-thread removal keeps the old set until every remaining country and actor verifies. */
     static Graph removeCountry(Context c,String code)throws IOException{
+        if(!Store.beginInstall())throw new IOException("Stop guidance and wait for the current map change before removing a country");
+        try{return removeLocked(c,code);}finally{Store.installing=false;}
+    }
+    private static Graph removeLocked(Context c,String code)throws IOException{
         if(code==null||!code.matches("[A-Z]{2}")||Store.navigating)throw new IOException("Cannot remove this country during guidance");
         String selected=c.getSharedPreferences("settings",0).getString("region","");
         if(!selected.matches("[0-9a-f-]{36}"))throw new IOException("Invalid saved country selection");

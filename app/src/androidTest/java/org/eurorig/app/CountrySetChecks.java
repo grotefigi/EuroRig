@@ -54,14 +54,29 @@ final class CountrySetChecks {
             reset();Store.load(isolated);router=Store.nativeRouter;
             require(new File(owned,"regions").listFiles().length==1,"Verified reopening cleans only the unselected recovery candidate");checkRoutes();
             File descriptor=new File(set,"manifest.json");byte[] original=Files.readAllBytes(descriptor.toPath());
+            for(String incoming:new String[]{"hu","legacy"}){
+            boolean replacementRefused=false;
             try{
                 JSONObject changed=new JSONObject(new String(original,StandardCharsets.UTF_8));changed.put("format",true);
                 Files.write(descriptor.toPath(),changed.toString().getBytes(StandardCharsets.UTF_8));
                 refused=false;try{TileIndex.validateInstalled(set);}catch(IOException expected){refused=true;}
                 require(refused,"Boolean set version refuses");
-            }finally{Files.write(descriptor.toPath(),original);}
+                try{install(isolated,fixtures,incoming);}catch(IOException expected){replacementRefused=true;}
+            }finally{if(descriptor.getParentFile().isDirectory())Files.write(descriptor.toPath(),original);}
+            require(replacementRefused&&set.isDirectory()&&selected.equals(isolated.getSharedPreferences("settings",0).getString("region",""))
+                    &&router==Store.nativeRouter,"Corrupted selected set refuses replacement without losing any installed country: "+incoming);
+            }
             TileIndex.validateInstalled(set);
+            for(boolean guidance:new boolean[]{false,true}){
+                Store.navigating=guidance;Store.installing=!guidance;
+                try{
+                    refused=false;try{RegionPackages.removeCountry(isolated,"RO");}catch(IOException expected){refused=true;}
+                    require(refused&&set.isDirectory()&&selected.equals(isolated.getSharedPreferences("settings",0).getString("region",""))
+                            &&router==Store.nativeRouter,"Removal refuses while guidance or a map change owns the guard");
+                }finally{Store.navigating=false;Store.installing=false;}
+            }
             Store.graph=RegionPackages.removeCountry(isolated,"RO");File remaining=selected(isolated);
+            require(!Store.installing,"Removal releases the map-change guard");
             require(CountrySets.countries(remaining).keySet().equals(Collections.singleton("HU")),"Removal retains other country");
             require(RegionPackages.validateTileDirectory(new File(remaining,"tiles"),true)==2,"Shared tile retained, last-owner-only tile removed");
             reset();Store.load(isolated);checkRoutes();
@@ -75,6 +90,17 @@ final class CountrySetChecks {
             require(Store.graph==null&&Store.nativeRouter==null&&Store.display==null&&!isolated.getSharedPreferences("settings",0).getBoolean("native",true),"Last removal returns to empty offline install");
             require(new File(owned,"regions").listFiles().length==0,"Last-owner removal reclaims all installed country files");
             Store.load(isolated);require(Store.graph==null,"Empty install reopens without a map");
+            Store.graph=install(isolated,fixtures,"legacy");File legacy=selected(isolated);
+            JSONObject oldCountry=CountrySets.manifest(legacy);oldCountry.put("format",2).put("name","Romania").remove("country");
+            Files.delete(new File(legacy,"tiles.sqlite").toPath());
+            Files.write(new File(legacy,"manifest.json").toPath(),oldCountry.toString().getBytes(StandardCharsets.UTF_8));
+            reset();Store.load(isolated);checkRoutes();
+            require(CountrySets.countries(legacy).keySet().equals(Collections.singleton("RO")),"Older named Romania map remains manageable");
+            oldCountry.put("name","Unknown country");Files.write(new File(legacy,"manifest.json").toPath(),oldCountry.toString().getBytes(StandardCharsets.UTF_8));
+            refused=false;try{RegionPackages.removeCountry(isolated,"RO");}catch(IOException expected){refused=true;}
+            require(refused&&legacy.isDirectory()&&Store.nativeRouter!=null,"Unknown older country refuses removal without losing its map");
+            oldCountry.put("name","Romania");Files.write(new File(legacy,"manifest.json").toPath(),oldCountry.toString().getBytes(StandardCharsets.UTF_8));
+            Store.graph=RegionPackages.removeCountry(isolated,"RO");require(Store.graph==null&&!legacy.exists(),"Older named country removal returns to empty installation");
         }finally{
             reset();RegionPackages.deleteTiles(owned);
             for(String name:new String[]{"settings","truck","endpoints"})app.deleteSharedPreferences(prefix+name);

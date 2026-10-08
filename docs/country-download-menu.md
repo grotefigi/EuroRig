@@ -26,7 +26,21 @@ are not displayed as downloadable maps.
 The public catalogue currently contains Romania only. Regional presentation is
 tested with a local synthetic catalogue; that does not publish regional maps or
 establish seamless routing between downloaded regions. Coherent country-set
-activation and full European coverage are separate unfinished work.
+activation is implemented and tested with original artificial country fixtures;
+real geographic cross-border coverage and full Europe remain unverified.
+
+Maps → Manage installed countries lists the countries active for offline use.
+Remove opens a confirmation and warns when removing the last country. Cancelling
+keeps the map; successful last-country removal returns to an empty installation.
+Removal is disabled during guidance, simulation, another map change or downloads.
+Other contributors and their shared tiles remain when one country is removed.
+Older maps with a recognized country name or code can also be managed; unknown
+older identities refuse removal with an explanation and retain their map.
+
+Large text stacks the removal action below the country identity and lets the
+heading scroll with the list. The maps menu keeps its full status behind Status
+at large text sizes so the landscape list remains reachable. Both interfaces use
+the existing native controls and semantic light/dark palette.
 
 Run `python tools/audit_country_menu.py --device emulator-5554` on a dedicated
 emulator with a map installed. The audit serves its own temporary catalogue,
