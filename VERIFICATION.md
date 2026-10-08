@@ -1,5 +1,17 @@
 # Verification
 
+## Settlement index storage follow-up (2026-10-08)
+
+The compiler now uses a partial `place_area` index matching the app's settlement
+query, retaining all address/place rows. Six compiler checks pass with osmium
+available, including query-plan use, labels and address/accent/prefix search.
+An owned old RO/HU/RS display copy saves194,523,136 bytes after index replacement
+and host compaction, with all payload row counts retained and sampled query parity.
+Actual API26 queue installation and rendering accepts two artificial contributors
+with the partial index; original map/four preferences restore. This compiler-only
+change leaves the APK and existing public/installed maps unchanged. It does not
+establish real-country device performance or the full Europe storage budget.
+
 ## Queue restart identity checks (2026-10-08)
 
 The dedicated API26 emulator reproduced repeated RO/HU package transfers after a

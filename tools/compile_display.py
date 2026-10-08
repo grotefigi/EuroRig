@@ -100,7 +100,7 @@ def compile_display(sources,destination,name,seeds=None):
               'places':database.execute('SELECT count(*) FROM places').fetchone()[0],'missing_geometry':missing,
               'attribution':'© OpenStreetMap contributors · ODbL 1.0','cell_size':CELL}
         database.executemany('INSERT INTO metadata VALUES(?,?)',[(k,json.dumps(v,ensure_ascii=False)) for k,v in meta.items()])
-        database.executescript('CREATE INDEX road_level ON roads(level,south);CREATE INDEX road_large ON roads(large,level,south);CREATE INDEX place_area ON places(kind,lat);ANALYZE;')
+        database.executescript("CREATE INDEX road_level ON roads(level,south);CREATE INDEX road_large ON roads(large,level,south);CREATE INDEX place_area ON places(kind,lat) WHERE kind IN ('city','town','village');ANALYZE;")
         database.commit()
         if database.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError('Display database failed integrity check')
         print('Indexed',roads,'roads and',meta['places'],'places',flush=True)

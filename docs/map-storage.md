@@ -1,5 +1,29 @@
 # Map storage: measured costs, the duplicate search text, and what Europe needs
 
+## Settlement-label index, 2026-10-08
+
+New display builds index only `city`, `town` and `village` rows in `place_area`.
+The app uses that index for this exact settlement-label query. All places,
+addresses, search text, roads and restrictions remain in their existing tables.
+The implementation uses SQLite's existing [partial index support](https://www.sqlite.org/partialindex.html).
+
+An owned copy of the old private RO/HU/RS display database measured
+1,300,606,976 bytes after replacing this index and running host `VACUUM`, versus
+1,495,130,112 bytes before: a saving of 194,523,136 bytes. The index itself fell
+from 154,755,072 to 552,960 bytes; the remaining saving comes from compaction,
+and must not be attributed entirely to the compiler's index change.
+All 5,889,699 places, 2,725,871 roads and restriction/search row counts remain.
+Four settlement queries and six search queries returned identical results;
+the existing app query uses the smaller index. Six compiler checks pass,
+including accent/prefix/address search and the settlement query plan. Actual
+API26 service installation/rendering of two original artificial country fixtures
+with the partial index passes and restores the previous map/preferences.
+
+These are a real host measurement and a small Android compatibility control,
+not a new public country package, physical tablet result or continent estimate.
+Existing public/tablet maps are unchanged. The compiler affects future builds;
+the complete 20,000,000,000-byte Europe/storage gate remains open.
+
 ## Compatible search-index follow-up, 2026-10-07
 
 New country builds use `fts4(text,tokenize=unicode61,matchinfo=fts3)` in

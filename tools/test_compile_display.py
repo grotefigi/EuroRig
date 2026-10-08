@@ -47,6 +47,11 @@ class DisplayTests(unittest.TestCase):
                 self.assertEqual([('București',)],labels)
                 self.assertEqual([('bucuresti',)],db.execute('SELECT text FROM search WHERE text MATCH ?',('bucurest*',)).fetchall())
                 self.assertEqual([],db.execute("SELECT name FROM sqlite_master WHERE name='search_docsize'").fetchall())
+                area_sql="SELECT label,lat,lon FROM places WHERE kind IN ('city','town','village') AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT 40"
+                box=(44.4,44.5,26,26.2)
+                self.assertTrue(any('place_area' in row[3] for row in db.execute('EXPLAIN QUERY PLAN '+area_sql,box)))
+                self.assertEqual([('București',44.42,26.1)],db.execute(area_sql,box).fetchall())
+                self.assertEqual([('Strada Test 7',)],db.execute('SELECT p.label FROM search s JOIN places p ON p.id=s.rowid WHERE s.text MATCH ?',('strada test 7',)).fetchall())
                 self.assertEqual([(44.42,26.1),(44.43,26.11)],decode(db.execute('SELECT shape FROM roads').fetchone()[0]))
             enrich([source],output)
             with closing(sqlite3.connect(output)) as db:
