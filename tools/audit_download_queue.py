@@ -15,10 +15,10 @@ parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--device', required=True)
 parser.add_argument('--fixtures', type=Path, required=True)
 parser.add_argument('--prior', action='store_true', help='Verify the historical queue or retained-manual-archive failure on an older APK')
-parser.add_argument('--case', choices=('complete', 'mismatched', 'regional', 'manual', 'manual-mismatched', 'manual-retained', 'manual-unsafe'), default='complete')
+parser.add_argument('--case', choices=('complete', 'mismatched', 'regional', 'manual', 'manual-mismatched', 'manual-retained', 'manual-unsafe', 'manual-checksum', 'restart', 'restart-removed', 'restart-changed', 'restart-corrupt'), default='complete')
 args = parser.parse_args()
 manual = args.case.startswith('manual')
-require(not args.prior or args.case in ('complete', 'manual'), 'Prior comparison requires the complete queue or successful manual case')
+require(not args.prior or args.case in ('complete', 'manual', 'restart'), 'Prior comparison requires complete, manual or restart case')
 s.device = args.device
 if not s.device.startswith('emulator-'):
     raise RuntimeError('Dedicated emulator required')
@@ -104,6 +104,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def log_message(self, *unused):
         pass
+def run_queue():
+    s.tap('Maps');s.tap('Download all Europe');s.tap('Maps')
+    deadline = time.monotonic() + 90
+    while time.monotonic() < deadline:
+        view = s.ui()
+        texts = [n.attrib.get('text', '') for n in view.iter('node')]
+        terminal = [text for text in texts if text.startswith('Map download:') or any('Original HU queue fixture ' + outcome + ' for offline navigation' in text for outcome in ('ready', 'installed', 'already installed'))]
+        services = s.run('shell', 'dumpsys', 'activity', 'services', 'org.eurorig.app').decode()
+        if terminal and 'MapDownloadService' not in services:
+            return view, terminal
+        time.sleep(0.5)
+    raise RuntimeError('Real service did not report terminal queue status')
 server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
 threading.Thread(target=server.serve_forever, daemon=True).start()
 reverse=f'tcp:{server.server_port}'
@@ -132,6 +144,8 @@ try:
             finally:
                 s.run('shell', 'rm', '-f', temporary)
             require(s.run('shell', 'run-as', 'org.eurorig.app', 'sha256sum', target).decode().split()[0] == entry['sha256'], 'Staged manual package checksum differs from its host fixture')
+            if args.case == 'manual-checksum' and code == 'hu':
+                s.run('shell', 'run-as', 'org.eurorig.app', 'truncate', '-s', '0', target)
             reference = target.rsplit('/', 1)[1]
             if args.case == 'manual-unsafe' and code == 'hu':
                 outside = owned + '/' + reference
@@ -152,6 +166,8 @@ try:
                 view = s.wait_text('different generations', seconds=30)
             elif args.case == 'manual-unsafe' and code == 'hu':
                 view = s.wait_text('Invalid downloaded country package path', seconds=30)
+            elif args.case == 'manual-checksum' and code == 'hu':
+                view = s.wait_text('Downloaded country package checksum mismatch', seconds=30)
             else:
                 if args.case == 'manual-retained':
                     s.wait_text('Country installed. Its downloaded archive could not be removed.', seconds=30)
@@ -159,16 +175,26 @@ try:
                 view = s.wait_text('Offline · Synthetic profile QA' + (' · Synthetic profile QA' if code == 'hu' else ''), seconds=30)
         terminal = [n.attrib.get('text', '') for n in view.iter('node') if 'Offline · ' in n.attrib.get('text', '') or 'Country installation:' in n.attrib.get('text', '')]
     else:
-        s.tap('Maps');s.tap('Download all Europe');s.tap('Maps')
-        deadline = time.monotonic() + 90
-        while time.monotonic() < deadline:
-            view = s.ui()
-            texts = [n.attrib.get('text', '') for n in view.iter('node')]
-            terminal = [text for text in texts if text.startswith('Map download:') or 'Original HU queue fixture ready for offline navigation' in text or 'Original HU queue fixture installed for offline navigation' in text]
-            if terminal: break
-            time.sleep(0.5)
-        else:
-            raise AssertionError('Real service did not report terminal queue status')
+        view, terminal = run_queue()
+        if args.case.startswith('restart'):
+            require(requests == ['/catalog.json', '/ro.eurorig', '/hu.eurorig'], 'First queue must transfer and activate both fixtures')
+            if args.case == 'restart-removed':
+                s.tap('Manage installed countries');s.tap('Remove offline map of Hungary');s.tap('Remove')
+                s.wait_text('Offline · Synthetic profile QA', seconds=30)
+            else:
+                s.tap('Close')
+            s.run('shell', 'am', 'force-stop', 'org.eurorig.app')
+            s.run('shell', 'am', 'start', '-n', 'org.eurorig.app/.MainActivity')
+            s.wait_text('Offline', seconds=40)
+            if args.case == 'restart-changed':
+                # A transport-only update must not be mistaken for its previously installed archive.
+                packages['hu'] += b'Original transport update'
+                catalog['maps'][1].update(bytes=len(packages['hu']), sha256=hashlib.sha256(packages['hu']).hexdigest())
+            if args.case == 'restart-corrupt':
+                selected_now = re.search(b'<string name="region">([0-9a-f-]{36})</string>', raw('settings')).group(1).decode()
+                s.run('shell', 'run-as', 'org.eurorig.app', 'truncate', '-s', '0', 'files/regions/' + selected_now + '/countries/RO/display.sqlite')
+            requests.clear()
+            view, terminal = run_queue()
     settings = raw('settings')
     current = re.search(b'<string name="region">([0-9a-f-]{36})</string>', settings).group(1).decode()
     selected_manifest = json.loads(s.run('exec-out', 'run-as', 'org.eurorig.app', 'cat', 'files/regions/' + current + '/manifest.json'))
@@ -183,7 +209,7 @@ try:
     proof = {'checked_at': datetime.now(timezone.utc).isoformat(), 'original_artificial_fixture': True, 'actual_service': not manual, 'actual_manual_ui': manual, 'requests': requests, 'installed_members': members, 'retained_downloads': archives, 'visible_status': status, 'apk_sha256': s.run('shell', 'sha256sum', s.run('shell', 'pm', 'path', 'org.eurorig.app').decode().strip().removeprefix('package:')).decode().split()[0], 'physical_device_access': False}
     proof['passed'] = False
     proof['ready_entries'] = sorted(node.attrib['name'] for node in ET.fromstring(raw('maps')) if node.attrib.get('name', '').startswith('ready_'))
-    output = ('manual-prior' if manual else 'prior') if args.prior else args.case
+    output = ('manual-prior' if manual else 'restart-prior' if args.case == 'restart' else 'prior') if args.prior else args.case
     (private / (output + '.json')).write_text(json.dumps(proof, indent=2) + '\n')
     print(json.dumps(proof), flush=True)
     if not args.prior and args.case in ('complete', 'manual'):
@@ -191,7 +217,17 @@ try:
         s.tap('Downloaded countries')
         s.wait_text('No downloaded packages await installation.')
     if args.prior:
-        require(members == (['HU', 'RO'] if manual else ['RO']) and len(archives) == 2, 'Expected historical archive/queue bug was not reproduced')
+        if args.case == 'restart':
+            require(members == ['HU', 'RO'] and requests == ['/catalog.json', '/ro.eurorig', '/hu.eurorig'], 'Expected historical repeated queue transfer was not reproduced')
+        else:
+            require(members == (['HU', 'RO'] if manual else ['RO']) and len(archives) == 2, 'Expected historical archive/queue bug was not reproduced')
+    elif args.case.startswith('restart'):
+        expected = ['/catalog.json'] + ([] if args.case in ('restart', 'restart-corrupt') else ['/hu.eurorig'])
+        require(members == ['HU', 'RO'] and requests == expected and not archives, 'Restart must transfer only absent or changed contributors, and preserve the set')
+        if args.case == 'restart-corrupt':
+            require(any('checksum mismatch' in text for text in status), 'Damaged installed payload must refuse instead of being skipped as installed')
+        else:
+            require(not proof['ready_entries'] and all(not text.startswith('Map download:') for text in status), 'Healthy restart must complete without stale archives, ready entries or error')
     elif args.case in ('complete', 'manual'):
         require(members == ['HU', 'RO'] and (not archives) and not proof['ready_entries'], 'All downloaded countries must be installed without retained redundant archives or ready entries')
     elif args.case in ('mismatched', 'manual-mismatched'):
@@ -200,6 +236,8 @@ try:
         require(members == ['RO'] and archives == [expected] and proof['ready_entries'] == ['ready_queue-qa-hu'] and any(('different generations' in text for text in status)), 'Rejected second package must preserve first country and verified retry archive')
     elif args.case == 'manual-retained':
         require(members == ['HU', 'RO'] and len(archives) == 2 and len(proof['ready_entries']) == 2, 'Cleanup failure must retain both archives and report successful installed countries')
+    elif args.case == 'manual-checksum':
+        require(members == ['RO'] and len(archives) == 1 and proof['ready_entries'] == ['ready_queue-qa-hu'] and any('Downloaded country package checksum mismatch' in text for text in status), 'Changed manual archive must refuse before activation and retain its recovery entry')
     elif args.case == 'manual-unsafe':
         require(members == ['RO'] and not archives and any('Invalid downloaded country package path' in text for text in status), 'Out-of-download source must refuse without replacing the installed country')
         require(s.run('shell', 'run-as', 'org.eurorig.app', 'sha256sum', outside).decode().split()[0] == catalog['maps'][1]['sha256'], 'Refused source outside downloads must remain unchanged')

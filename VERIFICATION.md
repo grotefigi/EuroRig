@@ -1,5 +1,19 @@
 # Verification
 
+## Queue restart identity checks (2026-10-08)
+
+The dedicated API26 emulator reproduced repeated RO/HU package transfers after a
+completed queue on the preceding APK. The new implementation records the verified
+transport hash in each installed contributor's manifest. Queue checks reuse the
+existing country ownership and payload validators before skipping a transfer;
+imports remove supplied transport claims. The audit covers an unchanged cold
+restart, removal and re-download of Hungary, a changed transport archive, damaged
+installed payload refusal and a changed deferred archive. Private receipts under
+`analysis/private/download-queue` record actual HTTP requests, UI results and
+restoration. These original artificial fixtures do not establish real geographic
+cross-border coverage, tablet behavior, Europe size or road readiness. Previous
+full Romania/camera/UI evidence belongs to earlier APKs.
+
 ## Deferred archive lifecycle, 2026-10-08
 
 - The preceding APK installed both original RO/HU fixtures through Downloaded
@@ -17,8 +31,8 @@
   preferences and owned files before further testing. Its platform root cause
   remains unproven; the audit verifies state and retries an idempotent preference
   restore once. Historical failed receipts/logs are retained privately.
-- External file imports are unchanged. Queue restart can still re-download already
-  installed countries. Real geographic cross-border coverage, tablet recovery,
+- At this earlier checkpoint external file imports were unchanged and queue
+  restart could still re-download installed countries. Real geographic coverage, tablet recovery,
   full European footprint/staging budgets and driving/voice remain unverified.
 
 ## Download queue and archive lifecycle, 2026-10-08

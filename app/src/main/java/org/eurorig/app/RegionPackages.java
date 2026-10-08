@@ -25,6 +25,9 @@ final class RegionPackages {
         for(File folder:folders)if(folder.getName().matches("[0-9a-f-]{36}")&&!folder.getName().equals(selected))cleanup(folder);
     }
     static Graph install(Context c,InputStream source) throws IOException {
+        return install(c,source,null);
+    }
+    static Graph install(Context c,InputStream source,String downloadedSha256) throws IOException {
         File dir=create(c);Set<String> seen=new HashSet<>();
         try{
         try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(source))){
@@ -38,7 +41,7 @@ final class RegionPackages {
             }
             if(!seen.contains("manifest.json")||!seen.contains("routing.tar")||seen.contains("display.sqlite")==seen.contains("display.europack"))throw new IOException("A region needs a manifest, routing tiles and one display map");
         }
-            return activate(c,dir);
+            return activate(c,dir,downloadedSha256);
         }catch(IOException|RuntimeException|LinkageError e){
             // A post-commit cleanup fault must never remove the selected map.
             if(!(e instanceof SelectionFailure)&&!dir.getName().equals(c.getSharedPreferences("settings",0).getString("region","")))cleanup(dir);
@@ -60,7 +63,7 @@ final class RegionPackages {
             }
         }
     }
-    private static Graph activate(Context c,File dir) throws IOException{
+    private static Graph activate(Context c,File dir,String downloadedSha256) throws IOException{
         File staged=dir;boolean uncertainSelection=false;
         try {
             JSONObject manifest=new JSONObject(new String(Files.readAllBytes(new File(dir,"manifest.json").toPath()),StandardCharsets.UTF_8));
@@ -83,6 +86,12 @@ final class RegionPackages {
             File routing=new File(dir,directoryTiles?"tiles":"routing.tar");
             if(directoryTiles)extractTiles(new File(dir,"routing.tar"),routing,true);
             if(format==3)TileIndex.validate(routing,new File(dir,"tiles.sqlite"),manifest);
+            // Imported manifests cannot claim a verified transport identity.
+            manifest.remove("download_sha256");
+            if(downloadedSha256!=null)manifest.put("download_sha256",downloadedSha256);
+            byte[] installedManifest=manifest.toString().getBytes(StandardCharsets.UTF_8);
+            if(installedManifest.length>65536)throw new IOException("Installed region manifest exceeds its size limit");
+            Files.write(new File(dir,"manifest.json").toPath(),installedManifest);
             if(directoryTiles){
                 Files.delete(new File(dir,"routing.tar").toPath());
                 String previous=c.getSharedPreferences("settings",0).getString("region","");

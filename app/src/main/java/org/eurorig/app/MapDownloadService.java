@@ -48,9 +48,14 @@ public final class MapDownloadService extends Service {
                 }
                 if(country==null&&!catalog.optBoolean("europe_complete",false))throw new IOException("All-Europe maps are not published yet. Download a published country instead.");
                 if(queue.isEmpty())throw new IOException("This country has not been published in the catalogue");
+                Set<String> verifiedSelections=new HashSet<>();
                 for(JSONObject map:queue){
                     if(cancelled)throw new InterruptedIOException("Map download paused");
                     String name=map.getString("name"),mapId=map.getString("id");
+                    if(Store.worker.submit(()->alreadyInstalled(this,map,verifiedSelections)).get()){
+                        if(cancelled)throw new InterruptedIOException("Map download paused");
+                        update(name+" already installed for offline navigation");continue;
+                    }
                     String address=new java.net.URL(new java.net.URL(url),map.getString("url")).toString();
                     File file=client.download(address,map.getString("sha256"),map.getLong("bytes"),new File(getFilesDir(),"downloads"),mapId,()->cancelled,(done,total)->update("Downloading "+name+" · "+Math.round(done*100.0/total)+"%"));
                     update("Checking "+name+"…");
@@ -84,7 +89,10 @@ public final class MapDownloadService extends Service {
                 ||!java.nio.file.Files.isRegularFile(file.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)
                 ||!directory.getCanonicalFile().equals(file.getParentFile().getCanonicalFile()))
             throw new IOException("Invalid downloaded country package path");
-        Graph graph;try(InputStream input=new FileInputStream(file)){graph=RegionPackages.install(context,input);}
+        String hash=file.getName().substring(file.getName().length()-72,file.getName().length()-8);
+        try{if(!hash.equals(RegionPackages.digest(file)))throw new IOException("Downloaded country package checksum mismatch");}
+        catch(java.security.NoSuchAlgorithmException e){throw new IOException("Cannot verify downloaded country package",e);}
+        Graph graph;try(InputStream input=new FileInputStream(file)){graph=RegionPackages.install(context,input,hash);}
         if(file.delete()){
             android.content.SharedPreferences preferences=context.getSharedPreferences("maps",0);
             android.content.SharedPreferences.Editor cleanup=preferences.edit();
@@ -93,6 +101,26 @@ public final class MapDownloadService extends Service {
             cleanup.apply();
         }
         return graph;
+    }
+    /** Worker-serialized check: only exact installed transport identity may avoid transfer. */
+    private static boolean alreadyInstalled(Context context,JSONObject map,Set<String> verifiedSelections)throws IOException,JSONException{
+        String code=CountryFlag.code(map.getString("id"),map.optString("country",""));
+        String hash=map.getString("sha256");
+        if(!hash.matches("[a-fA-F0-9]{64}")||map.getLong("bytes")<=0||map.getLong("bytes")>128L*1024*1024*1024
+                ||!map.getString("id").matches("[a-z][a-z0-9-]{0,63}"))throw new IOException("Invalid country-map metadata");
+        if(!context.getSharedPreferences("settings",0).getBoolean("native",false)||!Store.beginInstall())return false;
+        try{
+            String selected=context.getSharedPreferences("settings",0).getString("region","");
+            if(!selected.matches("[0-9a-f-]{36}"))throw new IOException("Invalid saved region selection");
+            File directory=new File(context.getFilesDir(),"regions/"+selected);
+            JSONObject descriptor=CountrySets.manifest(directory);
+            if(descriptor.optInt("format")!=4&&!descriptor.has("download_sha256"))return false;
+            File country=CountrySets.countries(directory).get(code);
+            if(country==null||!hash.equalsIgnoreCase(CountrySets.manifest(country).optString("download_sha256","")))return false;
+            // One full payload check per immutable selected directory in this queue; map changes use a new UUID.
+            if(!verifiedSelections.contains(selected)){TileIndex.validateInstalled(directory);verifiedSelections.add(selected);}
+            return true;
+        }finally{Store.installing=false;}
     }
     private void update(String text){status=text;long now=SystemClock.elapsedRealtime();if(now-lastNotification>1000){getSystemService(NotificationManager.class).notify(2,notification(text));lastNotification=now;}}
     private Notification notification(String text){

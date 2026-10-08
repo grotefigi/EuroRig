@@ -84,6 +84,19 @@ the actual picker, failed-generation preservation, cleanup failure and refusal o
 a source outside the download directory. Manual fixtures use `adb push` followed
 by a checksum check; binary shell stdin was observed to truncate a fixture.
 
-Restarting a completed queue can download successful packages again after cleanup. Resume
-bookkeeping, physical testing, real coherent countries and the complete Europe
+Restarting a queue checks the active country contributor against the catalogue's
+exact archive SHA-256. A downloaded installation records this identity inside its
+installed manifest, so composition and removal preserve the surviving countries'
+receipts. The worker verifies all installed payloads once per selected directory
+in that queue before skipping a transfer. A new map selection requires another
+check. Removed countries and changed archives download again; a corrupt installed
+set refuses rather than claiming that it is already installed. Older maps without
+a transport receipt download normally. External imports discard transport claims
+from their supplied manifest. Deferred downloads are rehashed before installation.
+
+Cases `restart`, `restart-removed`, `restart-changed`, `restart-corrupt` and
+`manual-checksum` exercise these paths. The changed case modifies transport bytes
+without changing the artificial geographic data. These small controls establish
+queue behavior, not real country coverage, full Europe performance or storage.
+Physical testing, real coherent countries and the complete Europe
 installed/temporary storage budgets remain required work.
