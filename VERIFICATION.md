@@ -612,6 +612,23 @@ port, e.g. `emulator-5556`.
 All intermediate Android versions and physical devices, real driving, successful
 voice synthesis, continental-scale routing/performance, country-specific law/ADR
 accuracy, full European maps, cross-package trips, multi-stop navigation, complete
-geocoding, lane guidance and live information. The CI workflow has been prepared
-but has not run on a public repository. This is a debug-signed development build;
+geocoding, lane guidance and live information. Current exact-head CI is tracked
+in publication receipts. This is a debug-signed development build;
 release signing, public hosting and the full product request remain unfinished.
+
+## Failed cold-open selection recovery
+
+The real Android 8/API26 activity previously switched the saved native map mode
+off after a malformed installed manifest refused cold opening. That bypassed
+the native selection checks on subsequent installations. The recovery path now
+releases runtime actors without changing the persisted country selection.
+The deliberate legacy prototype-map switch still disables native mode.
+
+`python tools/audit_saved_map_recovery.py --device emulator-5554` injects one
+invalid manifest field on a dedicated idle emulator, checks the actual activity
+error and retained selection, then restores the original manifest and all four
+preference files exactly. Healthy reopening of the restored map is checked.
+`--prior` verifies the historical mode-loss behavior on the preceding APK.
+This guard test does not provide a user-facing repair workflow for damaged maps
+or validate real driving, tablet recovery or European map storage.
+

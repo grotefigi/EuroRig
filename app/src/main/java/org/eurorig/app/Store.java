@@ -100,9 +100,13 @@ final class Store {
     }
     @android.annotation.SuppressLint("ApplySharedPref") // Worker-thread commit precedes a map switch and must survive process termination.
     static void closeNative(Context c){
-        if(nativeRouter!=null){nativeRouter.close();nativeRouter=null;}
-        if(display!=null){display.close();display=null;}
+        releaseNative();
         c.getSharedPreferences("settings",0).edit().putBoolean("native",false).commit();
+    }
+    /** Release failed runtime actors without forgetting the durable country selection. */
+    static void releaseNative(){
+        RegionPackages.closeRetired(nativeRouter);nativeRouter=null;
+        RegionPackages.closeRetired(display);display=null;
     }
     // Read legacy floats as their entered decimal value, avoiding float expansion at a road limit.
     private static double measurement(SharedPreferences p,String key,double fallback){

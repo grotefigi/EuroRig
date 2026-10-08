@@ -59,7 +59,7 @@ public final class MainActivity extends Activity {
             try {Store.load(getApplicationContext());main.post(()->{if(isDestroyed())return;busy=false;map.setGraph(Store.graph);refresh();});}
             catch(IOException|RuntimeException|LinkageError e){
                 // Recover the interface while retaining the damaged region on disk.
-                Store.closeNative(this);Store.graph=null;
+                Store.releaseNative();Store.graph=null;
                 main.post(()->{busy=false;map.setGraph(null);refresh();error("Saved map could not load. Import or download the map again. "+e.getMessage());});
             }
         });
