@@ -58,7 +58,7 @@ quality or physical-device performance.
 
 Every whole country in an accepted queue is installed in order. A verified
 download is marked installed only after its native/display candidate activates.
-Successful service installs remove their redundant archive and ready-file entry;
+Successful queued and manual deferred installs remove their redundant archive and ready-file entry;
 failed installations retain the verified package for recovery. Guidance or a map
 change blocks activation, retains the download and stops the remaining queue.
 Downloaded countries shows packages waiting to be installed. Manage installed
@@ -75,7 +75,15 @@ map and four preference files, restores them, and keeps receipts private. It use
 an owned ADB reverse port and removes that mapping afterward. Safety checks remain
 enabled with Python optimization. It never clears app data or operates a tablet.
 
-Manual deferred-package installs still retain their archive, and restarting a
-completed queue can download successful packages again after cleanup. Resume
+Both install paths use the same helper. Cleanup runs after verified activation
+and source closure, and accepts only regular packages inside the private download
+directory. If deletion fails, the country remains installed and its archive and
+ready entry are retained with an explanation. External file imports are untouched.
+Cases `manual`, `manual-mismatched`, `manual-retained` and `manual-unsafe` exercise
+the actual picker, failed-generation preservation, cleanup failure and refusal of
+a source outside the download directory. Manual fixtures use `adb push` followed
+by a checksum check; binary shell stdin was observed to truncate a fixture.
+
+Restarting a completed queue can download successful packages again after cleanup. Resume
 bookkeeping, physical testing, real coherent countries and the complete Europe
 installed/temporary storage budgets remain required work.

@@ -4,6 +4,7 @@ import android.app.*;
 import android.content.*;
 import android.os.*;
 import org.eurorig.maps.DownloadClient;
+import org.eurorig.routing.Graph;
 import org.json.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
@@ -61,13 +62,12 @@ public final class MapDownloadService extends Service {
                         final boolean[] activated={false};
                         Store.worker.execute(()->{
                             if(!Store.beginInstall()){installed.countDown();return;}
-                            try(InputStream in=new FileInputStream(file)){
-                            RegionPackages.install(this,in);activated[0]=true;
+                            try{
+                            installDownloaded(this,file);activated[0]=true;
                         }catch(Exception|LinkageError e){failure[0]=new IOException(e.getMessage(),e);}finally{Store.installing=false;installed.countDown();}});
                         installed.await();if(failure[0]!=null)throw failure[0];
                         if(!activated[0]){update(name+" downloaded · stop guidance or wait for map changes, then install from Downloaded countries");break;}
-                        if(file.delete()){
-                            getSharedPreferences("maps",0).edit().remove("ready_"+mapId).commit();
+                        if(!file.exists()){
                             update(name+" installed for offline navigation");
                         }else update(name+" installed · downloaded archive could not be removed");
                     }
@@ -75,6 +75,24 @@ public final class MapDownloadService extends Service {
             }catch(Exception e){status=cancelled?"Downloads paused. Press download to resume.":"Map download: "+e.getMessage();}
             finally{running=false;stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}
         },"EuroRig map download").start();return START_NOT_STICKY;
+    }
+    /** Both queued and deferred installs retire only their own archive after activation and close. */
+    static Graph installDownloaded(Context context,File file)throws IOException{
+        File directory=new File(context.getFilesDir(),"downloads");
+        if(!file.getName().matches("[a-z][a-z0-9-]{0,63}-[a-f0-9]{64}\\.eurorig")
+                ||!java.nio.file.Files.isDirectory(directory.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                ||!java.nio.file.Files.isRegularFile(file.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                ||!directory.getCanonicalFile().equals(file.getParentFile().getCanonicalFile()))
+            throw new IOException("Invalid downloaded country package path");
+        Graph graph;try(InputStream input=new FileInputStream(file)){graph=RegionPackages.install(context,input);}
+        if(file.delete()){
+            android.content.SharedPreferences preferences=context.getSharedPreferences("maps",0);
+            android.content.SharedPreferences.Editor cleanup=preferences.edit();
+            for(Map.Entry<String,?> entry:preferences.getAll().entrySet())
+                if(entry.getKey().startsWith("ready_")&&entry.getValue() instanceof String&&((String)entry.getValue()).endsWith("|"+file.getName()))cleanup.remove(entry.getKey());
+            cleanup.apply();
+        }
+        return graph;
     }
     private void update(String text){status=text;long now=SystemClock.elapsedRealtime();if(now-lastNotification>1000){getSystemService(NotificationManager.class).notify(2,notification(text));lastNotification=now;}}
     private Notification notification(String text){

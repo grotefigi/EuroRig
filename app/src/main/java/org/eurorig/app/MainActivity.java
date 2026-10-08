@@ -428,7 +428,7 @@ public final class MainActivity extends Activity {
         }
         if(names.isEmpty()){error("No downloaded packages await installation. Your offline maps are listed under Manage installed countries.");return;}
         new AlertDialog.Builder(this).setTitle("Select offline country").setItems(names.toArray(new String[0]),(d,w)->{
-            if(!canChangeMap()||!Store.beginInstall())return;busy=true;refresh();Store.worker.execute(()->{try(InputStream in=new FileInputStream(files.get(w))){Graph g=RegionPackages.install(this,in);main.post(()->installGraph(g));}catch(Exception|LinkageError e){main.post(()->{busy=false;refresh();error("Country installation: "+e.getMessage());});}finally{Store.installing=false;}});
+            if(!canChangeMap()||!Store.beginInstall())return;busy=true;refresh();Store.worker.execute(()->{try{Graph g=MapDownloadService.installDownloaded(this,files.get(w));main.post(()->{installGraph(g);if(files.get(w).exists()&&!isDestroyed())error("Country installed. Its downloaded archive could not be removed.");});}catch(Exception|LinkageError e){main.post(()->{busy=false;refresh();error("Country installation: "+e.getMessage());});}finally{Store.installing=false;}});
         }).setNegativeButton("Close",null).show();
     }
     private void installedCountries(){

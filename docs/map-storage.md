@@ -72,9 +72,12 @@ slack, SQLite scratch from any in-place VACUUM/reindex, and OS page cache.
 The Eurowag screenshot's **149.5 MB** is a *download* figure and is not comparable to our installed
 sizes. In the same decimal units, Romania's download is **407.5 MB**, about **2.73×** that label.
 Its installed payload is 873.5 MB (833.0 MiB). We do not know Eurowag's installed size or data scope;
-nothing here extrapolates either. The physical Tab S9 currently holds this imported payload, with
-no retained download archive. A map installed through the downloader also retains its verified
-407.5 MB archive for reinstallation, bringing those map files to about 1,281.0 MB before other caches.
+nothing here extrapolates either. At measurement time the physical Tab S9 held this imported
+payload with no retained download archive. Current queued and deferred installations remove
+their verified transport archive after successful activation and source closure. Failed installs
+or failed archive deletion retain it for recovery, adding the 407.5 MB transport size to this
+measured example until resolved. The archive still contributes to installation peak space.
+This cleanup does not prove the full European installed-storage or staging budget.
 
 ## 2. Where the bytes go (MEASURED, dbstat)
 

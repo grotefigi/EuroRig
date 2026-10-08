@@ -29,7 +29,7 @@ if not args.installed:
         if any('Offline' in text and 'Romania' in text for text in visible):break
         time.sleep(2)
     else:
-        s.tap('Maps');s.tap('Download status');raise AssertionError('Country download did not install: '+str([n.attrib.get('text') for n in s.ui().iter('node')]))
+        s.tap('Maps');s.tap('Status');raise AssertionError('Country download did not install: '+str([n.attrib.get('text') for n in s.ui().iter('node')]))
     assert foreground,'Download did not run in foreground'
     s.screenshot(args.prefix+'-installed')
 # The API 26 image's shell UID cannot change Wi-Fi; root is confined to the emulator guard above.
@@ -48,6 +48,7 @@ s.run('shell','am','force-stop','org.eurorig.app')
 s.run('shell','am','start','-n','org.eurorig.app/.MainActivity');s.wait_text('Offline ·')
 s.tap('Plan route');s.wait_text('Route ready for your truck')
 s.run('shell','svc','wifi','enable')
-s.tap('Maps');s.tap('Downloaded countries');s.wait_text('Romania');s.screenshot(args.prefix+'-countries');s.tap('Close')
-s.tap('Maps');s.tap('Download all Europe');time.sleep(2);s.tap('Maps');s.tap('Download status');s.wait_text('All-Europe maps are not published yet')
+s.tap('Maps');s.tap('Downloaded countries');s.wait_text('No downloaded packages await installation.');s.tap('OK')
+s.tap('Maps');s.tap('Manage installed countries');s.wait_text('Romania');s.screenshot(args.prefix+'-countries');s.tap('Close')
+s.tap('Maps');s.tap('Download all Europe');time.sleep(2);s.tap('Maps');s.tap('Status');s.wait_text('All-Europe maps are not published yet')
 print('PASS: empty install, public HTTPS Romania download, foreground progress, checksum/install, offline routing/cold restart, country selection, honest Europe availability',flush=True)

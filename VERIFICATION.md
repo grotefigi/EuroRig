@@ -1,5 +1,26 @@
 # Verification
 
+## Deferred archive lifecycle, 2026-10-08
+
+- The preceding APK installed both original RO/HU fixtures through Downloaded
+  countries but retained both archives. Queued and deferred installs now share
+  an owned-file helper that validates the private download path, activates the
+  map, closes its source, then removes the archive and matching ready entries.
+- Actual Android 8/API26 picker checks verify successful two-country installation
+  without archives, generation-mismatch preservation, deletion-failure handling
+  and refusal of a source outside downloads. Original Romania and all four raw
+  preference files are restored; runtime guards remain enabled under Python
+  optimization. The source-path/deletion controls use small original fixtures.
+- The manual fixture staging first failed because binary ADB shell stdin truncated
+  a package. It now reuses `adb push` and verifies the staged SHA-256. A later
+  restoration command returned exit 255; independent recovery restored the map,
+  preferences and owned files before further testing. Its platform root cause
+  remains unproven; the audit verifies state and retries an idempotent preference
+  restore once. Historical failed receipts/logs are retained privately.
+- External file imports are unchanged. Queue restart can still re-download already
+  installed countries. Real geographic cross-border coverage, tablet recovery,
+  full European footprint/staging budgets and driving/voice remain unverified.
+
 ## Download queue and archive lifecycle, 2026-10-08
 
 - The prior APK fetched both original RO/HU ownership fixtures but installed only
@@ -21,7 +42,7 @@
   and first installed country were preserved. The controlled audit uses an owned
   ADB reverse port and removes it afterward. This does not establish a production
   network root cause or verify automatic retry behavior.
-- Manual deferred-package installs still retain archives. Queue restart bookkeeping,
+- Queue restart bookkeeping,
   real coherent map coverage and installed/temporary Europe storage fit remain
   unfinished. Public Romania data and the disabled all-Europe publication gate
   are unchanged.
