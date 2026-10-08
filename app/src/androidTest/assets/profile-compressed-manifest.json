@@ -1,0 +1,17 @@
+{
+  "format": 3,
+  "engine": "valhalla",
+  "native_version": "0.6.3",
+  "name": "Original compressed fixture",
+  "routing_source": "Original EuroRig test network",
+  "routing_date": "2026-10-06",
+  "attribution": "© OpenStreetMap contributors",
+  "license": "ODbL-1.0",
+  "country": "RO",
+  "generation_id": "0000000000000001",
+  "sha256": {
+    "routing.tar": "6138035bc151d5390b6a09d7984f521d42422d629327a74d62a9638d5b989403",
+    "display.sqlite": "90ffb6f6e0775c5c4b3b2f13e43a14c7e6036b70b7be3e79e54641f235bfb976",
+    "tiles.sqlite": "122b972050a7034ec083e35ee151ed0b22595402eedfbd662c9d99ef5f79c04b"
+  }
+}

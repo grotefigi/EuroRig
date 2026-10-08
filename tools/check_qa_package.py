@@ -14,11 +14,14 @@ Checks, in order (a refusal names the check that failed):
     values, and it is within the app's 65536-byte limit
  3. every declared payload is present, stream-hashed, and matches its recorded sha256 - no extra, no missing
  4. the coverage box, if published, validates
- 5. format 3: country and generation_id syntax; tiles.sqlite carries user_version 1, exactly the
+ 5. format 3: country and generation_id syntax; tiles.sqlite carries user_version 1 or 2, exactly the
     documented schema, the metadata rows (generation_id, country, tiles), and one row per canonical tile
     in the tar with matching hash and size - no duplicate, absent or extra row, and no row for a tile the
     tar does not contain. The index metadata is ALWAYS compared with the manifest, with or without
     --generation: an index that disagrees with the manifest it ships beside is refused either way.
+    Version 2 adds paired compressed hash/size claims. Stored gzip bytes must match those claims;
+    decoding is capped at canonical size plus one byte and must reproduce canonical SHA256/size.
+    Both raw-only index versions remain readable. Android acceptance requires its own device checks.
  6. with --generation: the package's generation_id matches the coherent manifest, and every tile in
     the tar hashes to the coherent claim - the same claims the packager enforced, re-checked
     independently by this gate
@@ -27,6 +30,7 @@ Anything that fails for a structural reason - malformed JSON, an unexpected JSON
 bad tar - is reported as a FAIL receipt with exit 1, never as an uncaught traceback.
 """
 import argparse
+import gzip
 import hashlib
 import json
 import re
@@ -35,11 +39,12 @@ import sys
 import tarfile
 import tempfile
 import zipfile
+import zlib
 from contextlib import closing
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from package_region import (GENERATION_ID, MANIFEST_LIMIT, TILE_INDEX_VERSION, TILE_SHA256,  # noqa: E402
+from package_region import (GENERATION_ID, MANIFEST_LIMIT, TILE_INDEX_SCHEMAS, TILE_SHA256,  # noqa: E402
                             canonical_tile_name, coverage_box, read_generation)
 
 ALLOWED = {
@@ -137,7 +142,7 @@ def check_coverage(manifest):
     return coverage_box(coverage['bbox'])
 
 
-def tar_tiles(stream):
+def tar_tiles(stream, claims=None):
     """Every canonical tile in the tar, with its sha256 and byte count. Refuses anything else.
 
     A .gph member that is not a regular file is refused rather than skipped: a symlink or hardlink named
@@ -145,28 +150,52 @@ def tar_tiles(stream):
     carry.
     """
     rows, seen = {}, set()
-    with tarfile.open(fileobj=stream, mode='r|') as archive:
+    with stream, tarfile.open(fileobj=stream, mode='r|') as archive:
         for entry in archive:
-            if entry.name.endswith('.gph') and not entry.isfile():
+            compressed = entry.name.endswith('.gph.gz')
+            if (entry.name.endswith('.gph') or compressed) and not entry.isfile():
                 raise Refused(f'tar member {entry.name!r} is not a regular file')
-            if not entry.isfile() or not entry.name.endswith('.gph'):
+            if not entry.isfile() or not (entry.name.endswith('.gph') or compressed):
                 continue
-            name = canonical_tile_name(entry.name)
+            name = canonical_tile_name(entry.name[:-3] if compressed else entry.name)
             if name in seen:
                 raise Refused(f'tar lists {name} more than once')
             seen.add(name)
-            if entry.size < 272:
+            if not compressed and entry.size < 272:
                 raise Refused(f'{name} is too small to be a graph tile')
             digest, read = hashlib.sha256(), 0
             source = archive.extractfile(entry)
             if source is None:
                 raise Refused(f'{name} cannot be read from the tar')
-            while True:
-                chunk = source.read(1 << 20)
-                if not chunk:
-                    break
-                digest.update(chunk)
-                read += len(chunk)
+            claim = None if claims is None else claims.get(name)
+            if compressed:
+                if claim is None or claim[2] is None:
+                    raise Refused(f'Compressed tile {name} has no compressed index claim')
+                if entry.size != claim[3]:
+                    raise Refused(f'Compressed tile {name} stored size mismatch')
+                with tempfile.TemporaryFile() as stored:
+                    stored_hash = hashlib.sha256()
+                    while chunk := source.read(1 << 20):
+                        stored_hash.update(chunk)
+                        stored.write(chunk)
+                    if stored.tell() != claim[3] or stored_hash.hexdigest() != claim[2]:
+                        raise Refused(f'Compressed tile {name} stored hash or size mismatch')
+                    stored.seek(0)
+                    try:
+                        with gzip.GzipFile(fileobj=stored, mode='rb') as decoded:
+                            while chunk := decoded.read(min(1 << 20, claim[1] + 1 - read)):
+                                read += len(chunk)
+                                if read > claim[1]:
+                                    raise Refused(f'Compressed tile {name} exceeds its declared decoded size')
+                                digest.update(chunk)
+                    except (EOFError, gzip.BadGzipFile, zlib.error) as error:
+                        raise Refused(f'Compressed tile {name} is not a complete gzip payload') from error
+            else:
+                if claim is not None and claim[2] is not None:
+                    raise Refused(f'Tile {name} declares compression but ships raw bytes')
+                while chunk := source.read(1 << 20):
+                    digest.update(chunk)
+                    read += len(chunk)
             rows[name] = (digest.hexdigest(), read)
     if not rows:
         raise Refused('tar contains no Valhalla graph tiles')
@@ -181,7 +210,9 @@ def check_index_identity(manifest, index):
                           f'the manifest says {manifest.get(field)!r}')
 
 
-def check_tile_index(archive, tar_rows):
+def load_tile_index(archive):
+    if archive.getinfo('tiles.sqlite').file_size > 128 * 1024 * 1024:
+        raise Refused('tiles.sqlite exceeds the app size limit')
     raw = archive.read('tiles.sqlite')
     digest = hashlib.sha256(raw).hexdigest()
     with tempfile.TemporaryDirectory() as directory:
@@ -189,39 +220,61 @@ def check_tile_index(archive, tar_rows):
         path.write_bytes(raw)
         with closing(sqlite3.connect(f'file:{path.as_posix()}?mode=ro', uri=True)) as db:
             version = db.execute('PRAGMA user_version').fetchone()[0]
-            if version != TILE_INDEX_VERSION:
-                raise Refused(f'tiles.sqlite user_version is {version}, expected {TILE_INDEX_VERSION}')
+            if version not in TILE_INDEX_SCHEMAS:
+                raise Refused(f'tiles.sqlite user_version is {version}, expected 1 or 2')
+            if db.execute('PRAGMA quick_check').fetchone() != ('ok',):
+                raise Refused('Damaged tiles.sqlite')
+            expected_schema = dict(EXPECTED_SCHEMA)
+            expected_schema['tiles'] = TILE_INDEX_SCHEMAS[version].split(';')[1]
             schema = dict(db.execute('SELECT name, sql FROM sqlite_master WHERE type="table"'))
-            for table, expected in EXPECTED_SCHEMA.items():
+            for table, expected in expected_schema.items():
                 if table not in schema:
                     raise Refused(f'tiles.sqlite has no {table} table')
                 if ' '.join(schema[table].split()) != expected:
                     raise Refused(f'{table} schema is {schema[table]!r}, expected {expected!r}')
             objects = set(db.execute('SELECT type, name FROM sqlite_master WHERE sql IS NOT NULL'))
-            if objects != {('table', name) for name in EXPECTED_SCHEMA}:
+            if objects != {('table', name) for name in expected_schema}:
                 raise Refused('tiles.sqlite contains unexpected schema objects')
             meta = dict(db.execute('SELECT key, value FROM metadata'))
             for key in ('generation_id', 'country', 'tiles'):
                 if key not in meta:
                     raise Refused(f'tiles.sqlite metadata has no {key}')
-            for digest_value in [row[0] for row in db.execute('SELECT sha256 FROM tiles')]:
-                if not isinstance(digest_value, str) or not TILE_SHA256.fullmatch(digest_value):
-                    raise Refused(f'tiles.sqlite has a malformed sha256 value {digest_value!r}')
-            rows = dict((row[0], (row[1], row[2])) for row in
-                        db.execute('SELECT path, sha256, size FROM tiles'))
+            if set(meta) != {'generation_id', 'country', 'tiles'} or not all(isinstance(value, str) for value in meta.values()):
+                raise Refused('Unexpected single-country index metadata')
+            query = 'SELECT path, sha256, size' + (', compressed_sha256, compressed_size' if version==2 else '') + ' FROM tiles'
+            rows = {}
+            for row in db.execute(query):
+                name, raw_hash, size = row[:3]
+                if not isinstance(raw_hash, str) or not TILE_SHA256.fullmatch(raw_hash):
+                    raise Refused(f'tiles.sqlite has a malformed sha256 value {raw_hash!r}')
+                if not isinstance(name, str) or canonical_tile_name(name) != name or type(size) is not int or size < 272:
+                    raise Refused('Invalid canonical tile index claim')
+                stored_hash, stored_size = row[3:] if version==2 else (None, None)
+                if (stored_hash is None) != (stored_size is None):
+                    raise Refused('Compression hash and size must both be present or both NULL')
+                if stored_hash is not None and (not isinstance(stored_hash, str) or not TILE_SHA256.fullmatch(stored_hash)
+                                               or type(stored_size) is not int or stored_size < 20):
+                    raise Refused('Malformed compressed tile claim')
+                rows[name] = (raw_hash, size, stored_hash, stored_size)
+    if not rows or str(len(rows)) != meta['tiles']:
+        raise Refused(f'index has {len(rows)} tile rows, metadata declares {meta["tiles"]} tiles')
+    return {'sha256': digest, 'rows': len(rows), 'metadata': meta, 'version': version, 'claims': rows}
+
+
+def check_tile_index(archive, tar_rows, index=None):
+    index = load_tile_index(archive) if index is None else index
+    rows, meta = index['claims'], index['metadata']
     if len(rows) != len(tar_rows):
         raise Refused(f'index has {len(rows)} tile rows, the tar has {len(tar_rows)}')
     if set(rows) != set(tar_rows):
         missing = sorted(set(tar_rows) - set(rows))[:3]
         extra = sorted(set(rows) - set(tar_rows))[:3]
         raise Refused(f'index rows do not match the tar (missing {missing}, extra {extra})')
-    for name, (digest_claimed, size) in rows.items():
+    for name, (digest_claimed, size, _, _) in rows.items():
         if (digest_claimed, size) != tar_rows[name]:
             raise Refused(f'index row for {name} disagrees with the tar: {digest_claimed[:12]}…/{size} '
                           f'vs {tar_rows[name][0][:12]}…/{tar_rows[name][1]}')
-    if str(len(rows)) != meta['tiles']:
-        raise Refused(f'metadata says {meta["tiles"]} tiles, the index has {len(rows)}')
-    return {'sha256': digest, 'rows': len(rows), 'metadata': meta}
+    return {key: value for key, value in index.items() if key != 'claims'}
 
 
 def check_generation(manifest, index, tar_rows, generation):
@@ -259,9 +312,10 @@ def main(argv=None):
             receipt['checks']['payload_hashes'] = sorted(manifest['sha256'])
             receipt['checks']['coverage'] = check_coverage(manifest)
             if fmt == 3:
-                tar_rows = tar_tiles(archive.open('routing.tar'))
-                index = check_tile_index(archive, tar_rows)
+                index = load_tile_index(archive)
                 check_index_identity(manifest, index)
+                tar_rows = tar_tiles(archive.open('routing.tar'), index['claims'])
+                index = check_tile_index(archive, tar_rows, index)
                 receipt['checks']['tile_index'] = index
                 receipt['checks']['tar_tiles'] = len(tar_rows)
                 if args.generation is not None:

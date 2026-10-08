@@ -15,10 +15,13 @@ contains, keeps the coherent build's generation_id unchanged, and streams every 
 claimed hash. The per-tile index lives in its own hashed file because the app manifest is capped at
 65536 bytes; a whole-country package cannot carry per-tile evidence in the manifest itself.
 
-The app consumes canonical format-3 packages with this version-1 index. Compressed indices and
-country-set activation remain separate work; this tool does not certify native truck legality.
+The app consumes canonical format-3 version-1 indices and validated version-2 tile directories.
+Country-set activation remains separate work; this tool does not certify native truck legality.
+--experimental-compressed writes gzip tiles with a version-2 index for development only.
+The host gate and app validate version 2. Full-country/device checks are required before distribution.
 """
 import argparse
+import gzip
 import hashlib
 import json
 import math
@@ -45,6 +48,11 @@ TILE_INDEX_SCHEMA = (
     'CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT);'
     'CREATE TABLE tiles(path TEXT PRIMARY KEY, sha256 TEXT, size INTEGER) WITHOUT ROWID;'
 )
+TILE_INDEX_SCHEMAS = {1: TILE_INDEX_SCHEMA, 2: (
+    'CREATE TABLE metadata(key TEXT PRIMARY KEY, value TEXT);'
+    'CREATE TABLE tiles(path TEXT PRIMARY KEY, sha256 TEXT, size INTEGER, '
+    'compressed_sha256 TEXT, compressed_size INTEGER) WITHOUT ROWID;'
+)}
 
 
 def sha256(path):
@@ -171,13 +179,48 @@ def scan_tiles(archive, claims):
     return sorted(rows)
 
 
-def write_tile_index(path, generation_id, country, rows):
+def compress_tiles(source, destination, rows):
+    """Write gzip tiles without retaining raw copies; recheck claims during the second source pass."""
+    expected = {name: (digest, size) for name, digest, size in rows}
+    result, seen = [], set()
+    with tarfile.open(source, 'r|') as archive, tarfile.open(destination, 'w') as output:
+        for entry in archive:
+            if not entry.name.endswith('.gph'):
+                continue
+            name = canonical_tile_name(entry.name)
+            if not entry.isfile() or name in seen or name not in expected:
+                raise ValueError('Routing source changed during compression')
+            seen.add(name)
+            digest, size = hashlib.sha256(), 0
+            with tempfile.TemporaryFile(dir=Path(destination).parent) as stored:
+                with archive.extractfile(entry) as tile, gzip.GzipFile(
+                        filename='', mode='wb', fileobj=stored, compresslevel=6, mtime=0) as writer:
+                    while chunk := tile.read(1 << 20):
+                        digest.update(chunk)
+                        size += len(chunk)
+                        writer.write(chunk)
+                if (digest.hexdigest(), size) != expected[name]:
+                    raise ValueError(f'Tile {name} changed during compression')
+                compressed_size = stored.tell()
+                stored.seek(0)
+                compressed_hash = hashlib.file_digest(stored, 'sha256').hexdigest()
+                stored.seek(0)
+                member = tarfile.TarInfo(name + '.gz')
+                member.size, member.mode = compressed_size, 0o644
+                output.addfile(member, stored)
+            result.append((name, digest.hexdigest(), size, compressed_hash, compressed_size))
+    if seen != set(expected):
+        raise ValueError('Routing source lost tiles during compression')
+    return sorted(result)
+
+
+def write_tile_index(path, generation_id, country, rows, version=TILE_INDEX_VERSION):
     """Write the per-tile index: metadata plus one row per tile actually shipped in the tar."""
     with closing(sqlite3.connect(path)) as db:
-        db.executescript(f'PRAGMA user_version={TILE_INDEX_VERSION};' + TILE_INDEX_SCHEMA)
+        db.executescript(f'PRAGMA user_version={version};' + TILE_INDEX_SCHEMAS[version])
         db.executemany('INSERT INTO metadata VALUES (?,?)',
                        (('generation_id', generation_id), ('country', country), ('tiles', str(len(rows)))))
-        db.executemany('INSERT INTO tiles VALUES (?,?,?)', rows)
+        db.executemany('INSERT INTO tiles VALUES (' + ','.join('?' for _ in range(5 if version==2 else 3)) + ')', rows)
         db.commit()
 
 
@@ -190,13 +233,16 @@ def encode_manifest(manifest):
     return encoded
 
 
-def package(tiles, display, destination, name, source, date, bbox=None, generation=None, country=None):
+def package(tiles, display, destination, name, source, date, bbox=None, generation=None, country=None,
+            experimental_compressed=False):
     tiles, display, destination = map(Path, (tiles, display, destination))
     if (generation is None) != (country is None):
         raise ValueError('--generation and --country must be given together: format 3 carries both, and '
                          'neither alone means anything')
     if country is not None and not re.fullmatch(r'[A-Z]{2}', country):
         raise ValueError('Country must be a two-letter ISO2 code in upper case')
+    if experimental_compressed and generation is None:
+        raise ValueError('Experimental compression requires --generation and --country')
     claims = None
     if generation is not None:
         generation_id, claims = read_generation(generation)
@@ -248,8 +294,15 @@ def package(tiles, display, destination, name, source, date, bbox=None, generati
     coverage = coverage_box(bbox)
     if coverage is not None:
         manifest['coverage'] = dict(tiles=count, bbox=coverage)
-    index = output = None
+    index = output = compressed_tar = None
     try:
+        routing_input = tiles
+        if experimental_compressed:
+            descriptor, compressed_name = tempfile.mkstemp(prefix='.compressed-tiles-', suffix='.part', dir=str(destination.parent))
+            os.close(descriptor)
+            compressed_tar = Path(compressed_name)
+            rows = compress_tiles(tiles, compressed_tar, rows)
+            routing_input = compressed_tar
         if claims is not None:
             # An unpredictable name inside the destination's own directory: a deterministic staging name
             # could overwrite or delete a file the caller happens to have there, since the staging file
@@ -258,8 +311,8 @@ def package(tiles, display, destination, name, source, date, bbox=None, generati
                                                       dir=str(destination.parent))
             os.close(descriptor)
             index = Path(index_name)
-            write_tile_index(index, generation_id, country, rows)
-        manifest['sha256'] = {'routing.tar': sha256(tiles), display_name: sha256(display)}
+            write_tile_index(index, generation_id, country, rows, version=2 if experimental_compressed else TILE_INDEX_VERSION)
+        manifest['sha256'] = {'routing.tar': sha256(routing_input), display_name: sha256(display)}
         if claims is not None:
             manifest['sha256']['tiles.sqlite'] = sha256(index)
         encoded = encode_manifest(manifest)
@@ -270,7 +323,7 @@ def package(tiles, display, destination, name, source, date, bbox=None, generati
         # Import streams the decompressed payload to disk; routes memory-map that TAR.
         with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED, compresslevel=3,
                              allowZip64=True) as archive:
-            archive.write(tiles, 'routing.tar')
+            archive.write(routing_input, 'routing.tar', compress_type=zipfile.ZIP_STORED if experimental_compressed else zipfile.ZIP_DEFLATED)
             archive.write(display, display_name)
             if claims is not None:
                 archive.write(index, 'tiles.sqlite')
@@ -281,6 +334,8 @@ def package(tiles, display, destination, name, source, date, bbox=None, generati
             output.unlink(missing_ok=True)
         if index is not None and index.exists():
             index.unlink()
+        if compressed_tar is not None:
+            compressed_tar.unlink(missing_ok=True)
     return manifest
 
 
@@ -298,12 +353,18 @@ if __name__ == '__main__':
                         help="The coherent build's generation.json; with --country produces format 3")
     parser.add_argument('--country', default=None,
                         help='ISO2 code of the country this package covers; with --generation produces format 3')
+    parser.add_argument('--experimental-compressed', action='store_true',
+                        help='Development format-3 package: gzip tiles with a version-2 index; validate before distribution')
     args = parser.parse_args()
     try:
         manifest = package(args.tiles, args.display, args.destination, args.name, args.source, args.date,
                            args.bbox.split(',') if args.bbox else None,
-                           generation=args.generation, country=args.country)
+                           generation=args.generation, country=args.country,
+                           experimental_compressed=args.experimental_compressed)
     except ValueError as error:
         parser.error(str(error))
-    print(f'Created {args.destination}; format {manifest["format"]}; routes use local tiles, '
-          f'display/search uses the separate graph')
+    if args.experimental_compressed:
+        print(f'Created experimental {args.destination}; format 3/index v2; validate before distribution')
+    else:
+        print(f'Created {args.destination}; format {manifest["format"]}; routes use local tiles, '
+              f'display/search uses the separate graph')

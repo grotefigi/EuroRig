@@ -23,7 +23,10 @@ final class NativeRouter implements AutoCloseable {
     }
     /** Internal directory path for a verified staged tile set; legacy packages still use TARs. */
     NativeRouter(Context context,File tiles,boolean directory) throws IOException {
-        try{if(directory)RegionPackages.validateTileDirectory(tiles);else RegionPackages.validateTar(tiles);}
+        this(context,tiles,directory,false);
+    }
+    NativeRouter(Context context,File tiles,boolean directory,boolean compressed) throws IOException {
+        try{if(directory)RegionPackages.validateTileDirectory(tiles,compressed);else RegionPackages.validateTar(tiles);}
         catch(IOException e){throw new IOException("Installed routing map is missing or damaged. Download or import the country map again.",e);}
         if(!directory&&!android.os.Process.is64Bit()&&tiles.length()>1_500_000_000L)throw new IOException("Use a routing extract below 1.5 GB on a 32-bit device");
         JSONObject manifest=readManifest(tiles.getParentFile());

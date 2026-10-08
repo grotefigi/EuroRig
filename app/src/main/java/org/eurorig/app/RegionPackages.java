@@ -20,11 +20,13 @@ final class RegionPackages {
     private static final long MAX_TILES=128L*1024*1024*1024, MAX_DISPLAY=128L*1024*1024;
     static void cleanupStale(Context c){
         String selected=c.getSharedPreferences("settings",0).getString("region","");
+        if(!selected.matches("[0-9a-f-]{36}"))return;
         File[] folders=new File(c.getFilesDir(),"regions").listFiles();if(folders==null)return;
         for(File folder:folders)if(folder.getName().matches("[0-9a-f-]{36}")&&!folder.getName().equals(selected))cleanup(folder);
     }
     static Graph install(Context c,InputStream source) throws IOException {
         File dir=create(c);Set<String> seen=new HashSet<>();
+        try{
         try(ZipInputStream zip=new ZipInputStream(new BufferedInputStream(source))){
             ZipEntry entry;
             while((entry=zip.getNextEntry())!=null){
@@ -35,8 +37,13 @@ final class RegionPackages {
                 zip.closeEntry();
             }
             if(!seen.contains("manifest.json")||!seen.contains("routing.tar")||seen.contains("display.sqlite")==seen.contains("display.europack"))throw new IOException("A region needs a manifest, routing tiles and one display map");
+        }
             return activate(c,dir);
-        }catch(IOException|RuntimeException|LinkageError e){cleanup(dir);throw e;}
+        }catch(IOException|RuntimeException|LinkageError e){
+            // A post-commit cleanup fault must never remove the selected map.
+            if(!dir.getName().equals(c.getSharedPreferences("settings",0).getString("region","")))cleanup(dir);
+            throw e;
+        }
     }
     private static File create(Context c) throws IOException{
         File folder=new File(c.getFilesDir(),"regions/"+UUID.randomUUID());
@@ -67,22 +74,30 @@ final class RegionPackages {
                 String expected=manifest.getJSONObject("sha256").getString(name);
                 if(!digest(new File(dir,name)).equalsIgnoreCase(expected))throw new IOException("Region checksum mismatch: "+name);
             }
-            if(format==3)TileIndex.validate(new File(dir,"routing.tar"),new File(dir,"tiles.sqlite"),manifest);
+            boolean directoryTiles=format==3&&TileIndex.version(new File(dir,"tiles.sqlite"))==2;
+            File routing=new File(dir,directoryTiles?"tiles":"routing.tar");
+            if(directoryTiles)extractTiles(new File(dir,"routing.tar"),routing,true);
+            if(format==3)TileIndex.validate(routing,new File(dir,"tiles.sqlite"),manifest);
             Graph graph;
             if(format>=2){candidateDisplay=new DisplayDatabase(new File(dir,displayFile));graph=candidateDisplay.endpoints;}
             else try(InputStream in=new FileInputStream(new File(dir,displayFile))){graph=Graph.read(in);}
             if(graph.demo)throw new IOException("Native regions must contain real map data");
-            candidate=new NativeRouter(c,new File(dir,"routing.tar"));
+            candidate=new NativeRouter(c,routing,directoryTiles,directoryTiles);
+            if(directoryTiles)Files.delete(new File(dir,"routing.tar").toPath());
             String old=c.getSharedPreferences("settings",0).getString("region","");
             if(!c.getSharedPreferences("settings",0).edit().putBoolean("native",true).putString("region",dir.getName()).commit())throw new IOException("Could not save region selection");
-            if(Store.nativeRouter!=null)Store.nativeRouter.close();Store.nativeRouter=candidate;candidate=null;
-            if(Store.display!=null)Store.display.close();Store.display=candidateDisplay;candidateDisplay=null;
+            NativeRouter previousRouter=Store.nativeRouter;DisplayDatabase previousDisplay=Store.display;
+            Store.nativeRouter=candidate;candidate=null;Store.display=candidateDisplay;candidateDisplay=null;
+            closeRetired(previousRouter);closeRetired(previousDisplay);
             if(old.matches("[0-9a-f-]{36}"))cleanup(new File(c.getFilesDir(),"regions/"+old));
             return graph;
         }catch(JSONException|NoSuchAlgorithmException e){throw new IOException("Invalid region manifest",e);}
         finally {if(candidate!=null)candidate.close();if(candidateDisplay!=null)candidateDisplay.close();}
     }
     static void validateTar(File file)throws IOException{
+        validateTar(file,false);
+    }
+    static void validateTar(File file,boolean compressed)throws IOException{
         try(RandomAccessFile tar=new RandomAccessFile(file,"r")){
             byte[] header=new byte[512];int tiles=0,entries=0;boolean terminated=false;
             while(tar.getFilePointer()+512<=tar.length()){
@@ -94,8 +109,10 @@ final class RegionPackages {
                 long size=octal(header,124,12),next=tar.getFilePointer()+((size+511)/512)*512;
                 if(size<0||next<tar.getFilePointer()||next>tar.length())throw new IOException("Truncated routing archive");
                 String name=new String(header,0,100,StandardCharsets.US_ASCII).split("\u0000",2)[0];
-                if(name.endsWith(".gph")){
-                    if((header[156]!=0&&header[156]!='0')||!name.matches("(?:\\./)?[012]/(?:[0-9]{3}/)*[0-9]{3}\\.gph")||size<272)
+                boolean gzip=compressed&&name.endsWith(".gph.gz");
+                if(name.endsWith(".gph")||gzip){
+                    String canonical=gzip?name.substring(0,name.length()-3):name;
+                    if((header[156]!=0&&header[156]!='0')||!canonical.matches("(?:\\./)?[012]/(?:[0-9]{3}/)*[0-9]{3}\\.gph")||size<(gzip?20:272))
                         throw new IOException("Invalid graph tile entry");
                     tiles++;
                 }
@@ -107,7 +124,11 @@ final class RegionPackages {
     /** Extract only canonical GPH files into a fresh private directory. Never overlays installed tiles. */
     @android.annotation.SuppressLint("UsableSpace") // Keep a reserve without evicting other apps' caches.
     static void extractTiles(File archive,File directory)throws IOException{
-        validateTar(archive);
+        extractTiles(archive,directory,false);
+    }
+    @android.annotation.SuppressLint("UsableSpace")
+    static void extractTiles(File archive,File directory,boolean compressed)throws IOException{
+        validateTar(archive,compressed);
         if(directory.exists()||!directory.mkdirs())throw new IOException("Tile staging directory must be new");
         boolean complete=false;
         try(RandomAccessFile tar=new RandomAccessFile(archive,"r")){
@@ -117,9 +138,10 @@ final class RegionPackages {
                 if(zero)break;
                 long size=octal(header,124,12),next=tar.getFilePointer()+((size+511)/512)*512;
                 String name=new String(header,0,100,StandardCharsets.US_ASCII).split("\u0000",2)[0];
-                if(name.endsWith(".gph")){
+                boolean gzip=compressed&&name.endsWith(".gph.gz");
+                if(name.endsWith(".gph")||gzip){
                     if(name.startsWith("./"))name=name.substring(2);
-                    if(!tilePath(name)||!names.add(name))throw new IOException("Unsafe or duplicate tile path");
+                    if(!tilePath(gzip?name.substring(0,name.length()-3):name)||!names.add(name))throw new IOException("Unsafe or duplicate tile path");
                     File out=new File(directory,name);
                     if(!out.getParentFile().isDirectory()&&!out.getParentFile().mkdirs())throw new IOException("Cannot create tile hierarchy");
                     try(OutputStream stream=new FileOutputStream(out)){
@@ -132,17 +154,17 @@ final class RegionPackages {
                 }
                 tar.seek(next);
             }
-            validateTileDirectory(directory);complete=true;
+            validateTileDirectory(directory,compressed);complete=true;
         }finally{
-            if(!complete)Files.walkFileTree(directory.toPath(),new SimpleFileVisitor<Path>(){
-                public FileVisitResult visitFile(Path path,BasicFileAttributes attrs)throws IOException{Files.delete(path);return FileVisitResult.CONTINUE;}
-                public FileVisitResult postVisitDirectory(Path path,IOException error)throws IOException{Files.delete(path);return FileVisitResult.CONTINUE;}
-            });
+            if(!complete)deleteTiles(directory);
         }
     }
     static boolean tilePath(String name){return name.length()<=64&&name.matches("[012]/(?:[0-9]{3}/)*[0-9]{3}\\.gph");}
     /** Structural validation only. Composition must separately check generation and per-tile hashes. */
     static void validateTileDirectory(File directory)throws IOException{
+        validateTileDirectory(directory,false);
+    }
+    static int validateTileDirectory(File directory,boolean compressed)throws IOException{
         Path root=directory.toPath();
         if(!Files.isDirectory(root,LinkOption.NOFOLLOW_LINKS))throw new IOException("Missing tile directory");
         final int[] count={0};
@@ -154,13 +176,26 @@ final class RegionPackages {
             }
             public FileVisitResult visitFile(Path path,BasicFileAttributes attrs)throws IOException{
                 String relative=root.relativize(path).toString().replace(File.separatorChar,'/');
-                if(!attrs.isRegularFile()||!tilePath(relative)||attrs.size()<272||++count[0]>2000000)
+                boolean gzip=compressed&&relative.endsWith(".gph.gz");
+                if(!attrs.isRegularFile()||!tilePath(gzip?relative.substring(0,relative.length()-3):relative)||attrs.size()<(gzip?20:272)||++count[0]>2000000)
                     throw new IOException("Invalid graph tile file");
                 if(!android.os.Process.is64Bit()&&attrs.size()>1_500_000_000L)throw new IOException("Graph tile exceeds 32-bit device limit");
                 return FileVisitResult.CONTINUE;
             }
         });
         if(count[0]==0)throw new IOException("Empty tile directory");
+        return count[0];
+    }
+    static void deleteTiles(File directory)throws IOException{
+        if(!Files.exists(directory.toPath(),LinkOption.NOFOLLOW_LINKS))return;
+        Files.walkFileTree(directory.toPath(),new SimpleFileVisitor<Path>(){
+            public FileVisitResult visitFile(Path path,BasicFileAttributes attrs)throws IOException{Files.delete(path);return FileVisitResult.CONTINUE;}
+            public FileVisitResult postVisitDirectory(Path path,IOException error)throws IOException{if(error!=null)throw error;Files.delete(path);return FileVisitResult.CONTINUE;}
+        });
+    }
+    static void closeRetired(AutoCloseable resource){
+        if(resource==null)return;
+        try{resource.close();}catch(Exception|LinkageError e){android.util.Log.w("EuroRig","Could not close replaced map",e);}
     }
     static long octal(byte[] header,int start,int length)throws IOException{
         String value=new String(header,start,length,StandardCharsets.US_ASCII).replace("\u0000","").trim();
@@ -174,6 +209,7 @@ final class RegionPackages {
     }
     private static void cleanup(File dir){
         // Only internally generated UUID directories and fixed filenames are removed.
+        try{deleteTiles(new File(dir,"tiles"));}catch(IOException e){android.util.Log.w("EuroRig","Could not clean staged tiles",e);}
         for(String name:new String[]{"routing.tar","display.europack","display.sqlite","tiles.sqlite","manifest.json","device-config.json"})new File(dir,name).delete();dir.delete();
     }
 }

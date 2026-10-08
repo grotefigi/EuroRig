@@ -123,6 +123,9 @@ final class ProfileRoutingChecks {
                 Files.copy(input,new File(directory,name).toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
             }
         Truck truck=truck(4,2.55,16.5,40,11.5);
+        DisplayDatabase previous=Store.display;
+        try(DisplayDatabase fixture=new DisplayDatabase(new File(directory,"display.sqlite"))){
+        Store.display=fixture;
         try(NativeRouter declared=coverageRouter(app,directory,new double[]{16.108446,42.229789,30.278960,48.589212})){
             String message=failure(declared,45,27.001,41,28,truck);
             require(message.contains("outside the installed map"),
@@ -147,6 +150,7 @@ final class ProfileRoutingChecks {
             require(message.contains("check country coverage"),
                 "A package with no declared coverage keeps the original advice: "+message);
         }
+        }finally{Store.display=previous;}
     }
     /** A router whose tar sits beside a manifest declaring the given coverage box. */
     private static NativeRouter coverageRouter(Context app,File directory,double[] box)throws Exception{

@@ -24,7 +24,7 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
     public void onStart(){
         Bundle result=new Bundle();
         try{
-            if(indexedOnly){IndexedPackageChecks.run(getTargetContext(),packagePath);result.putString("stream","PASS: format3 activation/reopen, truck and ADR routes; ten invalid imports preserve active map\n");finish(-1,result);return;}
+            if(indexedOnly){IndexedPackageChecks.run(getTargetContext(),packagePath);result.putString("stream","PASS: format3 v1/v2 activation/reopen, truck and ADR routes; twenty invalid imports preserve active map; no retained v2 TAR\n");finish(-1,result);return;}
             if(mapLifecycleOnly){MapLifecycleChecks.run(this);result.putString("stream","PASS: attached map reloads after detach/reuse; obsolete callbacks preserve current pending query\n");finish(-1,result);return;}
             if(gzipOnly){GzipTileChecks.run(getTargetContext(),getContext());result.putString("stream","PASS: JNI .gph.gz fixture parity; .gz and empty controls refuse routes; tile bytes retained\n");finish(-1,result);return;}
             if(corridorsOnly){CorridorChecks.run(getTargetContext(),qaRegion);result.putString("stream","PASS: native corridor measurements written; inspect individual outcomes\n");finish(-1,result);return;}

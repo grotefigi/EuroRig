@@ -2,8 +2,8 @@
 
 The `.eurorig` package is the unit a driver downloads. This documents what is inside each format, the
 per-tile evidence index, and the invariants the packager and app enforce. The app consumes formats 1,
-2 and canonical format 3 with a version-1 tile index. Compressed indices and country-set activation
-are not enabled.
+2 and format 3 with version-1 canonical TARs or verified version-2 tile directories.
+Country-set activation is not enabled.
 
 Written from `tools/package_region.py` (packager) and `tools/check_qa_package.py` (host gate).
 
@@ -54,6 +54,31 @@ in the index and in the generation manifest — is **64 lowercase hex**; a 64-ch
 hexadecimal is refused, not accepted.
 
 ## Manifest additions
+
+### Experimental compressed index version 2
+
+`--experimental-compressed` keeps package format 3 and writes deterministic gzip-6
+tiles named `<canonical path>.gz`. It requires `--generation` and `--country`.
+The Android app verifies this version, extracts a fresh private tile directory and
+removes the duplicate TAR before activation. Keep development packages out of driver
+catalogues until whole-country installation, reopening and routing are verified.
+
+Version 2 keeps the metadata table and canonical identity, extending only `tiles`:
+
+```sql
+CREATE TABLE tiles(path TEXT PRIMARY KEY, sha256 TEXT, size INTEGER,
+                   compressed_sha256 TEXT, compressed_size INTEGER) WITHOUT ROWID;
+```
+
+`sha256`/`size` describe decoded canonical bytes. The additional pair describes
+stored gzip bytes; both NULL means raw-only. The host gate accepts versions 1 and 2,
+requires each pair to be both present or both NULL, verifies stored hash/size,
+and caps decoding at the declared canonical size plus one byte before comparing
+canonical identity. A declared gzip payload cannot fall back to raw bytes.
+Truncated gzip, symlinks, duplicate canonical paths and country/generation mismatches
+are refused. Generation binding to the coherent build still requires `--generation`.
+
+## Manifest identity
 
 Format 3 adds `country` and `generation_id` to the manifest, and `sha256` covers all three payloads
 including `tiles.sqlite`. The **`generation_id` is the coherent build's, unchanged**: a country package
@@ -107,12 +132,13 @@ writes the verdict as JSON, and a receipt that cannot be written does not change
 
 ## Not true yet
 
-- Format-3 compressed tile indices are not consumed. Canonical version-1 indices are checked against
+- Country-set installation and full-country compressed distribution are not verified.
+  The host tools and app consume version-2 indices. Canonical version-1 indices are checked against
   the exact schema, manifest country/generation, declared count and every TAR tile's bytes/hash before
   activation. Failed imports preserve the old map. The index is verified again when reopening it;
   a missing or changed installed index is refused.
-- `NativeRouter` has a tested directory adapter, but country-set installation and compressed-package
-  validation are not connected to it. Legacy and canonical format-3 imports still use the TAR adapter.
+- `NativeRouter` has a tested directory adapter used by verified version-2 imports.
+  Legacy and canonical version-1 imports keep the TAR adapter. Country-set installation is unfinished.
 - Composition must not assume per-country `ATTACH`: SQLite's attached-database limit is finite and
   cannot span all of Europe. Bounded connections or merged queries are the alternative to test.
 - Cleanup and rollback must never leave an installed country unreachable: removal preserves the

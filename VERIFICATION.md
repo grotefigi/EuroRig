@@ -1,5 +1,63 @@
 # Verification
 
+## Full-country compressed Romania and recovery, 2026-10-08
+
+- A private version-2 package carries all 636 tiles from the pinned published
+  Romania build. Every stored and decoded identity passes the host gate. Payload
+  storage is 640,147,341 bytes, compared with 873,488,384 bytes before compression.
+  The download is 398,119,115 bytes. These figures exclude APK, allocation and cache;
+  they do not establish the complete Europe budget.
+- Full-country import, offline search, routing and camera checks pass API 26.
+  Two cold runs each retain all 40 baseline outcomes (28 routes, 12 refusals),
+  within 50 m geometry and 3 s ETA tolerance. Snap/ETA bounds, heading and traveled
+  route removal pass. No duplicate TAR or retained test archive remains.
+- The private generation identifies the exact archived Romania payloads only.
+  Original build provenance is unavailable; this package must not be composed with
+  new Europe data. The public catalogue and physical tablet map remain unchanged.
+- Map cleanup now runs only after the selected native country opens successfully.
+  Invalid and missing saved selections refuse without deleting a recoverable map.
+  Source-stream closure finishes before activation commits; its injected failure
+  preserves the previous country. Replaced actors close after the new references
+  are assigned; retirement failure is logged without destroying the selected map.
+  The Android 8 indexed-package regressions pass these controls.
+- The initial full-country test revealed a fixture mismatch: the synthetic
+  coverage router was audited against the installed Romania display. Coverage
+  tests now use their matching display and restore the previous display afterward.
+  The original failing trace and the corrected passing run are retained privately.
+
+## Compressed country installation and reopening, 2026-10-08
+
+- Version-2 indices drive a fresh, validated directory of `.gph.gz` or raw tiles.
+  Stored size/SHA256 are checked before bounded decoding verifies canonical identity.
+  The duplicate routing TAR is removed before selection is committed. Reopening
+  verifies index/payload integrity and refuses missing, changed or extra tile files.
+- An original three-tile package activates, routes and reopens on API 26. Native
+  routes, height refusals and ADR audits pass in all three route preferences.
+  Twenty rejected imports across v1/v2 preserve selection and the live router;
+  rejected compressed staging is removed. Missing/corrupt compressed tiles refuse
+  reopening, and restoring the verified bytes restores routing.
+- Read-only compressed candidate/profile guards pass API 26 and physical API 36.
+  Physical settings, truck preferences, saved endpoints and Romania hashes are unchanged.
+  The tablet retains its existing public format-2 map; no compressed fixture is activated there.
+- Full-country compressed routing, country-set activation and the complete 20 GB
+  installed Europe budget remain separate required gates.
+
+## Experimental compressed-package host pipeline, 2026-10-08
+
+- An explicit development flag writes format-3 version-2 indices and `.gph.gz`
+  payloads. Canonical hash/size keep their original meaning; stored hash/size are
+  additional paired claims. Defaults continue to produce version-1 packages.
+- The host gate accepts v1, raw-only v2 and compressed v2. It checks exact schemas,
+  country/generation agreement, paired claims, stored bytes, bounded decoded identity,
+  complete gzip, regular members and unique canonical paths. Coherent-generation
+  binding passes on the original three-tile native fixture.
+- The package suite passes 60 tests; the complete Python suite passes 143 tests
+  with Osmium enabled. Rehashed mutations test unpaired claims, stored hash/size,
+  decoded identity/overflow, truncated or invalid gzip, symlinks and country/generation
+  mismatch. Injected writer failure preserves the existing destination and cleans staging.
+- Country sets and continental storage fit remain unfinished. No public map or
+  driver catalogue is changed by the host pipeline.
+
 ## Canonical format-3 country installation, 2026-10-08
 
 - The app now consumes the existing `tiles.sqlite` version-1 package index.
@@ -20,8 +78,8 @@
   12 refusals), with ETA/snap bounds and camera/heading/trail checks passing.
   Tablet preferences, saved endpoints and existing map hashes are unchanged.
 - Debug and test APK builds and Android lint pass. Public Romania remains format 2;
-  compressed indices, country-set activation and the 20 GB Europe budget are not
-  verified or shipped by this change.
+  country-set activation and the 20 GB Europe budget are not verified or shipped
+  by this canonical-v1 checkpoint. Later compressed-index evidence is recorded above.
 
 ## Map view reuse, 2026-10-08
 

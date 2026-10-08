@@ -32,17 +32,17 @@ final class Store {
     static volatile long fixTime;
     static volatile boolean voiceEnabled=true;
     static void load(Context context) throws IOException {
-        RegionPackages.cleanupStale(context);
         if(graph==null) {
             SharedPreferences settings=context.getSharedPreferences("settings",0);
             if(settings.getBoolean("native",false)){
                 String selection=context.getSharedPreferences("settings",0).getString("region","");
                 if(!selection.matches("[0-9a-f-]{36}"))throw new IOException("Invalid saved region selection");
                 File region=new File(context.getFilesDir(),"regions/"+selection);
-                TileIndex.validateInstalled(region);
+                boolean directoryTiles=TileIndex.validateInstalled(region);
                 if(new File(region,"display.sqlite").exists()){display=new DisplayDatabase(new File(region,"display.sqlite"));graph=display.endpoints;}
                 else try(InputStream in=new FileInputStream(new File(region,"display.europack"))){graph=Graph.read(in);}
-                nativeRouter=new NativeRouter(context,new File(region,"routing.tar"));
+                nativeRouter=new NativeRouter(context,new File(region,directoryTiles?"tiles":"routing.tar"),directoryTiles,directoryTiles);
+                RegionPackages.cleanupStale(context);
             }else{
             File file=new File(context.getFilesDir(),"installed.europack");
             if(file.exists())try(InputStream in=new FileInputStream(file)){graph=Graph.read(in);}

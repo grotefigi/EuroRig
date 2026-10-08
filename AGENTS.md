@@ -8,6 +8,8 @@ Before implementing unfamiliar behavior or replacing an existing tool, consult o
 
 Use the installed Caveman skill for concise chat replies. Preserve technical facts, numbers, units, negations, code, commands and paths. Keep persisted code, documentation and commit messages in clear conventional language.
 
+Investigate the cause when 30 minutes pass without meaningful progress, then take a corrective step within the authorized scope. Record verified implementation changes, newly passed release gates, measured milestones or resolved blockers in private progress evidence. Polling, status messages, bookkeeping and unchanged test reruns do not count as meaningful progress. Preserve writer ownership and correctness/storage gates; explain a concrete external blocker when user input is necessary.
+
 Use only original EuroRig code and licensed dependencies. Keep reference APKs, tablet screenshots, account data and real GPS evidence in ignored `analysis/private/`. Device smoke scripts that clear app data must run only on dedicated emulators. Truck dimensions, loaded weights, access restrictions and ADR checks apply to every routing mode.
 
 Use the installed Compaction CLI when its integration is supported and its native hooks have been reviewed and trusted. Preserve current requirements, decisions, file references, unfinished work and test evidence when condensing context. Keep generated .compaction data private. Do not claim live input compression or token savings without measured receipts; the current Windows gateway connector does not detect Codex.

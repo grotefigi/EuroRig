@@ -1,4 +1,5 @@
 import hashlib
+import gzip
 import io
 import json
 import sqlite3
@@ -11,7 +12,7 @@ from contextlib import closing
 from pathlib import Path
 
 import check_qa_package
-from package_region import (MANIFEST_LIMIT, canonical_tile_name, package, read_generation, sha256)
+from package_region import (MANIFEST_LIMIT, canonical_tile_name, compress_tiles, package, read_generation, sha256)
 
 # The shapes real coherent builds use: level 0 and 1 with two groups, level 2 with three.
 TILE_A = '0/003/019.gph'
@@ -86,6 +87,50 @@ def claims_for(entries, extra=None):
 
 
 class RegionTests(unittest.TestCase):
+    def test_experimental_compression_preserves_canonical_and_stored_identity(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            entries=[(TILE_A,tile_bytes(b'a')),(TILE_B,tile_bytes(b'b'))]
+            source=tiles_tar(root,entries)
+            original=sha256(source)
+            coherent=generation(root,tiles=claims_for(entries))
+            target=root/'compressed.eurorig'
+            manifest=package(source,display(root),target,'Test','Original fixture','unknown',
+                             generation=coherent,country='RO',experimental_compressed=True)
+            with zipfile.ZipFile(target) as archive:
+                self.assertEqual(manifest['sha256']['routing.tar'],hashlib.sha256(archive.read('routing.tar')).hexdigest())
+                index=root/'index.sqlite';index.write_bytes(archive.read('tiles.sqlite'))
+                with closing(sqlite3.connect(index)) as db:
+                    self.assertEqual(db.execute('PRAGMA user_version').fetchone()[0],2)
+                    rows={p:(h,n,ch,cn) for p,h,n,ch,cn in db.execute('SELECT * FROM tiles')}
+                with tarfile.open(fileobj=io.BytesIO(archive.read('routing.tar'))) as routing:
+                    self.assertEqual(set(routing.getnames()),{name+'.gz' for name,_ in entries})
+                    for name,payload in entries:
+                        packed=routing.extractfile(name+'.gz').read()
+                        self.assertEqual(gzip.decompress(packed),payload)
+                        self.assertEqual(rows[name],(hashlib.sha256(payload).hexdigest(),len(payload),hashlib.sha256(packed).hexdigest(),len(packed)))
+            self.assertEqual(sha256(source),original)
+            self.assertFalse(list(root.glob('.*.part')))
+
+    def test_compression_refuses_changed_input_claims(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=tiles_tar(root,[(TILE_A,tile_bytes())])
+            with self.assertRaisesRegex(ValueError,'changed during compression'):
+                compress_tiles(source,root/'out.tar',[(TILE_A,'f'*64,512)])
+
+    def test_experimental_compression_requires_generation_and_preserves_output_on_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);source=tiles_tar(root,[(TILE_A,tile_bytes())]);map_file=display(root)
+            target=root/'map.eurorig';target.write_bytes(b'previous verified package')
+            with self.assertRaisesRegex(ValueError,'requires --generation'):
+                package(source,map_file,target,'Test','Original fixture','unknown',experimental_compressed=True)
+            coherent=generation(root,tiles=claims_for([(TILE_A,tile_bytes())]))
+            with patch('package_region.zipfile.ZipFile.write',side_effect=OSError('injected write failure')):
+                with self.assertRaisesRegex(OSError,'injected'):
+                    package(source,map_file,target,'Test','Original fixture','unknown',generation=coherent,country='RO',experimental_compressed=True)
+            self.assertEqual(target.read_bytes(),b'previous verified package')
+            self.assertFalse(list(root.glob('.*.part')))
+
     def test_manifest_matches_streamed_payloads(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -540,7 +585,7 @@ class GateMutationTests(unittest.TestCase):
         self.assertIn('tiles', receipt['refused'])
 
     def test_index_user_version_is_refused(self):
-        target = self.mutate_index(lambda db: db.execute('PRAGMA user_version=2'))
+        target = self.mutate_index(lambda db: db.execute('PRAGMA user_version=3'))
         code, receipt = self.gate(target)
         self.assertEqual((code, receipt['verdict']), (1, 'FAIL'))
         self.assertIn('user_version', receipt['refused'])
@@ -645,6 +690,83 @@ class GateMutationTests(unittest.TestCase):
         code, receipt = self.gate(self.root / 'good.eurorig', ('--generation', str(other)))
         self.assertEqual((code, receipt['verdict']), (1, 'FAIL'))
         self.assertIn('do not match the coherent claim', receipt['refused'])
+
+
+class CompressedGateTests(unittest.TestCase):
+    parts=GateMutationTests.parts
+    repack=GateMutationTests.repack
+    mutate_index=GateMutationTests.mutate_index
+    gate=GateMutationTests.gate
+    tearDown=GateMutationTests.tearDown
+
+    def setUp(self):
+        GateMutationTests.setUp(self)
+        package(self.tar,self.display,self.root/'good.eurorig','Romania','Original fixture','unknown',
+                generation=self.generation,country='RO',experimental_compressed=True)
+
+    def test_compressed_country_passes_with_and_without_coherent_manifest(self):
+        for arguments in ((),('--generation',str(self.generation))):
+            code,receipt=self.gate(self.root/'good.eurorig',arguments)
+            self.assertEqual(code,0,receipt.get('refused'))
+            self.assertEqual(receipt['checks']['tile_index']['version'],2)
+
+    def test_compressed_claim_and_generation_controls(self):
+        for sql in ("UPDATE tiles SET compressed_sha256=NULL", "UPDATE tiles SET compressed_size=NULL",
+                    "UPDATE tiles SET compressed_sha256='"+'f'*64+"'", "UPDATE tiles SET compressed_size=compressed_size+1",
+                    "UPDATE tiles SET size=size-1", "UPDATE tiles SET sha256='"+'f'*64+"'",
+                    "UPDATE metadata SET value='HU' WHERE key='country'",
+                    "UPDATE metadata SET value='0000000000000002' WHERE key='generation_id'"):
+            with self.subTest(sql=sql):
+                code,receipt=self.gate(self.mutate_index(lambda db:db.execute(sql)))
+                self.assertEqual((code,receipt['verdict']),(1,'FAIL'))
+
+    def replace_compressed_payload(self,payload,symlink=False):
+        items=self.parts();output=io.BytesIO()
+        with tarfile.open(fileobj=io.BytesIO(items['routing.tar'])) as old,tarfile.open(fileobj=output,mode='w') as new:
+            for member in old:
+                data=payload if member.name==TILE_A+'.gz' else old.extractfile(member).read()
+                info=tarfile.TarInfo(member.name)
+                if symlink and member.name==TILE_A+'.gz':
+                    info.type=tarfile.SYMTYPE;info.linkname='outside.gph.gz';new.addfile(info)
+                else:
+                    info.size=len(data);new.addfile(info,io.BytesIO(data))
+        items['routing.tar']=output.getvalue();path=self.root/'modified-index.sqlite';path.write_bytes(items['tiles.sqlite'])
+        with closing(sqlite3.connect(path)) as db:
+            db.execute('UPDATE tiles SET compressed_sha256=?,compressed_size=? WHERE path=?',
+                       (hashlib.sha256(payload).hexdigest(),len(payload),TILE_A));db.commit()
+        items['tiles.sqlite']=path.read_bytes();manifest=json.loads(items['manifest.json'])
+        for name in ('routing.tar','tiles.sqlite'):manifest['sha256'][name]=hashlib.sha256(items[name]).hexdigest()
+        items['manifest.json']=json.dumps(manifest).encode()
+        return self.repack(items)
+
+    def test_rehashed_invalid_gzip_and_decoded_identity_controls(self):
+        original=gzip.compress(tile_bytes(),mtime=0)
+        for payload,reason in ((original[:-2],'complete gzip'),(b'not gzip at all.....','complete gzip'),
+                               (gzip.compress(tile_bytes(b'z'),mtime=0),'disagrees with the tar'),
+                               (gzip.compress(tile_bytes()+b'x',mtime=0),'exceeds its declared decoded size')):
+            with self.subTest(reason=reason):
+                code,receipt=self.gate(self.replace_compressed_payload(payload))
+                self.assertEqual((code,receipt['verdict']),(1,'FAIL'))
+                self.assertIn(reason,receipt['refused'])
+
+    def test_compressed_symlink_is_refused(self):
+        code,receipt=self.gate(self.replace_compressed_payload(gzip.compress(tile_bytes(),mtime=0),symlink=True))
+        self.assertEqual((code,receipt['verdict']),(1,'FAIL'))
+        self.assertIn('not a regular file',receipt['refused'])
+
+    def test_version2_canonical_only_index_remains_readable(self):
+        legacy=self.root/'legacy.eurorig'
+        package(self.tar,self.display,legacy,'Romania','Original fixture','unknown',generation=self.generation,country='RO')
+        items=self.parts(legacy);path=self.root/'raw-v2.sqlite';path.write_bytes(items['tiles.sqlite'])
+        with closing(sqlite3.connect(path)) as db:
+            db.execute('ALTER TABLE tiles ADD COLUMN compressed_sha256 TEXT')
+            db.execute('ALTER TABLE tiles ADD COLUMN compressed_size INTEGER')
+            db.execute('PRAGMA user_version=2');db.commit()
+        items['tiles.sqlite']=path.read_bytes();manifest=json.loads(items['manifest.json'])
+        manifest['sha256']['tiles.sqlite']=hashlib.sha256(items['tiles.sqlite']).hexdigest()
+        items['manifest.json']=json.dumps(manifest).encode()
+        code,receipt=self.gate(self.repack(items),('--generation',str(self.generation)))
+        self.assertEqual(code,0,receipt.get('refused'))
 
 
 if __name__ == '__main__':
