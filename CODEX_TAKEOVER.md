@@ -39,9 +39,9 @@ Use `README.md`, `ROADMAP.md`, `VERIFICATION.md`, `AGENTS.md`, `docs/DEVICE_REQU
 
 The API 26 candidate's code came from tree `de3acc26923524fcb3eafbba4be6f065873f16df`. Its debug APK was 37,997,939 bytes, SHA-256 `7254946ea77ce66c10be35e12cc2e33adf1ed9f3582bd275ccebe70b656ab6f0`; its Android test APK was 2,443,597 bytes, SHA-256 `a7d5a55f851a3991353e4ccaab922c7abbd2bc1bb8a72df8480322a53d8ffea6`. These local artifacts are not GitHub release assets. The public source later received a verification-documentation-only edit before this handoff; rebuild locally and record the hashes before using a new APK.
 
-## Skills to enable in the new Codex account
+## Codex skills to enable in the new Codex account
 
-The following 20 skills were available in the source Codex session. Install or enable all of them in the new Codex account; if a skill is already bundled, verify it is available instead of duplicating it. Add the same skills to Hermes when that app supports them. If a platform cannot install an item, record that limitation rather than claiming it is installed.
+The following 21 skills were available in the source Codex session. Install or enable all of them in the new Codex account; if a skill is already bundled, verify it is available instead of duplicating it. This list is Codex-only. Hermes has its own separate installed-skill inventory: the owner should transfer the private `HERMES_SKILLS_TRANSFER.md` file separately and restore those skills in Hermes. That private inventory is intentionally not stored in this public repository. If it is not available on the new PC, ask the owner to transfer it; do not claim Hermes skills were restored without checking Hermes itself.
 
 1. `imagegen` — bundled image generation.
 2. `openai-docs` — official OpenAI product and API documentation.
@@ -63,6 +63,7 @@ The following 20 skills were available in the source Codex session. Install or e
 18. `template-creator` — create reusable artifact templates.
 19. `ui-ux-pro-max` — UI design and accessibility guidance; [nextlevelbuilder/ui-ux-pro-max-skill](https://github.com/nextlevelbuilder/ui-ux-pro-max-skill).
 20. `visualize` — create explanatory charts and interactive visualizations.
+21. `graphify` — build/query a knowledge graph for codebase structure; [Graphify-Labs/graphify](https://github.com/Graphify-Labs/graphify).
 
 Also install/enable the project-requested `compaction` skill/tool from [philipppohlmann/compaction](https://github.com/philipppohlmann/compaction) when its Codex integration is supported. Keep its generated state private and do not claim token savings without measured receipts. The REA repository ([morluto/rea](https://github.com/morluto/rea)) is a reverse-engineering reference tool, not a Codex skill; use it only for lawful analysis of material the user owns or is authorized to inspect.
 
@@ -75,7 +76,9 @@ Continue the EuroRig project from this public repository. I am moving to a new C
 
 Set up this PC for Windows Android development using JDK 21, Android SDK platform 37.0, build-tools 36.0.0, platform-tools/ADB, Python 3.12 and the included Gradle 9.6.0 wrapper. Configure only this PC's ignored local.properties. Run the project's existing host checks, Android app/test APK build and lint, then report exact results and artifact hashes.
 
-Install or enable every skill listed in CODEX_TAKEOVER.md, plus compaction, in this Codex account and Hermes if supported. Use bundled skills when already available. Inspect upstream SKILL.md/setup instructions; report every installed item and any platform limitation. Do not claim a skill or integration is installed without verifying it.
+Install or enable every Codex skill listed in CODEX_TAKEOVER.md, plus compaction when its Codex integration is supported, in this Codex account. Use bundled skills when already available. Inspect upstream SKILL.md/setup instructions; report every installed item and any platform limitation. Do not claim a skill or integration is installed without verifying it.
+
+Restore Hermes separately using the owner's private `HERMES_SKILLS_TRANSFER.md` inventory. Install/restore those skill folders in Hermes (use Hermes Skills Hub's “Add to this Agent” for available catalog skills, and a trusted transfer/backup for custom skills), then verify the installed skills in Hermes' UI/profile. Keep the Codex and Hermes inventories separate. Never copy Hermes credentials, provider configuration, session history or secrets, and do not publish the private Hermes inventory or skill contents. If the inventory is missing from this PC, ask the owner to transfer it before claiming Hermes setup is complete.
 
 Continue toward a free, fully local Android 8+ truck-navigation app for Europe excluding Russia. Keep routing/search on device after country maps are installed. Do not claim the app is road-ready: coherent Europe data, geographic cross-border routing, source-backed truck/ADR restrictions, storage under 20,000,000,000 bytes, update/removal rollback, real GPS/driving/voice, old-device performance, lifecycle checks and a signed public release remain gates. The pinned 35,145,100,444-byte Europe PBF is not in GitHub; use a transferred copy only after verifying the exact size and SHA-256 stated above. Do not launch a continent build before measuring temporary peak space and the complete installed footprint against the 20 GB cap.
 
