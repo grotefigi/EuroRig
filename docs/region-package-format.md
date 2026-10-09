@@ -174,6 +174,11 @@ Romania/Hungary coverage; the rehashed shared-conflict package is a negative con
 
 ## Not true yet
 
+- **Display evidence completeness.** A display database built before commit `e986323` omits node-level
+  restriction rows for a node whose only evidence is `minspeed`, `trailer`, `vehicle`, `motor_vehicle` or
+  `motorcar` (the enricher's node prefilter dropped them before the summary ran). The schema and
+  `restriction_version` are unchanged, so existing packages stay valid and readable, but they must be
+  **regenerated** to gain that evidence; nothing in place needs migrating.
 - Real-country sets and full-country compressed distribution are not verified.
   The host tools and app consume version-2 indices. Canonical version-1 indices are checked against
   the exact schema, manifest country/generation, declared count and every TAR tile's bytes/hash before

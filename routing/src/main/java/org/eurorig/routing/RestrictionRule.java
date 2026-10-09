@@ -31,6 +31,15 @@ public final class RestrictionRule {
                     if(key.equals("maxheight")&&truck.height<=4)continue;
                     relevant=true;continue;
                 }
+                // `none`, `unsigned` and `no_sign` are documented equivalents of a national default
+                // reference for maxheight (OSM Wiki, Key:maxheight - non-numerical values), so the
+                // existing 4 m default-height policy applies to them too instead of clearing any truck
+                // height. The other limit keys are deliberately not covered: that source does not
+                // establish their behaviour for these values, so it must not be extrapolated to them.
+                if(key.equals("maxheight")&&("none".equals(tags.get(key))||"unsigned".equals(tags.get(key))||"no_sign".equals(tags.get(key)))){
+                    if(truck.height<=4)continue;
+                    relevant=true;continue;
+                }
                 if(key.startsWith("hazmat")&&!truck.hazmat)continue;
                 if(key.matches("max(height|width|length|weight|axleload)(:(physical|hgv|forward|backward))*")&&!tags.get(key).matches("(?i)(none|unsigned|no|[0-9]+(\\.[0-9]+)?\\s*(t|tonnes|kg|lbs|m|cm|ft)?|[0-9]+'\\s*[0-9]+(\\.[0-9]+)?\"?)"))relevant=true;
                 if(key.contains(":conditional")||key.startsWith("maxweightrating")||key.startsWith("maxbogie")||key.startsWith("hgv:trailer")||key.startsWith("trailer")||key.startsWith("minspeed")||key.startsWith("max")&&key.contains(":")&&!key.endsWith(":physical")&&!key.endsWith(":hgv")&&!key.endsWith(":forward")&&!key.endsWith(":backward"))relevant=true;
@@ -52,13 +61,45 @@ public final class RestrictionRule {
     public String hazardViolation(Truck truck){
         if(truck.hazmat&&"no".equals(tags.get("hazmat")))return "Hazardous goods prohibited";
         if((truck.hazardousLoad&2)!=0&&"no".equals(tags.get("hazmat:water")))return "Water-polluting load prohibited";
-        if((truck.hazardousLoad&4)!=0&&"no".equals(tags.get("hazmat:explosives")))return "Explosive load prohibited";
+        // Vienna Convention signs are mapped to the documented keys (OSM Wiki, Key:hazmat): hazmat:water and
+        // hazmat:explosive. The plural is accepted so evidence already built with it keeps refusing.
+        if((truck.hazardousLoad&4)!=0&&("no".equals(tags.get("hazmat:explosive"))||"no".equals(tags.get("hazmat:explosives"))))return "Explosive load prohibited";
+        // A hazard key clears a load only when it grants access generally. A scope-limited, malformed or
+        // unknown value is evidence this build cannot evaluate, so it must not clear a hazardous load -
+        // the same rule the unmapped tunnel category and unsupported access exception already follow.
+        if(truck.hazmat&&tags.containsKey("hazmat")&&!grantsAccess(tags.get("hazmat")))return "Mapped hazardous materials access needs verification";
+        if((truck.hazardousLoad&2)!=0&&tags.containsKey("hazmat:water")&&!grantsAccess(tags.get("hazmat:water")))return "Mapped water-pollution access needs verification";
+        if((truck.hazardousLoad&4)!=0&&((tags.containsKey("hazmat:explosive")&&!grantsAccess(tags.get("hazmat:explosive")))
+            ||(tags.containsKey("hazmat:explosives")&&!grantsAccess(tags.get("hazmat:explosives")))))return "Mapped explosive access needs verification";
+        // A hazmat group this build does not evaluate must not clear a hazardous load either. The exact
+        // keys evaluated above are hazmat:water, hazmat:explosive(s) and the ADR code letters B..E;
+        // anything else (hazmat:1, hazmat:6.1, hazmat:flammable, hazmat:explosive_custom, a lower-case
+        // code letter, ...) is mapped evidence whose group cannot be matched to this load, so only a
+        // general-access value on it may pass. Group names are matched exactly - a prefix match would
+        // hide an unmodelled restrictive key behind a known name.
+        if(truck.hazmat)for(String key:tags.keySet()){
+            if(!key.startsWith("hazmat:"))continue;
+            String group=key.substring(7);
+            if(group.equals("water")||group.equals("explosive")||group.equals("explosives")||(group.length()==1&&group.charAt(0)>='B'&&group.charAt(0)<='E'))continue;
+            if(!grantsAccess(tags.get(key)))return "Mapped hazmat group "+group+" needs verification";
+        }
         String tunnel=tags.getOrDefault("tunnel:category","").trim().toUpperCase(java.util.Locale.ROOT);
         if(truck.tunnelCode!=0&&tags.containsKey("tunnel")&&!"no".equals(tags.get("tunnel"))&&tunnel.isEmpty())return "Tunnel category is not mapped for this ADR load";
         if(truck.tunnelCode!=0&&!tunnel.isEmpty()){
             if(tunnel.length()!=1||tunnel.charAt(0)<'A'||tunnel.charAt(0)>'E')return "Unknown ADR tunnel category";
             if(tunnel.charAt(0)-'A'+1>=truck.tunnelCode)return "ADR tunnel category "+tunnel+" is prohibited for this load";
         }
+        // A tunnel's ADR category is also mapped as the code suffix itself (OSM Wiki, Key:hazmat:
+        // "The tunnel restriction code is used as key suffix", hazmat:B..hazmat:E). This load's own code
+        // decides the way; a code mapping that omits or cannot clear it does not clear the load.
+        if(truck.tunnelCode!=0){
+            char code=(char)('A'+truck.tunnelCode-1);String own=tags.get("hazmat:"+code);
+            if("no".equals(own))return "Mapped ADR tunnel code "+code+" is prohibited for this load";
+            if(own!=null&&!grantsAccess(own))return "Mapped ADR tunnel code "+code+" needs verification";
+            if(own==null)for(char other='B';other<='E';other++)if(tags.containsKey("hazmat:"+other))return "Mapped ADR tunnel codes do not clear this load";
+        }
         return null;
     }
+    /** General access values only (OSM access=yes|designated|permissive). */
+    private static boolean grantsAccess(String value){return value!=null&&(value.equals("yes")||value.equals("designated")||value.equals("permissive"));}
 }

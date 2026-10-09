@@ -8,7 +8,7 @@ import json
 import math
 import sqlite3
 from pathlib import Path
-from compile_map import restrictions, ROADS, ALLOW, BLOCKED, UNCERTAIN
+from compile_map import restrictions, ROADS, ALLOW, BLOCKED, HAZMAT, UNCERTAIN, EVIDENCE_PREFIXES
 
 
 def summary(tags, kind=None):
@@ -17,7 +17,9 @@ def summary(tags, kind=None):
     flags=a|b
     if kind is not None and kind not in ROADS and tags.get('hgv') not in ALLOW:
         flags|=BLOCKED
-    relevant={k:v for k,v in tags.items() if k.startswith(('max','access','hgv','vehicle','motor_vehicle','motorcar','hazmat','tunnel','barrier','oneway','bridge'))}
+    # Keep every key the compiler reads, not a narrower list: an UNCERTAIN flag whose only reason was
+    # dropped (minspeed, trailer, ...) leaves the app an unrelated tag to clear the rule with.
+    relevant={k:v for k,v in tags.items() if k.startswith(EVIDENCE_PREFIXES)}
     return (*limits,flags,json.dumps(relevant,ensure_ascii=False,separators=(',',':')))
 
 
@@ -47,9 +49,12 @@ def enrich(sources,destination):
                     db.execute('INSERT OR IGNORE INTO road_rules VALUES(?,?,?,?,?,?,?,?)',(way.id,*values))
             def node(self,node):
                 tags=dict(node.tags)
-                if not any(k.startswith(('max','access','hgv','barrier','hazmat')) for k in tags):return
+                # The prefilter must not be narrower than the compiler's own evidence set: a node whose
+                # only reason is minspeed/trailer was dropped before summary ever saw it. Nodes are still
+                # stored only when summary finds a real limit or flag, so this is not a tag dump.
+                if not any(k.startswith(EVIDENCE_PREFIXES) for k in tags):return
                 values=summary(tags)
-                if node.location.valid() and (any(values[:5]) or values[5]&(BLOCKED|UNCERTAIN|2)):
+                if node.location.valid() and (any(values[:5]) or values[5]&(BLOCKED|UNCERTAIN|HAZMAT)):
                     db.execute('INSERT OR IGNORE INTO node_rules VALUES(?,?,?,?,?,?,?,?,?,?)',(node.id,node.location.lat,node.location.lon,*values))
         for source in sources:
             print('Reading restriction tags:',Path(source).name,flush=True)

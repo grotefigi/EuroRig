@@ -1,5 +1,38 @@
 # Verification
 
+## Truck evidence, download recovery and zoom checkpoint (2026-10-09)
+
+The second reviewed development candidate passes 58 Java unit checks, 158 Python
+checks, Android app/test assembly and lint (zero errors, four existing warnings).
+Its installed app and test APKs were pulled back and independently hashed on the
+dedicated Android 8 emulator. Both map palettes, switching themes and relaunch
+persistence, camera following, heading-arrow pixels and travelled-route removal
+pass controlled device checks. These are emulator controls, not real GPS or
+driving evidence. Short timing samples vary substantially and do not establish
+performance parity or old-device readiness.
+
+Truck rules now recognize the documented hazardous-load suffixes, refuse unknown
+hazard groups, and scope the existing default-height policy to height keys.
+Compiler evidence retention now includes trailer, minimum-speed and related
+unsupported restrictions, including relevant physical and uncertain node rules.
+Existing map databases require regeneration to gain newly retained evidence;
+retention does not itself prove that every interior-node restriction is enforced
+by native routing. Mapped ADR, node association and the remaining Economical
+geometry-audit failure remain release blockers.
+
+Download ownership now prevents stale workers from publishing another run's
+state, and a stale partial rejected with HTTP 416 gets one guarded restart.
+Host controls pass. Actual duplicate-start, pause/resume, foreground notification
+and service recreation checks remain pending a corrected state-preserving test
+harness; preparation and synthetic controls are not platform proof.
+
+The preceding reviewed UI/navigation APK was installed on the physical Tab S9
+with matching signing identity. Every original map file and all five raw
+preferences remained unchanged after installation and launch. This newer
+candidate has not yet been installed on that tablet. Whole-Europe provenance,
+the complete 20,000,000,000-byte installed footprint, audible offline voice,
+driving, broad lifecycle validation and signed release remain pending.
+
 ## Cached map rendering and guidance-session ownership (2026-10-09)
 
 The combined development candidate passes 47 host unit checks, Android app/test

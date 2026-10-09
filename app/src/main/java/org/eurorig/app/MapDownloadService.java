@@ -15,15 +15,41 @@ public final class MapDownloadService extends Service {
     static volatile boolean running;
     static final String IDLE="Country maps are downloaded once, then used offline.";
     static volatile String status=IDLE;
+    /**
+     * Process-wide run identity. A download runs on its own thread and can outlive the service that
+     * started it, so every write to the shared running/status state is scoped to the run that owns it:
+     * a finished run must never clear a later run's flag of a later run's status.
+     */
+    private static volatile int runId;
+    static int currentRun(){return runId;}
+    /** Ownership moves under one lock: the worker thread reads and writes it while start intents arrive. */
+    static synchronized int beginRun(){return ++runId;}
+    static boolean ownsRun(int run){return run==runId;}
+    /** Publishes only for the owning run, and reports whether the text was published. */
+    static synchronized boolean publish(int run,String text){if(run!=runId)return false;status=text;return true;}
+    static synchronized void finish(int run){if(run==runId)running=false;}
+    /** A client may not exist yet when a pause arrives on a freshly created instance. */
+    static void cancelQuietly(DownloadClient client){if(client!=null)client.cancel();}
     private volatile boolean cancelled;
     private DownloadClient client;
+    private int ownedRun=-1;
     private long lastNotification;
     public void onCreate(){super.onCreate();client=new DownloadClient(BuildConfig.DEBUG);getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel("maps","Map downloads",NotificationManager.IMPORTANCE_LOW));}
     @android.annotation.SuppressLint("ApplySharedPref") // Download worker persists a verified file before process termination.
     public int onStartCommand(Intent intent,int flags,int id){
         if(intent==null)return START_NOT_STICKY;
         if("PAUSE".equals(intent.getAction())){pause();return START_NOT_STICKY;}
-        if(running)return START_NOT_STICKY;
+        if(running){
+            // A download is already running. The service must still enter the foreground (returning
+            // after startForegroundService() without startForeground() is a platform crash), but an
+            // instance that owns no thread must not stay there: the running thread belongs to another
+            // instance, so nothing else would ever stop this one or take its notification down.
+            startForeground(2,notification(status));
+            if(ownedRun!=currentRun())stopSelf(id);
+            return START_NOT_STICKY;
+        }
+        final int run=beginRun();
+        ownedRun=run;
         running=true;cancelled=false;status="Opening country catalogue…";startForeground(2,notification(status));
         final String country=intent.getStringExtra("country");
         new Thread(()->{
@@ -54,11 +80,11 @@ public final class MapDownloadService extends Service {
                     String name=map.getString("name"),mapId=map.getString("id");
                     if(Store.worker.submit(()->alreadyInstalled(this,map,verifiedSelections)).get()){
                         if(cancelled)throw new InterruptedIOException("Map download paused");
-                        update(name+" already installed for offline navigation");continue;
+                        update(run,name+" already installed for offline navigation");continue;
                     }
                     String address=new java.net.URL(new java.net.URL(url),map.getString("url")).toString();
-                    File file=client.download(address,map.getString("sha256"),map.getLong("bytes"),new File(getFilesDir(),"downloads"),mapId,()->cancelled,(done,total)->update("Downloading "+name+" · "+Math.round(done*100.0/total)+"%"));
-                    update("Checking "+name+"…");
+                    File file=client.download(address,map.getString("sha256"),map.getLong("bytes"),new File(getFilesDir(),"downloads"),mapId,()->cancelled,(done,total)->update(run,"Downloading "+name+" · "+Math.round(done*100.0/total)+"%"));
+                    update(run,"Checking "+name+"…");
                     if(!getSharedPreferences("maps",0).edit().putString("ready_"+mapId,name+"|"+file.getName()).commit())throw new IOException("Could not save the downloaded package. Its file is retained for recovery.");
                     if(cancelled)throw new InterruptedIOException("Map download paused");
                     {
@@ -71,14 +97,14 @@ public final class MapDownloadService extends Service {
                             installDownloaded(this,file);activated[0]=true;
                         }catch(Exception|LinkageError e){failure[0]=new IOException(e.getMessage(),e);}finally{Store.installing=false;installed.countDown();}});
                         installed.await();if(failure[0]!=null)throw failure[0];
-                        if(!activated[0]){update(name+" downloaded · stop guidance or wait for map changes, then install from Downloaded countries");break;}
+                        if(!activated[0]){update(run,name+" downloaded · stop guidance or wait for map changes, then install from Downloaded countries");break;}
                         if(!file.exists()){
-                            update(name+" installed for offline navigation");
-                        }else update(name+" installed · downloaded archive could not be removed");
+                            update(run,name+" installed for offline navigation");
+                        }else update(run,name+" installed · downloaded archive could not be removed");
                     }
                 }
-            }catch(Exception e){status=cancelled?"Downloads paused. Press download to resume.":"Map download: "+e.getMessage();}
-            finally{running=false;stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}
+            }catch(Exception e){publish(run,cancelled?"Downloads paused. Press download to resume.":"Map download: "+e.getMessage());}
+            finally{if(ownsRun(run)){stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}finish(run);}
         },"EuroRig map download").start();return START_NOT_STICKY;
     }
     /** Both queued and deferred installs retire only their own archive after activation and close. */
@@ -122,14 +148,14 @@ public final class MapDownloadService extends Service {
             return true;
         }finally{Store.installing=false;}
     }
-    private void update(String text){status=text;long now=SystemClock.elapsedRealtime();if(now-lastNotification>1000){getSystemService(NotificationManager.class).notify(2,notification(text));lastNotification=now;}}
+    private void update(int run,String text){if(!publish(run,text))return;long now=SystemClock.elapsedRealtime();if(now-lastNotification>1000){getSystemService(NotificationManager.class).notify(2,notification(text));lastNotification=now;}}
     private Notification notification(String text){
         PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         PendingIntent pause=PendingIntent.getService(this,2,new Intent(this,MapDownloadService.class).setAction("PAUSE"),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         return new Notification.Builder(this,"maps").setSmallIcon(R.drawable.ic_truck).setContentTitle("EuroRig · Country maps").setContentText(text).setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(null,"Pause",pause).build()).build();
     }
-    private void pause(){cancelled=true;status="Downloads paused. Press download to resume.";client.cancel();}
+    private void pause(){cancelled=true;if(running)publish(currentRun(),"Downloads paused. Press download to resume.");cancelQuietly(client);}
     public void onTimeout(int startId,int type){pause();stopSelf();}
     public IBinder onBind(Intent intent){return null;}
-    public void onDestroy(){cancelled=true;if(client!=null)client.cancel();super.onDestroy();}
+    public void onDestroy(){cancelled=true;cancelQuietly(client);super.onDestroy();}
 }
