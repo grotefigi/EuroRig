@@ -7,8 +7,8 @@ android {
         applicationId 'org.eurorig.app'
         minSdk 26
         targetSdk 37
-        versionCode 5
-        versionName '0.5.0-dev'
+        versionCode 7
+        versionName '0.6.1-dev'
         buildConfigField 'String', 'MAP_CATALOG_URL', groovy.json.JsonOutput.toJson(providers.gradleProperty('mapCatalogUrl').getOrElse('https://raw.githubusercontent.com/grotefigi/EuroRig/main/maps/catalog.json'))
         testInstrumentationRunner 'org.eurorig.app.NativeSmokeInstrumentation'
     }
@@ -19,4 +19,5 @@ android {
 dependencies {
     implementation project(':routing')
     implementation 'io.github.rallista:valhalla-mobile:0.6.3'
+    testImplementation 'junit:junit:4.13.2'
 }

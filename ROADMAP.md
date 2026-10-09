@@ -6,6 +6,13 @@ original product request requires all of the following milestones.
 The additional driver parking, walking, provenance and offline renderer work is
 tracked in [docs/DRIVER_FEATURES.md](docs/DRIVER_FEATURES.md).
 
+Complete and verify the Galaxy Tab S9 experience first. The app plus all European
+maps must stay within 20 GB of installed storage; Android 8 phones with 4 GB RAM
+and 32 GB storage are the subsequent performance target. See
+[device requirements](docs/DEVICE_REQUIREMENTS.md) for the storage accounting and
+validation requirements. The current continental size extrapolation does not meet
+this requirement and must not be shipped.
+
 1. **Production offline engine and renderer.** Valhalla Mobile 0.6.3 is embedded
    and routes a full Romania country offline. Indexed SQLite roads and FTS
    search are implemented. Improve rendering/geocoding, validate native rules,

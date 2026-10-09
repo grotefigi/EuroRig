@@ -12,8 +12,8 @@ def set_theme(dark):
  else:s.tap('Close')
  time.sleep(1);s.screenshot(args.prefix+('-dark' if dark else '-light'))
  colors=Counter(Image.open(s.ROOT/'dist/screenshots'/((args.prefix+('-dark' if dark else '-light'))+'.png')).convert('RGB').get_flattened_data())
- assert colors[(22,34,37) if dark else (233,236,228)]>1000,'Map theme did not change'
- assert colors[(16,25,28) if dark else (247,249,252)]>1000,'Controls theme did not change'
+ assert colors[(17,27,38) if dark else (232,238,232)]>1000,'Map theme did not change'
+ assert colors[(25,28,34) if dark else (255,255,255)]>1000,'Controls theme did not change'
  settings=ET.fromstring(s.run('shell','run-as','org.eurorig.app','cat','shared_prefs/settings.xml'))
  assert next(n.attrib['value'] for n in settings if n.attrib['name']=='dark_mode')==str(dark).lower()
  s.tap('Truck') if not args.guidance else None

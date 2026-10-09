@@ -64,4 +64,18 @@ public class DownloadTest {
         try{download(new DownloadClient(true));fail("bad range accepted");}catch(IOException expected){assertTrue(expected.getMessage().contains("resume range"));}
         assertEquals(1000,Files.size(partial()));
     }
+    @Test public void partialThePublishedObjectCannotSatisfyStartsOver()throws Exception{
+        // The stored bytes are longer than what the object now offers, so every resume is refused with
+        // 416. Keeping them would make the country undownloadable forever; the transfer must restart.
+        server.createContext("/replaced",exchange->{
+            if(exchange.getRequestHeaders().getFirst("Range")!=null){
+                exchange.getResponseHeaders().set("Content-Range","bytes */"+payload.length);exchange.sendResponseHeaders(416,-1);exchange.close();return;
+            }
+            exchange.sendResponseHeaders(200,payload.length);
+            try(OutputStream output=exchange.getResponseBody()){output.write(payload);}
+        });
+        Files.write(partial(),Arrays.copyOf(payload,150000));url=url.replace("/map","/replaced");
+        File result=download(new DownloadClient(true));
+        assertArrayEquals(payload,Files.readAllBytes(result.toPath()));assertFalse(Files.exists(partial()));
+    }
 }

@@ -32,16 +32,22 @@ final class Store {
     static volatile long fixTime;
     static volatile boolean voiceEnabled=true;
     static void load(Context context) throws IOException {
-        RegionPackages.cleanupStale(context);
         if(graph==null) {
             SharedPreferences settings=context.getSharedPreferences("settings",0);
             if(settings.getBoolean("native",false)){
                 String selection=context.getSharedPreferences("settings",0).getString("region","");
                 if(!selection.matches("[0-9a-f-]{36}"))throw new IOException("Invalid saved region selection");
                 File region=new File(context.getFilesDir(),"regions/"+selection);
-                if(new File(region,"display.sqlite").exists()){display=new DisplayDatabase(new File(region,"display.sqlite"));graph=display.endpoints;}
-                else try(InputStream in=new FileInputStream(new File(region,"display.europack"))){graph=Graph.read(in);}
-                nativeRouter=new NativeRouter(context,new File(region,"routing.tar"));
+                boolean directoryTiles=TileIndex.validateInstalled(region);
+                DisplayDatabase candidateDisplay=null;NativeRouter candidateRouter=null;Graph candidateGraph;
+                try{
+                    if(new File(region,"countries").exists()){candidateDisplay=new DisplayDatabase(CountrySets.displays(region),false);candidateGraph=candidateDisplay.endpoints;}
+                    else if(new File(region,"display.sqlite").exists()){candidateDisplay=new DisplayDatabase(new File(region,"display.sqlite"));candidateGraph=candidateDisplay.endpoints;}
+                    else try(InputStream in=new FileInputStream(new File(region,"display.europack"))){candidateGraph=Graph.read(in);}
+                    candidateRouter=new NativeRouter(context,new File(region,directoryTiles?"tiles":"routing.tar"),directoryTiles,directoryTiles);
+                    display=candidateDisplay;candidateDisplay=null;nativeRouter=candidateRouter;candidateRouter=null;graph=candidateGraph;
+                }finally{RegionPackages.closeRetired(candidateRouter);RegionPackages.closeRetired(candidateDisplay);}
+                RegionPackages.cleanupStale(context);
             }else{
             File file=new File(context.getFilesDir(),"installed.europack");
             if(file.exists())try(InputStream in=new FileInputStream(file)){graph=Graph.read(in);}
@@ -94,9 +100,13 @@ final class Store {
     }
     @android.annotation.SuppressLint("ApplySharedPref") // Worker-thread commit precedes a map switch and must survive process termination.
     static void closeNative(Context c){
-        if(nativeRouter!=null){nativeRouter.close();nativeRouter=null;}
-        if(display!=null){display.close();display=null;}
+        releaseNative();
         c.getSharedPreferences("settings",0).edit().putBoolean("native",false).commit();
+    }
+    /** Release failed runtime actors without forgetting the durable country selection. */
+    static void releaseNative(){
+        RegionPackages.closeRetired(nativeRouter);nativeRouter=null;
+        RegionPackages.closeRetired(display);display=null;
     }
     // Read legacy floats as their entered decimal value, avoiding float expansion at a road limit.
     private static double measurement(SharedPreferences p,String key,double fallback){

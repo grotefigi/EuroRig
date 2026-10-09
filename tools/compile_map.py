@@ -18,6 +18,12 @@ ROADS = {'motorway': 80, 'motorway_link': 50, 'trunk': 75, 'trunk_link': 45,
          'tertiary': 45, 'tertiary_link': 35, 'unclassified': 35,
          'residential': 30, 'service': 20, 'living_street': 10}
 ALLOW = {'yes', 'designated', 'permissive'}
+# Every tag prefix the compiler reads or treats as a reason for an UNCERTAIN restriction. The display
+# summary MUST keep all of them: a tag that made a restriction uncertain has to survive into the stored
+# evidence, or the app is left with an unrelated tag and clears the rule. `tools/test_enrich_evidence.py`
+# fails if a key that flags UNCERTAIN ever stops matching this tuple, so the two lists cannot drift apart.
+EVIDENCE_PREFIXES = ('max', 'minspeed', 'trailer', 'access', 'hgv', 'vehicle', 'motor_vehicle',
+                     'motorcar', 'hazmat', 'tunnel', 'barrier', 'oneway', 'bridge', 'toll')
 
 
 def limit(value, weight=False):

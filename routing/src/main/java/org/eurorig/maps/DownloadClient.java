@@ -50,11 +50,21 @@ public final class DownloadClient {
         long offset=partial.exists()?partial.length():0;
         if(offset==bytes&&digest(partial).equalsIgnoreCase(sha256)){Files.move(partial.toPath(),target.toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);return target;}
         if(offset>=bytes){Files.delete(partial.toPath());offset=0;}
-        if(directory.getUsableSpace()<Math.multiplyExact(bytes,2)-offset+200L*1024*1024)throw new IOException("Not enough free space for download and installation");
+        requireSpace(directory,bytes,offset);
         if(cancelled.getAsBoolean())throw new InterruptedIOException("Map download paused");
         HttpURLConnection c=open(url,offset);
         try{
             int code=c.getResponseCode();
+            if(offset>0&&code==416){
+                // The stored bytes cannot be satisfied by the published object (replaced by a shorter
+                // one, or a partial left by an older revision). Keeping them fails every retry with
+                // 416 and the country can never be downloaded again, so start over from the beginning.
+                c.disconnect();active=null;Files.delete(partial.toPath());offset=0;
+                // The whole object is still to be written again, and the reserve was only validated for
+                // the bytes the discarded partial had covered, so the requirement is re-checked here.
+                requireSpace(directory,bytes,offset);
+                c=open(url,0);code=c.getResponseCode();
+            }
             if(offset>0&&code==206){
                 Matcher range=Pattern.compile("bytes (\\d+)-(\\d+)/(\\d+)").matcher(Objects.toString(c.getHeaderField("Content-Range"),""));
                 if(!range.matches()||Long.parseLong(range.group(1))!=offset||Long.parseLong(range.group(3))!=bytes)throw new IOException("Server returned an invalid resume range");
@@ -73,6 +83,10 @@ public final class DownloadClient {
             if(!digest(partial).equalsIgnoreCase(sha256)){Files.delete(partial.toPath());throw new IOException("Map checksum did not match; download discarded");}
             Files.move(partial.toPath(),target.toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);return target;
         }finally{c.disconnect();active=null;}
+    }
+    /** Peak space one transfer needs: the bytes still to write, the installed copy and a reserve. */
+    private static void requireSpace(File directory,long bytes,long offset)throws IOException{
+        if(directory.getUsableSpace()<Math.multiplyExact(bytes,2)-offset+200L*1024*1024)throw new IOException("Not enough free space for download and installation");
     }
     private static String digest(File file)throws IOException{
         try{

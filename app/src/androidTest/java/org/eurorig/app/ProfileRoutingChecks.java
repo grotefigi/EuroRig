@@ -1,6 +1,7 @@
 package org.eurorig.app;
 
 import android.content.Context;
+import android.database.sqlite.SQLiteDatabase;
 import org.eurorig.routing.*;
 import org.json.*;
 import java.io.*;
@@ -10,7 +11,13 @@ import java.util.*;
 /** Original synthetic networks isolate hard limits from route preferences. */
 final class ProfileRoutingChecks {
     static void run(Context app,Context tests)throws Exception{
+        TileIndexChecks.run(app,tests);
         checkAudit();
+        checkCoverage();
+        checkCoverageMessages(app,tests);
+        checkMissingDisplayEvidence(app,tests);
+        checkTileDirectory(app,tests);
+        checkCompositeDisplay(app,tests);
         File directory=new File(app.getFilesDir(),"profile-qa");if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Cannot create profile QA directory");
         boolean missingRejected=false;
         try(NativeRouter ignored=new NativeRouter(app,new File(directory,"missing.tar"))){throw new AssertionError("Missing routing map initialized");}
@@ -64,6 +71,286 @@ final class ProfileRoutingChecks {
             new JSONArray().put(edge(0,4,10)).put(edge(1,2,12))}){
             rejected(()->{try{NativeRouter.auditedWays(bad,5);}catch(JSONException e){throw new IllegalStateException(e);}},"Incomplete or invalid restriction trace must fail closed");
         }
+    }
+    /**
+     * The published coverage box is advisory and never proof of coverage: a malformed box must behave
+     * exactly as undeclared, and an outside destination must be detected as readily as an outside
+     * origin, or a driver whose destination lies beyond the map is told to try a different entrance.
+     */
+    private static void checkCoverage()throws Exception{
+        JSONObject good=new JSONObject().put("tiles",1024)
+            .put("bbox",new JSONArray().put(16.108446).put(42.229789).put(30.278960).put(48.589212));
+        double[] bounds=NativeRouter.coverageBounds(good);
+        require(bounds!=null,"A well-formed coverage box is accepted");
+        require(NativeRouter.withinBounds(bounds,45.435,28.008)&&NativeRouter.withinBounds(bounds,46.253,20.141),
+            "Galati and Szeged lie inside the published box");
+        require(!NativeRouter.withinBounds(bounds,41.0,28.0),"A point south of the box lies outside it");
+        require(NativeRouter.withinBounds(bounds,45.435,28.008)&&!NativeRouter.withinBounds(bounds,41.0,28.0),
+            "An outside destination is detected even when the origin is inside");
+        require(NativeRouter.coverageBounds(new JSONObject())==null,"A package with no coverage declares nothing");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(30.278960).put(48.589212).put(16.108446).put(42.229789)))==null,
+            "Reversed bounds are treated as undeclared");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(-200.0).put(42.229789).put(30.278960).put(48.589212)))==null,
+            "An out-of-range longitude is treated as undeclared");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(16.108446).put(42.229789).put(30.278960).put(95.0)))==null,
+            "An out-of-range latitude is treated as undeclared");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(16.108446).put(42.229789).put(16.108446).put(48.589212)))==null,
+            "A degenerate box is treated as undeclared");
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put(16.108446).put(42.229789).put(30.278960)))==null,
+            "An incomplete box is treated as undeclared");
+        // org.json refuses NaN and Infinity outright, so a non-numeric component stands in for them.
+        require(NativeRouter.coverageBounds(new JSONObject().put("bbox",
+            new JSONArray().put("west").put(42.229789).put(30.278960).put(48.589212)))==null,
+            "A non-numeric bound is treated as undeclared");
+        require(!NativeRouter.withinBounds(null,45.435,28.008),"An undeclared box contains nothing");
+    }
+    /**
+     * Error-message wiring for the published coverage box: the real strings NativeRouter produces,
+     * against the same tiny native fixture the profile checks use, with a temporary manifest written
+     * beside a copy of the tar. Nothing here touches an installed map - every router reads a package
+     * in app-private storage.
+     */
+    private static void checkCoverageMessages(Context app,Context tests)throws Exception{
+        File directory=new File(app.getFilesDir(),"coverage-qa");
+        if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Cannot create coverage QA directory");
+        for(String name:new String[]{"routing.tar","display.sqlite"})
+            try(InputStream input=tests.getAssets().open("profile-"+name)){
+                Files.copy(input,new File(directory,name).toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+            }
+        Truck truck=truck(4,2.55,16.5,40,11.5);
+        DisplayDatabase previous=Store.display;
+        try(DisplayDatabase fixture=new DisplayDatabase(new File(directory,"display.sqlite"))){
+        Store.display=fixture;
+        try(NativeRouter declared=coverageRouter(app,directory,new double[]{16.108446,42.229789,30.278960,48.589212})){
+            String message=failure(declared,45,27.001,41,28,truck);
+            require(message.contains("outside the installed map"),
+                "An inside origin with an outside destination is reported as outside the map: "+message);
+            message=failure(declared,41,28,45,27.001,truck);
+            require(message.contains("outside the installed map"),
+                "An outside origin with an inside destination is reported as outside the map: "+message);
+            message=failure(declared,45,27.9,45,27.95,truck);
+            require(message.contains("check country coverage")&&!message.contains("outside the installed map"),
+                "Inside the declared box keeps the conservative road-snap advice: "+message);
+            declared.route(45,27.001,45,27.015,truck,null,false);
+            require(declared.auditAttempts()>0,"A successful route records its own attempts");
+            failure(declared,45,27.9,45,27.95,truck);
+            require(declared.auditAttempts()==1&&declared.auditExcluded().length()==0,
+                "A failing request reports its own audit counters, not the previous call's");
+            failure(declared,45,27.001,45,27.015,truck(4,2.55,16.5,120,11.5));
+            require(declared.auditAttempts()==0&&declared.auditExcluded().length()==0,
+                "A request refused before the engine clears the audit counters");
+        }
+        try(NativeRouter undeclared=new NativeRouter(app,new File(directory,"routing.tar"))){
+            String message=failure(undeclared,45,27.9,45,27.95,truck);
+            require(message.contains("check country coverage"),
+                "A package with no declared coverage keeps the original advice: "+message);
+        }
+        }finally{Store.display=previous;}
+    }
+    /** A router whose tar sits beside a manifest declaring the given coverage box. */
+    private static NativeRouter coverageRouter(Context app,File directory,double[] box)throws Exception{
+        File covered=new File(directory,"covered");
+        if(!covered.isDirectory()&&!covered.mkdirs())throw new IOException("Cannot create covered QA directory");
+        Files.copy(new File(directory,"routing.tar").toPath(),new File(covered,"routing.tar").toPath(),
+            java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        JSONObject manifest=new JSONObject().put("name","Coverage QA")
+            .put("coverage",new JSONObject().put("tiles",1).put("bbox",new JSONArray(box)));
+        Files.write(new File(covered,"manifest.json").toPath(),
+            manifest.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        return new NativeRouter(app,new File(covered,"routing.tar"));
+    }
+    private static String failure(NativeRouter router,double lat,double lon,double endLat,double endLon,Truck truck){
+        try{router.route(lat,lon,endLat,endLon,truck,null,false);return "(routed)";}
+        catch(IllegalStateException expected){return expected.getMessage()==null?"":expected.getMessage();}
+    }
+    /**
+     * Routing tiles can cover a way that the display evidence does not. This fixture keeps routing intact
+     * and removes the display road coverage, and every mode must then refuse the route: a way missing
+     * from the evidence is unknown, not unrestricted. The intact control proves the trigger is the
+     * removed coverage rather than the routing data.
+     */
+    private static void checkMissingDisplayEvidence(Context app,Context tests)throws Exception{
+        File directory=new File(app.getFilesDir(),"evidence-qa");
+        if(!directory.isDirectory()&&!directory.mkdirs())throw new IOException("Cannot create evidence QA directory");
+        File tar=new File(directory,"routing.tar");
+        try(InputStream input=tests.getAssets().open("profile-routing.tar")){
+            Files.copy(input,tar.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        File intact=copyDisplay(tests,directory,"display-intact.sqlite");
+        File missingPrimary=copyDisplay(tests,directory,"display-missing-primary.sqlite");
+        File none=copyDisplay(tests,directory,"display-none.sqlite");
+        // Way 20000003 is the shortest link across the parallel pair; remove ONLY its evidence so the
+        // known detour over 20000004 stays evidenced. Nothing else about the graph changes.
+        try(SQLiteDatabase database=SQLiteDatabase.openDatabase(missingPrimary.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            database.execSQL("DELETE FROM roads WHERE id=20000003");
+            database.execSQL("DELETE FROM road_rules WHERE way=20000003");
+        }
+        // No evidence for any routed way: keep exactly one road so the database still opens, then move it
+        // to an id no route uses, so only the road_rules table (the evidence claim itself) survives.
+        try(SQLiteDatabase database=SQLiteDatabase.openDatabase(none.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            database.execSQL("DELETE FROM roads WHERE id NOT IN (SELECT id FROM roads ORDER BY id LIMIT 1)");
+            database.execSQL("UPDATE roads SET id=999999");
+        }
+        Truck legal=new Truck(3,2.2,10,18,7,false,false,true,true);      // satisfies way 20000003's limits
+        Truck hazmat=new Truck(3,2.2,10,18,7,true,false,true,true);      // ADR load, no tunnel code
+        Truck detailed=new Truck(3,2.2,10,18,7,true,false,true,true,5,80,3,3);   // detailed ADR
+        DisplayDatabase previousDisplay=Store.display;NativeRouter previousRouter=Store.nativeRouter;
+        try(DisplayDatabase control=new DisplayDatabase(intact);DisplayDatabase partial=new DisplayDatabase(missingPrimary);
+            DisplayDatabase empty=new DisplayDatabase(none);NativeRouter router=new NativeRouter(app,tar)){
+            require(partial.restrictionEvidence,"The partial fixture still declares restriction evidence");
+            require(empty.restrictionEvidence,"The empty fixture still declares restriction evidence");
+            require(control.endpoints.nodes.length==2&&empty.endpoints.nodes.length==2,
+                "The fixture exposes its two endpoints");
+            double[] from={control.endpoints.nodes[0].lat,control.endpoints.nodes[0].lon};
+            double[] to={control.endpoints.nodes[1].lat,control.endpoints.nodes[1].lon};
+            Store.nativeRouter=router;
+            for(RoutingMode routingMode:RoutingMode.values()){
+                Store.display=control;
+                Router.Route baseline=router.route(from[0],from[1],to[0],to[1],legal,routingMode,false);
+                require(baseline!=null&&baseline.metres>0,"With the display coverage intact the corridor routes in "+routingMode);
+                // The unevidenced way must be excluded and an evidenced detour taken - not routed as
+                // unrestricted, and not treated as a dead end while a legal alternative exists.
+                Store.display=partial;
+                Router.Route detour=router.route(from[0],from[1],to[0],to[1],legal,routingMode,false);
+                require(detour!=null&&detour.metres>0,"A way missing from the evidence must not block an evidenced detour");
+                require(detour.edges.stream().noneMatch(edge->edge.way==20000003L)
+                    &&detour.edges.stream().anyMatch(edge->edge.way==20000004L),
+                    "The returned route uses the evidenced detour instead of the missing way in "+routingMode);
+                require(router.auditAttempts()>=2,"The unevidenced way was excluded and the route retried, not accepted");
+                require(router.auditExcluded().length()>=1,"The excluded attempt recorded the point it avoided");
+                // With no evidence at all there is no legal alternative, in any mode.
+                for(boolean delivery:new boolean[]{false,true})for(Truck mode:new Truck[]{legal,hazmat,detailed}){
+                    Store.display=empty;
+                    String message=null;
+                    try{router.route(from[0],from[1],to[0],to[1],mode,routingMode,delivery);}
+                    catch(IllegalStateException expected){message=expected.getMessage();}
+                    require(message!=null&&router.auditAttempts()>=2&&router.auditExcluded().length()>=1,
+                        "A route with no display evidence must be refused (delivery="+delivery+", hazmat="+mode.hazmat
+                            +", hazards="+mode.hazardousLoad+", tunnel="+mode.tunnelCode+", routing="+routingMode+"): "+message);
+                }
+            }
+        }finally{
+            Store.display=previousDisplay;Store.nativeRouter=previousRouter;
+        }
+    }
+    private static File copyDisplay(Context tests,File directory,String name)throws IOException{
+        File file=new File(directory,name);
+        try(InputStream input=tests.getAssets().open("profile-display.sqlite")){
+            Files.copy(input,file.toPath(),java.nio.file.StandardCopyOption.REPLACE_EXISTING);
+        }
+        return file;
+    }
+    private static void checkTileDirectory(Context app,Context tests)throws Exception{
+        File root=new File(app.getFilesDir(),"directory-qa-"+UUID.randomUUID());
+        if(!root.mkdirs())throw new IOException("Cannot create directory QA storage");
+        File tar=new File(root,"routing.tar"),tiles=new File(root,"tiles");
+        try(InputStream input=tests.getAssets().open("profile-routing.tar")){Files.copy(input,tar.toPath());}
+        File displayFile=copyDisplay(tests,root,"display.sqlite");
+        RegionPackages.extractTiles(tar,tiles);
+        require(RegionPackages.tilePath("2/000/123.gph")&&!RegionPackages.tilePath("../123.gph")
+            &&!RegionPackages.tilePath("2/000/../123.gph")&&!RegionPackages.tilePath("/2/000/123.gph"),
+            "Only canonical relative graph tile paths are accepted");
+        boolean overlay=false;try{RegionPackages.extractTiles(tar,tiles);}catch(IOException expected){overlay=true;}
+        require(overlay,"Extraction refuses to overwrite an existing tile directory");
+        File malformed=new File(root,"malformed");require(malformed.mkdir(),"Malformed fixture created");
+        boolean empty=false;try{RegionPackages.validateTileDirectory(malformed);}catch(IOException expected){empty=true;}
+        require(empty,"An empty directory cannot initialize a router");
+        File bad=new File(malformed,"unknown.gph");Files.write(bad.toPath(),new byte[512]);
+        boolean unsafe=false;try{RegionPackages.validateTileDirectory(malformed);}catch(IOException expected){unsafe=true;}
+        require(unsafe,"An unknown tile hierarchy is rejected");
+        Files.delete(bad.toPath());
+        File link=new File(malformed,"2");android.system.Os.symlink(tiles.getAbsolutePath(),link.getAbsolutePath());
+        boolean linked=false;try{RegionPackages.validateTileDirectory(malformed);}catch(IOException expected){linked=true;}
+        require(linked,"Directory validation never follows symbolic links");Files.delete(link.toPath());
+        // Repeat the first real TAR entry under the same name, keeping valid headers. The new extraction
+        // path must reject ambiguity and remove its incomplete output rather than choosing the last tile.
+        File duplicate=new File(root,"duplicate.tar"),failed=new File(root,"failed");
+        try(RandomAccessFile source=new RandomAccessFile(tar,"r");OutputStream out=new FileOutputStream(duplicate)){
+            byte[] header=new byte[512];source.readFully(header);
+            require(new String(header,0,100,java.nio.charset.StandardCharsets.US_ASCII).split("\u0000",2)[0].endsWith(".gph"),
+                "The duplicate fixture repeats a real graph tile");
+            long size=Long.parseLong(new String(header,124,12,java.nio.charset.StandardCharsets.US_ASCII).replace("\u0000","").trim(),8);
+            byte[] first=new byte[(int)(512+((size+511)/512)*512)];source.seek(0);source.readFully(first);
+            out.write(first);out.write(first);out.write(new byte[1024]);
+        }
+        boolean repeated=false;try{RegionPackages.extractTiles(duplicate,failed);}catch(IOException expected){repeated=true;}
+        require(repeated&&!failed.exists(),"Duplicate archive tiles are refused and partial extraction is removed");
+        DisplayDatabase previous=Store.display;
+        try(DisplayDatabase display=new DisplayDatabase(displayFile);
+            NativeRouter archive=new NativeRouter(app,tar);NativeRouter directory=new NativeRouter(app,tiles,true)){
+            Store.display=display;
+            for(RoutingMode mode:RoutingMode.values()){
+                Router.Route a=archive.route(45,27.001,45,27.015,Truck.standard(),mode,false);
+                Router.Route b=directory.route(45,27.001,45,27.015,Truck.standard(),mode,false);
+                require(Math.abs(a.metres-b.metres)<.001&&a.graph.nodes.length==b.graph.nodes.length,
+                    "Directory and TAR routing agree in "+mode);
+                for(int i=0;i<a.edges.size();i++)require(a.edges.get(i).way==b.edges.get(i).way,"Directory retains audited way IDs");
+                rejected(()->directory.route(45,27.001,45,27.015,truck(5,2.55,16.5,40,11.5),mode,false),
+                    "Directory routing still refuses an oversized truck in "+mode);
+                Truck adr=new Truck(4,2.55,16.5,40,11.5,true,false,true,true,5,80,1,3);
+                Router.Route route=directory.route(45.12,27.001,45.12,27.015,adr,mode,false);
+                require(route.edges.stream().noneMatch(edge->edge.way==20000013L),"Directory routing retains detailed ADR checks");
+            }
+        }finally{Store.display=previous;}
+    }
+    private static void checkCompositeDisplay(Context app,Context tests)throws Exception{
+        File root=new File(app.getFilesDir(),"display-set-qa-"+UUID.randomUUID());
+        if(!root.mkdirs())throw new IOException("Cannot create display set QA storage");
+        ArrayList<File> files=new ArrayList<>();
+        for(int i=0;i<12;i++){
+            File file=copyDisplay(tests,root,"country-"+i+".sqlite");files.add(file);
+            try(SQLiteDatabase db=SQLiteDatabase.openDatabase(file.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+                if(i%2==0){
+                    // Rebuild only test copies with the smaller FTS4 option; normalized content stays readable.
+                    db.execSQL("CREATE TABLE qa_search AS SELECT rowid AS id,text FROM search");
+                    db.execSQL("DROP TABLE search");
+                    db.execSQL("CREATE VIRTUAL TABLE search USING fts4(text,tokenize=unicode61,matchinfo=fts3)");
+                    db.execSQL("INSERT INTO search(rowid,text) SELECT id,text FROM qa_search");
+                    db.execSQL("DROP TABLE qa_search");
+                }
+                long id=900000000L+i;
+                db.execSQL("INSERT INTO places(id,label,lat,lon,kind) VALUES(?,?,?,?,?)",new Object[]{id,"Warehouse "+i,45,27.001,"place"});
+                db.execSQL("INSERT INTO search(rowid,text) VALUES(?,?)",new Object[]{id,"warehouse "+i});
+            }
+        }
+        try(DisplayDatabase one=new DisplayDatabase(files.get(0));DisplayDatabase many=new DisplayDatabase(files,true)){
+            require(many.search("Warehouse").size()==12,"Search spans mixed compact and legacy indexes beyond SQLite's attachment limit");
+            Map<Long,RestrictionRule> rules=many.rulesFor(Arrays.asList(20000003L,20000004L));
+            require(rules.size()==2&&rules.get(20000003L).height==3.5,"Shared rules are deduplicated without losing limits");
+            Graph single=one.visible(44.999,27,45.006,27.02,70000);
+            Graph combined=many.visible(44.999,27,45.006,27.02,70000);
+            require(single.edges.length==combined.edges.length&&combined.nodes.length<=60000,
+                "Shared geometry draws once with a bounded node count");
+        }
+        File conflicting=copyDisplay(tests,root,"conflicting.sqlite");
+        try(SQLiteDatabase db=SQLiteDatabase.openDatabase(conflicting.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            db.execSQL("UPDATE roads SET name=name||' conflict' WHERE id=20000003");
+        }
+        boolean rejected=false;
+        try(DisplayDatabase ignored=new DisplayDatabase(Arrays.asList(files.get(0),conflicting),true)){}
+        catch(IOException expected){rejected=true;}
+        require(rejected,"Countries with conflicting shared geometry are refused before use");
+        File missingRule=copyDisplay(tests,root,"missing-rule.sqlite");
+        try(SQLiteDatabase db=SQLiteDatabase.openDatabase(missingRule.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            db.execSQL("DELETE FROM road_rules WHERE way=20000003");
+        }
+        rejected=false;
+        try(DisplayDatabase ignored=new DisplayDatabase(Arrays.asList(files.get(0),missingRule),true)){}
+        catch(IOException expected){rejected=true;}
+        require(rejected,"A missing shared restriction row conflicts with the contributor carrying it");
+        File wrongSearch=copyDisplay(tests,root,"wrong-search.sqlite");
+        try(SQLiteDatabase db=SQLiteDatabase.openDatabase(wrongSearch.getPath(),null,SQLiteDatabase.OPEN_READWRITE)){
+            db.execSQL("UPDATE search SET text=text||' conflict' WHERE rowid=(SELECT MIN(rowid) FROM search)");
+        }
+        rejected=false;
+        try(DisplayDatabase ignored=new DisplayDatabase(Arrays.asList(files.get(0),wrongSearch),true)){}
+        catch(IOException expected){rejected=true;}
+        require(rejected,"Compact and legacy indexes still refuse conflicting shared search text");
     }
     private static JSONObject edge(int begin,int end,long way)throws JSONException{return new JSONObject().put("begin_shape_index",begin).put("end_shape_index",end).put("way_id",way);}
     private static Truck truck(double height,double width,double length,double weight,double axle){return new Truck(height,width,length,weight,axle,false,false,true,true);}

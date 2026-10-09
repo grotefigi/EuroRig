@@ -21,28 +21,30 @@ final class RoadMapView extends View {
     private DisplayDatabase queriedDisplay;
     private int queryGeneration;
     private Bitmap background;
+    private final MapCache cache=new MapCache();
+    private final Paint bitmapPaint=new Paint(Paint.FILTER_BITMAP_FLAG);
     private Graph cachedGraph,cachedRoads;
     private Truck cachedTruck;
-    private Router.Route cachedRoute;
     private Router.Route paintedRoute;
     private float[] routeLines;
     private int[] restrictedEdges;
     private double routeLat,routeLon,routeCos;
-    private int cachedStart,cachedEnd;
-    private boolean cachedOriginChosen,cachedDestinationChosen;
     private boolean cachedFollowing;
-    private double cachedLat,cachedLon,cachedPixels,cachedCos;
     private Graph strokeGraph;private Truck strokeTruck;
-    private float[] casings;private float[][] strokes;
+    private float[][] strokes;
     private double strokeLat,strokeLon,strokeCos;
     private final int[] roadColors;
     private final int landColor,casingColor,labelColor,attributionColor;
+    /** Clearance a placed sign keeps from the cached bitmap edge, which would clip its bubble. */
+    private static final int SIGN_EDGE_X=30,SIGN_EDGE_TOP=50,SIGN_EDGE_BOTTOM=35;
+    /** Signs and labels placed per screen area; the cached extent covers more than one screen. */
+    private static final int SIGNS_PER_SCREEN=60,LABELS_PER_SCREEN=24;
     Pick pick;
     RoadMapView(Context c) {
         super(c);setContentDescription("Offline road map. Tap a road to choose a route endpoint. Pinch to zoom, drag to pan.");
-        boolean dark=c.getSharedPreferences("settings",0).getBoolean("dark_mode",(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);
-        landColor=dark?0xff162225:0xffe9ece4;casingColor=dark?0xff0b1416:0xffb7c1b7;labelColor=dark?0xffbcd0d0:0xff34464a;attributionColor=dark?0xffa0b4b7:0xff506266;
-        roadColors=dark?new int[]{0xff8cabad,0xffed7070,0xffdda74f,0xff364b50}:new int[]{0xff54696f,0xffe15a56,0xffe6a73c,0xff9eaea0};
+        AppPalette palette=new AppPalette(c);
+        landColor=palette.land;casingColor=palette.casing;labelColor=palette.label;attributionColor=palette.attribution;
+        roadColors=palette.roads;
         scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
             public boolean onScale(ScaleGestureDetector d) { camera.zoom(d.getScaleFactor());invalidate();return true; }
         });
@@ -115,33 +117,35 @@ final class RoadMapView extends View {
     void zoom(double factor){camera.zoom(factor);invalidate();}
     void updatePosition(){camera.update(Store.lat,Store.lon);invalidate();}
     protected void onSizeChanged(int w,int h,int ow,int oh){if(ow==0&&Store.nativeRouter==null)fit();}
-    protected void onDetachedFromWindow(){super.onDetachedFromWindow();queryGeneration++;if(background!=null){background.recycle();background=null;}visibleRoads=null;strokeGraph=null;strokes=null;casings=null;paintedRoute=null;routeLines=null;restrictedEdges=null;}
+    protected void onDetachedFromWindow(){super.onDetachedFromWindow();queryGeneration++;loadedLevel=-1;loadingRoads=false;if(background!=null){background.recycle();background=null;}visibleRoads=null;strokeGraph=null;strokes=null;paintedRoute=null;routeLines=null;restrictedEdges=null;}
     private float x(double lon){return (float)(originX()+(lon-camera.longitude)*longitudeScale*camera.pixels);}
     private float y(double lat){return (float)(originY()-(lat-camera.latitude)*camera.pixels);}
     protected void onDraw(Canvas c) {
         if(graph==null){c.drawColor(landColor);return;}
         requestRoads();
         longitudeScale=Math.cos(Math.toRadians(camera.latitude));
-        float ratio=(float)(camera.pixels/cachedPixels);
-        float dx=(float)((cachedLon-camera.longitude)*longitudeScale*camera.pixels);
-        float dy=(float)((camera.latitude-cachedLat)*camera.pixels);
+        float ratio=(float)(camera.pixels/cache.pixels);
+        float dx=(float)((cache.longitude-camera.longitude)*longitudeScale*camera.pixels);
+        float dy=(float)((camera.latitude-cache.latitude)*camera.pixels);
         int marginX=Math.round(getWidth()*.25f),marginY=Math.round(getHeight()*.25f);
-        boolean covered=background!=null&&ratio>=1&&ratio<=1.8&&Math.abs(dx)<marginX&&Math.abs(dy)<marginY;
-        if(!covered||cachedGraph!=graph||cachedRoads!=visibleRoads||cachedTruck!=Store.truck||cachedRoute!=Store.route||cachedStart!=Store.start||cachedEnd!=Store.end||cachedOriginChosen!=Store.originChosen||cachedDestinationChosen!=Store.destinationChosen||cachedFollowing!=camera.following()){
+        // The static layer draws roads, signs and place labels only, so the route, endpoints and
+        // markers do not invalidate it. Reuse lasts while the bitmap still covers the view, which
+        // makes a pinch redraw once per margin step instead of once per frame.
+        boolean covered=background!=null&&cache.covers(camera,getWidth(),getHeight(),originX(),originY(),dx,dy)
+            &&cachedGraph==graph&&cachedRoads==visibleRoads&&cachedTruck==Store.truck&&cachedFollowing==camera.following();
+        if(!covered){
             int width=getWidth()+marginX*2,height=getHeight()+marginY*2;
             if(background==null||background.getWidth()!=width||background.getHeight()!=height){
                 if(background!=null)background.recycle();background=Bitmap.createBitmap(Math.max(1,width),Math.max(1,height),Bitmap.Config.ARGB_8888);
             }
             // Bounded overscan avoids redraws on swipe frames; cache replacement still runs on the UI thread.
-            Canvas buffer=new Canvas(background);buffer.translate(marginX,marginY);drawStatic(buffer);
-            cachedLat=camera.latitude;cachedLon=camera.longitude;cachedPixels=camera.pixels;cachedCos=longitudeScale;
-            cachedGraph=graph;cachedRoads=visibleRoads;cachedTruck=Store.truck;cachedRoute=Store.route;cachedStart=Store.start;cachedEnd=Store.end;
-            cachedOriginChosen=Store.originChosen;cachedDestinationChosen=Store.destinationChosen;
-            cachedFollowing=camera.following();
+            Canvas buffer=new Canvas(background);buffer.translate(marginX,marginY);drawStatic(buffer,marginX,marginY);
+            cache.anchor(camera,getWidth(),getHeight());
+            cachedGraph=graph;cachedRoads=visibleRoads;cachedTruck=Store.truck;cachedFollowing=camera.following();
             ratio=1;dx=0;dy=0;
         }
         c.drawColor(landColor);c.save();c.translate(originX()+dx,originY()+dy);
-        c.scale((float)(ratio*longitudeScale/cachedCos),ratio);c.drawBitmap(background,-marginX-originX(),-marginY-originY(),null);c.restore();
+        c.scale((float)(ratio*longitudeScale/cache.cos),ratio);c.drawBitmap(background,-marginX-originX(),-marginY-originY(),bitmapPaint);c.restore();
         drawRoute(c);
         marker(c,Store.start,Color.rgb(111,199,226),"A");marker(c,Store.end,Color.rgb(196,241,109),"B");
         if(Double.isFinite(Store.lat)){
@@ -169,7 +173,7 @@ final class RoadMapView extends View {
     private void requestRoads(){
         final DisplayDatabase display=Store.display;
         if(display==null){visibleRoads=null;queriedDisplay=null;loadedLevel=-1;return;}
-        if(queriedDisplay!=display){visibleRoads=null;loadedLevel=-1;queriedDisplay=display;mapFailure=null;queryGeneration++;}
+        if(queriedDisplay!=display){visibleRoads=null;loadedLevel=-1;loadingRoads=false;queriedDisplay=display;mapFailure=null;queryGeneration++;}
         double scale=Math.cos(Math.toRadians(camera.latitude));
         double halfLat=Math.max(originY(),getHeight()-originY())/camera.pixels,halfLon=Math.max(originX(),getWidth()-originX())/camera.pixels/scale;
         double south=camera.latitude-halfLat,north=camera.latitude+halfLat,west=camera.longitude-halfLon,east=camera.longitude+halfLon;
@@ -185,45 +189,53 @@ final class RoadMapView extends View {
             try{
                 Graph roads=display.visible(s,w,n,e,resolution);
                 post(()->{
+                    if(generation!=queryGeneration)return;
                     loadingRoads=false;
-                    if(generation==queryGeneration&&Store.display==display&&Store.truck==requestedTruck){visibleRoads=roads;loadedSouth=s;loadedWest=w;loadedNorth=n;loadedEast=e;loadedLevel=level;loadedTruck=requestedTruck;}
+                    if(Store.display==display&&Store.truck==requestedTruck){visibleRoads=roads;loadedSouth=s;loadedWest=w;loadedNorth=n;loadedEast=e;loadedLevel=level;loadedTruck=requestedTruck;}
                     invalidate();
                 });
-            }catch(RuntimeException failure){post(()->{loadingRoads=false;if(generation==queryGeneration)mapFailure=failure.getMessage();invalidate();});}
+            }catch(RuntimeException failure){post(()->{if(generation!=queryGeneration)return;loadingRoads=false;mapFailure=failure.getMessage();invalidate();});}
         });
     }
-    private void drawStatic(Canvas c){
+    private void drawStatic(Canvas c,int marginX,int marginY){
         c.drawColor(landColor);if(graph==null)return;
         longitudeScale=Math.cos(Math.toRadians(camera.latitude));
-        double minLat=camera.latitude-getHeight()/2.0/camera.pixels,maxLat=camera.latitude+getHeight()/2.0/camera.pixels;
-        double minLon=camera.longitude-getWidth()/2.0/camera.pixels/longitudeScale,maxLon=camera.longitude+getWidth()/2.0/camera.pixels/longitudeScale;
+        // Signs and labels fill the whole cached extent, not only the screen, so the strips that a
+        // pan or zoom-out reveals are populated. Only the bitmap edge cuts a bubble off, and their
+        // budget follows the extent area so the density the driver sees does not thin out.
+        float left=-marginX,top=-marginY,right=getWidth()+marginX,bottom=getHeight()+marginY;
+        float extentScreens=(1f+2f*marginX/Math.max(1,getWidth()))*(1f+2f*marginY/Math.max(1,getHeight()));
+        int signBudget=Math.round(SIGNS_PER_SCREEN*extentScreens),labelBudget=Math.round(LABELS_PER_SCREEN*extentScreens);
         p.setStrokeCap(Paint.Cap.ROUND);
         Graph roads=Store.display==null?graph:visibleRoads;
         if(roads!=null)drawRoadStrokes(c,roads);
         java.util.ArrayList<RectF> signBounds=new java.util.ArrayList<>();
         if(roads!=null&&camera.pixels>=18000){
-            java.util.HashSet<Long> signedWays=new java.util.HashSet<>();java.util.HashSet<Long> signCells=new java.util.HashSet<>();
+            // Primitive-keyed, so scanning every edge of the window allocates no boxed keys: this is
+            // the largest remaining per-render allocation on the UI thread.
+            android.util.LongSparseArray<Boolean> signedWays=new android.util.LongSparseArray<>(signBudget);
+            android.util.LongSparseArray<Boolean> signCells=new android.util.LongSparseArray<>(signBudget);
             for(Graph.Edge edge:roads.edges){
-                if(signedWays.contains(edge.way))continue;
+                if(signedWays.indexOfKey(edge.way)>=0)continue;
                 String label=restrictionLabel(edge);if(label==null)continue;
                 if((label.equals("Access")||label.equals("Check"))&&camera.pixels<120000)continue;
                 Graph.Node a=roads.nodes[edge.from],b=roads.nodes[edge.to];float sx=(x(a.lon)+x(b.lon))/2,sy=(y(a.lat)+y(b.lat))/2;
-                if(sx<30||sx>getWidth()-30||sy<50||sy>getHeight()-35)continue;
-                long cell=((long)(sx/90)<<32)|(long)(sy/65);
-                if(signCells.contains(cell))continue;
+                if(sx<left+SIGN_EDGE_X||sx>right-SIGN_EDGE_X||sy<top+SIGN_EDGE_TOP||sy>bottom-SIGN_EDGE_BOTTOM)continue;
+                long cell=MapCache.signCell(sx,sy);
+                if(signCells.indexOfKey(cell)>=0)continue;
                 if(!placeSign(c,sx,sy,label,(edge.flags&Graph.UNCERTAIN)!=0?0xffe6a73c:restricted(edge)?0xffe15a56:0xffcaac6a,signBounds))continue;
-                signedWays.add(edge.way);signCells.add(cell);
-                if(signedWays.size()>=60)break;
+                signedWays.put(edge.way,Boolean.TRUE);signCells.put(cell,Boolean.TRUE);
+                if(signedWays.size()>=signBudget)break;
             }
         }
         p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
         java.util.ArrayList<RectF> occupied=new java.util.ArrayList<>();
         java.util.HashSet<String> labels=new java.util.HashSet<>();
         if(roads!=null)for(Graph.Node n:roads.nodes) if(!n.label.isEmpty()){
-            float nx=x(n.lon),ny=y(n.lat);if(nx<0||nx>getWidth()||ny<0||ny>getHeight())continue;
+            float nx=x(n.lon),ny=y(n.lat);if(nx<left||nx>right||ny<top||ny>bottom)continue;
             String label=n.label;
             if(label.startsWith("! ")){if(camera.pixels>=120000||!label.equals("! Access"))placeSign(c,nx,ny,label.substring(2),0xffe6a73c,signBounds);continue;}
-            if(Store.nativeRouter!=null&&(Character.isDigit(label.charAt(0))||occupied.size()>=24||labels.contains(label)))continue;
+            if(Store.nativeRouter!=null&&(Character.isDigit(label.charAt(0))||occupied.size()>=labelBudget||labels.contains(label)))continue;
             if(label.length()>30)label=label.substring(0,28)+"…";
             RectF bounds=new RectF(nx+4,ny-p.getTextSize()-15,nx+p.measureText(label)+16,ny+2);
             if(Store.nativeRouter!=null){boolean overlap=false;for(RectF other:occupied)if(RectF.intersects(other,bounds)){overlap=true;break;}for(RectF other:signBounds)if(RectF.intersects(other,bounds)){overlap=true;break;}if(overlap)continue;occupied.add(bounds);labels.add(n.label);}
@@ -271,19 +283,23 @@ final class RoadMapView extends View {
             strokeLat=camera.latitude;strokeLon=camera.longitude;strokeCos=Math.cos(Math.toRadians(strokeLat));
             int[] sizes=new int[8];for(Graph.Edge edge:roads.edges)sizes[strokeGroup(edge)]+=4;
             strokes=new float[8][];for(int i=0;i<8;i++)strokes[i]=new float[sizes[i]];
-            casings=new float[roads.edges.length*4];int[] offsets=new int[8];int offset=0;
+            int[] offsets=new int[8];
             for(Graph.Edge edge:roads.edges){
                 Graph.Node a=roads.nodes[edge.from],b=roads.nodes[edge.to];int group=strokeGroup(edge),index=offsets[group];
-                strokes[group][index]=casings[offset++]=(float)((a.lon-strokeLon)*strokeCos*100000);
-                strokes[group][index+1]=casings[offset++]=(float)((strokeLat-a.lat)*100000);
-                strokes[group][index+2]=casings[offset++]=(float)((b.lon-strokeLon)*strokeCos*100000);
-                strokes[group][index+3]=casings[offset++]=(float)((strokeLat-b.lat)*100000);offsets[group]+=4;
+                strokes[group][index]=(float)((a.lon-strokeLon)*strokeCos*100000);
+                strokes[group][index+1]=(float)((strokeLat-a.lat)*100000);
+                strokes[group][index+2]=(float)((b.lon-strokeLon)*strokeCos*100000);
+                strokes[group][index+3]=(float)((strokeLat-b.lat)*100000);offsets[group]+=4;
             }
             strokeGraph=roads;strokeTruck=Store.truck;
         }
         canvas.save();canvas.translate(x(strokeLon),y(strokeLat));
         float scale=(float)(camera.pixels/100000);canvas.scale((float)(scale*longitudeScale/strokeCos),scale);
-        p.setStrokeWidth(9/scale);p.setColor(casingColor);canvas.drawLines(casings,p);
+        // Every casing is drawn before any road colour, which is what keeps a casing underneath a
+        // junction. Drawing the casing per group instead of from one concatenated array saves its
+        // copy of the whole window on the UI thread and costs eight extra line batches.
+        p.setStrokeWidth(9/scale);p.setColor(casingColor);
+        for(int group=0;group<8;group++)if(strokes[group].length>0)canvas.drawLines(strokes[group],p);
         for(int group=0;group<8;group++)if(strokes[group].length>0){
             p.setStrokeWidth((group/2==3?2:group%2==1?6:4)/scale);p.setColor(roadColors[group/2]);canvas.drawLines(strokes[group],p);
         }

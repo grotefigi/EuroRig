@@ -1,5 +1,467 @@
 # Verification
 
+## Truck evidence, download recovery and zoom checkpoint (2026-10-09)
+
+The second reviewed development candidate passes 58 Java unit checks, 158 Python
+checks, Android app/test assembly and lint (zero errors, four existing warnings).
+Its installed app and test APKs were pulled back and independently hashed on the
+dedicated Android 8 emulator. Both map palettes, switching themes and relaunch
+persistence, camera following, heading-arrow pixels and travelled-route removal
+pass controlled device checks. These are emulator controls, not real GPS or
+driving evidence. Short timing samples vary substantially and do not establish
+performance parity or old-device readiness.
+
+Truck rules now recognize the documented hazardous-load suffixes, refuse unknown
+hazard groups, and scope the existing default-height policy to height keys.
+Compiler evidence retention now includes trailer, minimum-speed and related
+unsupported restrictions, including relevant physical and uncertain node rules.
+Existing map databases require regeneration to gain newly retained evidence;
+retention does not itself prove that every interior-node restriction is enforced
+by native routing. Mapped ADR, node association and the remaining Economical
+geometry-audit failure remain release blockers.
+
+Download ownership now prevents stale workers from publishing another run's
+state, and a stale partial rejected with HTTP 416 gets one guarded restart.
+Host controls pass. Actual duplicate-start, pause/resume, foreground notification
+and service recreation checks remain pending a corrected state-preserving test
+harness; preparation and synthetic controls are not platform proof.
+
+The preceding reviewed UI/navigation APK was installed on the physical Tab S9
+with matching signing identity. Every original map file and all five raw
+preferences remained unchanged after installation and launch. This newer
+candidate has not yet been installed on that tablet. Whole-Europe provenance,
+the complete 20,000,000,000-byte installed footprint, audible offline voice,
+driving, broad lifecycle validation and signed release remain pending.
+
+## Cached map rendering and guidance-session ownership (2026-10-09)
+
+The combined development candidate passes 47 host unit checks, Android app/test
+assembly and lint (zero errors, four existing warnings). Cache reuse now requires
+the entire viewport at the current scale to be covered. Restriction signs and
+labels retain their overscan positions, signed cell coordinates remain distinct,
+and road casings draw below all road colours. Actual Android 8 pixel controls pass
+in light and dark themes; the old sign-cell implementation fails its regression
+control. Switching the app theme and relaunching retains both preference and
+rendered palette. A real legacy Romania installation retains the controlled
+13.9 km Bucharest route, camera and progress checks; its separate profile/ADR
+fixtures do not establish geographic restriction coverage.
+
+Arrival speech completion carries its own trip identity, and an old reroute
+completion cannot clear a later trip's reroute state. Four host overlap controls
+pass. Audible arrival, background GPS and driving validation remain pending.
+
+Both combined APKs were installed, pulled back and independently hashed on a
+dedicated API26 emulator. Private device settings remain unchanged across the
+binding gate. No driver tablet or public map was replaced. Emulator measurements
+still show pan/zoom stutter; these correctness gates do not establish low-device
+performance, whole-Europe size or release readiness.
+
+## Settlement index storage follow-up (2026-10-08)
+
+The compiler now uses a partial `place_area` index matching the app's settlement
+query, retaining all address/place rows. Six compiler checks pass with osmium
+available, including query-plan use, labels and address/accent/prefix search.
+An owned old RO/HU/RS display copy saves194,523,136 bytes after index replacement
+and host compaction, with all payload row counts retained and sampled query parity.
+Actual API26 queue installation and rendering accepts two artificial contributors
+with the partial index; original map/four preferences restore. This compiler-only
+change leaves the APK and existing public/installed maps unchanged. It does not
+establish real-country device performance or the full Europe storage budget.
+
+## Queue restart identity checks (2026-10-08)
+
+The dedicated API26 emulator reproduced repeated RO/HU package transfers after a
+completed queue on the preceding APK. The new implementation records the verified
+transport hash in each installed contributor's manifest. Queue checks reuse the
+existing country ownership and payload validators before skipping a transfer;
+imports remove supplied transport claims. The audit covers an unchanged cold
+restart, removal and re-download of Hungary, a changed transport archive, damaged
+installed payload refusal and a changed deferred archive. Private receipts under
+`analysis/private/download-queue` record actual HTTP requests, UI results and
+restoration. These original artificial fixtures do not establish real geographic
+cross-border coverage, tablet behavior, Europe size or road readiness. Previous
+full Romania/camera/UI evidence belongs to earlier APKs.
+
+## Deferred archive lifecycle, 2026-10-08
+
+- The preceding APK installed both original RO/HU fixtures through Downloaded
+  countries but retained both archives. Queued and deferred installs now share
+  an owned-file helper that validates the private download path, activates the
+  map, closes its source, then removes the archive and matching ready entries.
+- Actual Android 8/API26 picker checks verify successful two-country installation
+  without archives, generation-mismatch preservation, deletion-failure handling
+  and refusal of a source outside downloads. Original Romania and all four raw
+  preference files are restored; runtime guards remain enabled under Python
+  optimization. The source-path/deletion controls use small original fixtures.
+- The manual fixture staging first failed because binary ADB shell stdin truncated
+  a package. It now reuses `adb push` and verifies the staged SHA-256. A later
+  restoration command returned exit 255; independent recovery restored the map,
+  preferences and owned files before further testing. Its platform root cause
+  remains unproven; the audit verifies state and retries an idempotent preference
+  restore once. Historical failed receipts/logs are retained privately.
+- At this earlier checkpoint external file imports were unchanged and queue
+  restart could still re-download installed countries. Real geographic coverage, tablet recovery,
+  full European footprint/staging budgets and driving/voice remain unverified.
+
+## Download queue and archive lifecycle, 2026-10-08
+
+- The prior APK fetched both original RO/HU ownership fixtures but installed only
+  the first, falsely reported the second ready and retained both archives. The
+  actual service now activates every whole country in the queue. The final APK
+  retains both contributors and no redundant successful download archives.
+- A mismatched second generation refuses while keeping the first installed
+  country and the second verified retry package. Regional entries refuse before
+  downloading or replacing maps, because current ownership does not compose
+  separate regions of one country. Guidance/map-change deferral stops the queue
+  and reports a downloaded package rather than claiming it is installed.
+- A public audit runs the actual service and UI against a local original fixture
+  catalogue. Complete, mismatched and regional cases pass on API26; the regional
+  safety checks also run with Python optimization. The selected full Romania map
+  and four preference files restore exactly. No tablet or app-data clear is used.
+  Build, routing tests and Android lint pass. These small artificial partitions
+  do not prove real-country, cross-border, continental or physical operation.
+- Local emulator-network transfers encountered early EOF; the partial transfer
+  and first installed country were preserved. The controlled audit uses an owned
+  ADB reverse port and removes it afterward. This does not establish a production
+  network root cause or verify automatic retry behavior.
+- Queue restart bookkeeping,
+  real coherent map coverage and installed/temporary Europe storage fit remain
+  unfinished. Public Romania data and the disabled all-Europe publication gate
+  are unchanged.
+
+## Installed-country controls and replacement guards, 2026-10-08
+
+- A corrupted selected set was replaced and lost on the prior APK. The failing
+  regression is retained privately. The corrected APK validates the selected
+  payload before branching on its format; compressed and older replacements now
+  refuse while preserving the selected countries and live actor.
+- Removal refuses while guidance or another map change owns the guard and releases
+  the guard after completion. New graph/router/display state is published and old
+  routes are cleared before the map-change guard is released. The isolated API26
+  country-set checks pass, including recognized older Romania metadata, unknown
+  older-country refusal, shared ownership, last removal and recovery.
+- The actual installed-country interface passes eight API26 combinations: light
+  and dark, portrait and landscape, normal and 200% text. Remove targets are at
+  least 48 dp. Cancellation retains the selected map. Positive last-country removal
+  releases its storage, shows the empty-map interface and disables guidance.
+  A complete owned backup restores the original map and exact settings, truck
+  and endpoint preferences afterward; the physical tablet is untouched.
+- Visual testing found country labels squeezed by large-text actions and a
+  landscape maps menu with no room for its list. Stacked removal controls,
+  scrollable large-text headings and an accessible Status action fix those flows.
+  Screenshots were inspected in both themes; primary/secondary text contrast
+  exceeds 4.5:1. Build, routing checks and Android lint pass. The final full-Romania
+  regression retains all 40 baseline outcomes (28 routes/12 refusals), camera,
+  heading/trail, snap/speed bounds and preferences. Cold map opening took 7,088 ms
+  in this one emulator sample; this is not a continental performance guarantee.
+- These checks do not verify real driving, spoken guidance, physical-device
+  behavior, continental performance or the 20 GB Europe budget.
+
+## Owned country-set installation and recovery, 2026-10-08
+
+- Actual API26 app installation retains two artificial country contributors from
+  three original native fixture tiles, with one shared tile and exactly three
+  physical files. Offline search, all three routing modes, height and ADR checks
+  pass after activation and cold reopening. Removing one contributor keeps the
+  shared tile and removes its last-owner-only tile; the remaining country routes.
+  Removing the last country returns to an empty installation and releases storage.
+- Different generations, conflicting shared facts and older packages refuse
+  without replacing the selected countries or live actor. An injected preference
+  save that writes a new selection but reports failure restores the previous
+  selection and retains both valid sets. Reopening verifies selection before
+  cleaning the unselected recovery candidate. An injected engine configuration
+  write failure publishes no partial graph/display/router state; restoration reopens.
+- These checks use isolated owned storage and preference names on a dedicated
+  emulator. Persisted driver settings, truck and endpoints compare unchanged.
+  Build, routing checks and Android lint pass. A final real-Romania regression
+  retains40 outcomes (28 routes/12 refusals), geometry within50m and ETA within3s,
+  camera/heading/trail behavior, snap/speed bounds and preferences. The final cold
+  map-open sample is6358ms; this is one emulator sample, not a performance guarantee.
+- Android8 app storage refused hardlinks. Staging copies one file per tile identity
+  while retaining the old set and200MiB reserve. Continental installed/peak space,
+  the20GB total budget, actual geographic cross-border routes, physical tablet
+  behavior remain unverified. Map-management UI evidence appears above; public
+  maps are unchanged.
+- Reproduce ownership fixtures with `python tools/build_country_set_fixtures.py
+  <new-directory>`, stage the five packages to a dedicated emulator's private
+  fixture directory, and run `NativeSmokeInstrumentation` with
+  `countrySetsOnly=true` and `packagePath=<device-fixture-directory>`.
+
+## Installed payload corruption and startup measurement, 2026-10-08
+
+- The prior APK accepted a changed installed display payload in a read-only
+  candidate check. That regression fails on the prior APK and passes with the fix.
+  Reopening now verifies the display SHA256 for every supported format and the
+  routing TAR for legacy formats 1/2; format 3 retains its per-tile verification.
+  Missing or changed display/routing payloads refuse, and restored bytes reopen.
+  Engine/native-version claims are checked before a country can reopen.
+- Read-only corruption guards pass on API26 for legacy EuroPack, SQLite format2,
+  canonical format3/v1 and compressed format3/v2. They never replace the selected
+  country. Build, routing tests and Android lint pass.
+- A cold full-Romania API26 run retains all 40 baseline outcomes, camera/heading/
+  trail checks, snap/ETA bounds and preferences. The measured map-open interval is
+  6,871 ms, including payload verification and native/display opening. This is one
+  emulator sample, not a physical-tablet or continental performance guarantee.
+  Instrumentation records this interval separately from corridor routing time.
+- The tablet is unavailable today; the new guard has no physical-device proof yet.
+  Country-set activation, broader lifecycle/stability and Europe storage fit remain
+  required gates. SHA checks do not certify road restrictions or legal accuracy.
+
+## Full-country compressed Romania and recovery, 2026-10-08
+
+- A private version-2 package carries all 636 tiles from the pinned published
+  Romania build. Every stored and decoded identity passes the host gate. Payload
+  storage is 640,147,341 bytes, compared with 873,488,384 bytes before compression.
+  The download is 398,119,115 bytes. These figures exclude APK, allocation and cache;
+  they do not establish the complete Europe budget.
+- Full-country import, offline search, routing and camera checks pass API 26.
+  Two cold runs each retain all 40 baseline outcomes (28 routes, 12 refusals),
+  within 50 m geometry and 3 s ETA tolerance. Snap/ETA bounds, heading and traveled
+  route removal pass. No duplicate TAR or retained test archive remains.
+- The private generation identifies the exact archived Romania payloads only.
+  Original build provenance is unavailable; this package must not be composed with
+  new Europe data. The public catalogue and physical tablet map remain unchanged.
+- Map cleanup now runs only after the selected native country opens successfully.
+  Invalid and missing saved selections refuse without deleting a recoverable map.
+  Source-stream closure finishes before activation commits; its injected failure
+  preserves the previous country. Replaced actors close after the new references
+  are assigned; retirement failure is logged without destroying the selected map.
+  The Android 8 indexed-package regressions pass these controls.
+- The initial full-country test revealed a fixture mismatch: the synthetic
+  coverage router was audited against the installed Romania display. Coverage
+  tests now use their matching display and restore the previous display afterward.
+  The original failing trace and the corrected passing run are retained privately.
+
+## Compressed country installation and reopening, 2026-10-08
+
+- Version-2 indices drive a fresh, validated directory of `.gph.gz` or raw tiles.
+  Stored size/SHA256 are checked before bounded decoding verifies canonical identity.
+  The duplicate routing TAR is removed before selection is committed. Reopening
+  verifies index/payload integrity and refuses missing, changed or extra tile files.
+- An original three-tile package activates, routes and reopens on API 26. Native
+  routes, height refusals and ADR audits pass in all three route preferences.
+  Twenty rejected imports across v1/v2 preserve selection and the live router;
+  rejected compressed staging is removed. Missing/corrupt compressed tiles refuse
+  reopening, and restoring the verified bytes restores routing.
+- Read-only compressed candidate/profile guards pass API 26 and physical API 36.
+  Physical settings, truck preferences, saved endpoints and Romania hashes are unchanged.
+  The tablet retains its existing public format-2 map; no compressed fixture is activated there.
+- Full-country compressed routing, country-set activation and the complete 20 GB
+  installed Europe budget remain separate required gates.
+
+## Experimental compressed-package host pipeline, 2026-10-08
+
+- An explicit development flag writes format-3 version-2 indices and `.gph.gz`
+  payloads. Canonical hash/size keep their original meaning; stored hash/size are
+  additional paired claims. Defaults continue to produce version-1 packages.
+- The host gate accepts v1, raw-only v2 and compressed v2. It checks exact schemas,
+  country/generation agreement, paired claims, stored bytes, bounded decoded identity,
+  complete gzip, regular members and unique canonical paths. Coherent-generation
+  binding passes on the original three-tile native fixture.
+- The package suite passes 60 tests; the complete Python suite passes 143 tests
+  with Osmium enabled. Rehashed mutations test unpaired claims, stored hash/size,
+  decoded identity/overflow, truncated or invalid gzip, symlinks and country/generation
+  mismatch. Injected writer failure preserves the existing destination and cleans staging.
+- Country sets and continental storage fit remain unfinished. No public map or
+  driver catalogue is changed by the host pipeline.
+
+## Canonical format-3 country installation, 2026-10-08
+
+- The app now consumes the existing `tiles.sqlite` version-1 package index.
+  It verifies the index's payload checksum, exact schema, country/generation,
+  nonempty row count, canonical names and every TAR tile's size and SHA-256 before
+  selecting the candidate. Reopening checks the installed index and tile claims.
+- A host-gated original three-tile fixture activates and reopens on API 26.
+  Native truck routes, height refusals and ADR audits pass in all three preferences.
+  Ten invalid imports preserve the selected map and live router: wrong tile hash,
+  count, country, generation, path, schema, missing tile, unsupported index version,
+  index checksum and mismatched package format. Missing or changed installed indices
+  are refused on reopening; restoring the verified index restores use.
+- Read-only candidate checks on API 26 and physical API 36 exercise six mutations
+  against their specific expected error gates and a missing installed index. They
+  never activate the fixture on the tablet. Activation instrumentation refuses
+  physical hardware and is restricted to dedicated emulators.
+- The physical Romania corpus retains all 40 baseline outcomes (28 routes,
+  12 refusals), with ETA/snap bounds and camera/heading/trail checks passing.
+  Tablet preferences, saved endpoints and existing map hashes are unchanged.
+- Debug and test APK builds and Android lint pass. Public Romania remains format 2;
+  country-set activation and the 20 GB Europe budget are not verified or shipped
+  by this canonical-v1 checkpoint. Later compressed-index evidence is recorded above.
+
+## Map view reuse, 2026-10-08
+
+- The previous APK reproducibly left roads blank after the same attached map view
+  was removed from its activity and added again on API 26. Its cached coverage
+  still appeared valid after its road geometry had been discarded.
+- Detachment now clears coverage and pending-query state. Results and errors from
+  an obsolete query generation cannot clear the replacement generation's query.
+  The regression checks actual activity attachment, road reload and two controlled
+  worker barriers; it fails on the previous APK and passes with the fix on API 26
+  and physical arm64 API 36.
+- The test uses a fictional display fixture and fixed 1080 x 1600 view bounds.
+  An initial physical attempt had no layout while the screen was asleep; that
+  harness failure is retained privately. The successful fixed-bounds run is a
+  lifecycle check, not a visual screen inspection or a driving test. Tablet
+  settings, truck preferences, saved endpoints and active map hashes are unchanged.
+- The fix is installed on the Tab S9. Native profile/ADR/map-retention checks on
+  API 26, the routing suite, debug builds and Android lint pass. The independent
+  code review covers all three changed Java files; workflow and evidence documents
+  are reviewed separately. No continent readiness or installed-size fit is claimed.
+
+## Tablet-first checks, 2026-10-07
+
+- The physical Tab S9 (API 36, 0.6.1-dev) passes the installed Romania corpus:
+  40 expected outcomes, comprising 28 routes and 12 refusals. ETA speed bounds
+  and 250 m snap bounds pass. There are 22 same-endpoint Shortest comparisons;
+  six comparisons with different snapped endpoints are retained and excluded.
+- Physical profile instrumentation passes original dimension, weight, ADR,
+  permitted-delivery, missing-evidence, directory and composed-display fixtures.
+  Fixtures verify behavior; they do not establish the legality of real roads.
+- Camera checks use the first successful corpus route without changing saved
+  endpoints: overview clearance, device-density zoom, every route fix follows,
+  manual pan, recenter and rotation pass. Actual map pixels verify heading,
+  stale-location indication, partial-edge trail removal and arrival clearing.
+  Position fixes are simulated inside instrumentation, not a physical drive.
+- Settings, truck preferences, saved endpoints and active Romania payloads
+  retain their bytes/hashes. Physical corridor testing requires explicit
+  `--physical`, refuses running guidance/downloads, and refuses QA map staging.
+  Preference or map changes fail the runner after writing a private receipt.
+- A separate JNI proof passes on physical arm64 API 36 and x86_64 API 26.
+  Literal `.gph.gz` files preserve every fixture tile byte and all 30 native
+  request responses (12 routes, 18 refusals) across three modes and profiles.
+  Bare `.gz` and empty-directory controls return zero routes. This corrects a
+  peer experiment's suffix labels. This proof does not enable compressed
+  production packages, exercise the application's complete audit on compressed
+  data, measure continental performance, or prove the 20 GB installed budget.
+  The fictional fixture shrinks from 4,688 to 1,375 bytes; that ratio must not
+  be extrapolated to real countries. The shipping Romania map is unchanged.
+- 135 Python checks, 37 Java checks, build and Android lint pass.
+  See [device requirements](docs/DEVICE_REQUIREMENTS.md) for tablet priority and
+  the persistent 20,000,000,000-byte installed app/map/archive/cache limit.
+- Physical UI checks confirm the truck form opens/cancels, country rows show
+  actual sizes, and dark mode switches off/on and persists while restoring its
+  original state. The offline `Galati` query returns accented GalaÈ›i results,
+  with Cancel reachable above the visible keyboard. These
+  checks preserve driver settings and endpoints. A hardware GPS request without
+  mock locations timed out with the explicit "Try again outside" message. No
+  accurate hardware fix or physical drive is inferred from that result.
+- New builds use the compatible `matchinfo=fts3` FTS4 option. A private Romania
+  copy saves 22,384,640 bytes (4.64%) and retains 20 host query results. This
+  keeps search text readable, unlike the larger, blocked contentless experiment.
+  API 26 and physical API 36 native tests mix compact/legacy indexes across 12 countries and still reject
+  shared search-text conflicts. The public and active Romania map is unchanged.
+
+## Country download menu and storage audit
+
+- 0.6.1-dev is installed on the physical Galaxy Tab S9. The public Romania
+  chooser shows its circular flag, blue action, installed state and actual
+  407.5 MB download size. The unpublished all-Europe action is disabled.
+  Seven map and preference files retained identical SHA-256 hashes across
+  the upgrade. This physical check covers the dark country chooser, not driving.
+- The country chooser passes ten native API 26 layout checks: both themes on
+  375 x 812 dp at 100% and 200% text, 812 x 375 dp at 200%, 1280 x 800 dp,
+  and 800 x 1280 dp at 200%. Action targets remain at least 48 dp and reachable
+  by scrolling. Reduced motion is enabled. Screenshots were reviewed separately.
+- A local synthetic catalogue verifies actual decimal sizes, Russia exclusion,
+  disabled all-Europe downloads, region aggregation/drill-down, both Back actions,
+  empty catalogues and duplicate package rejection. No synthetic maps were
+  downloaded or published. The installed APK hash is retained in the private
+  receipt; interrupted runs were not counted as complete audits.
+- Android 8's emulator graphics stack produced an EGL_BAD_ALLOC abort during an
+  earlier repeated-dialog run. The final run after removing unchanged status
+  redraws passed; display resizing also caused two Launcher3 crashes, explicitly
+  logged and recovered as emulator OS failures. These do not establish physical
+  device performance. The app's crashes are never dismissed by the audit helper.
+- Romania's measured package is 407,495,153 bytes. Its routing/display payloads
+  total 873,488,384 bytes. An experimental copy reduced the display database by
+  85,180,416 bytes while preserving 20 host search queries. That index change is
+  not shipped: composed-country evidence validation and Android 8 compatibility
+  require additional work. The public Romania package remains unchanged.
+- 132 Python tests pass with the optional Osmium dependency enabled. Source
+  fetching tests cover validator changes, interrupted first downloads, retained
+  oversized partials, timeouts and completion without a second download. Package
+  writes preserve an existing package on failure; unexpected tile-index schema
+  objects are rejected. These host checks do not activate European map coverage.
+  Gradle
+  build and lint pass. Country-set activation, rollback/removal, complete
+  European map publication, and real-road testing remain unfinished.
+
+## Country-set foundations
+
+- 72 Python checks pass with the optional Osmium build dependency enabled; 37
+  Java checks pass. Android lint is clean.
+- Actual API 26 instrumentation passes on both x86_64 and 32-bit x86. The directory
+  tile adapter produces the same distances, geometry counts and audited way IDs
+  as TAR routing in every preference. Oversized vehicles and detailed ADR remain
+  checked. Empty directories, unsafe hierarchy, symlinks, overlay extraction and
+  duplicate archive tiles are refused; failed extraction removes its partial output.
+- A composed display layer queries 12 synthetic country databases with a cache
+  limited to four connections, rather than requiring simultaneous SQLite attachments.
+  Search reaches every country; shared geometry draws once and restrictions remain
+  intact. Conflicting shared road data or a missing shared restriction row is refused.
+- The fresh coherent RO/HU/RS API 37 corpus contains 40 explicitly expected
+  outcomes: 36 routes and 4 airport-centre snap refusals. Physical ETA and snap
+  checks pass, with 29 same-endpoint Shortest comparisons and 7 different-snap
+  comparisons retained and excluded. The signed airport-road case routes.
+- These are foundations and emulator checks. Format-3 activation, country-set
+  rollback/removal are not yet exposed to drivers. The separate country chooser
+  is implemented, with only Romania currently published.
+
+## Routing evidence follow-up
+
+- Android 8/API 26 native profile instrumentation passes explicit Shortest,
+  Easiest and Economical checks against a routing graph whose display evidence
+  is deliberately altered. Removing the primary way selects an evidenced detour;
+  the returned route excludes way 20000003 and includes way 20000004. The audit
+  records a retry and an exclusion. Removing all routed-way evidence refuses
+  routing across all three preferences, with normal, hazmat and detailed ADR
+  profiles, both with and without delivery permission. The intact control routes.
+- Missing evidence uses the existing bounded exclusion loop. Truck restrictions
+  remain enforced; a road with unknown evidence is never accepted as unrestricted.
+  A native no-path refusal can replace the earlier evidence message, so the check
+  verifies refusal plus the actual audit counters rather than one error phrase.
+- Independent private map-generation verification checks 1024 actual tiles.
+  The incompatible fixture is rejected for mixed generations and 636 conflicting
+  shared-tile claims. The compatible control verifies 1024 tiles with no mismatches
+  or unowned tiles. This is a host packaging check, not Android country composition.
+- Country composition, fresh coherent-package Android corridor checks and ferry
+  evidence remain unfinished. These changes do not certify real-road navigation.
+- The standing animation, UI and AI reference catalog is recorded in
+  [implementation references](docs/IMPLEMENTATION_REFERENCES.md).
+
+## 0.6.0-dev candidate, 2026-10-07
+
+- 37 Java tests and 28 Python tests pass; Android lint reports no issues.
+- The UI uses paired light/dark semantic colours, original vector controls,
+  native ripple and keyboard focus feedback, and a clear primary route action.
+  Theme switching changes the rendered map, controls and dialogs; the saved
+  selection survives restart and switching during guidance preserves following.
+- API 26 and API 37 each pass the 22-check UI sweep. Additional checks exercise
+  all seven numeric profile fields, six checkboxes, ADR E, precision after restart,
+  invalid-profile preservation, map picking, saved places, endpoint swap, trip-only
+  delivery permission, the live catalogue and licence content. These are emulator
+  checks, not a real driving or spoken-output validation.
+- Native profile, ADR, map-retention, camera, heading-arrow and route-trail checks
+  pass on both versions. API 37 injected GPS checks pass acquisition, following,
+  loss/unavailable speed, recovery, theme switching, edit protection and Stop.
+- Layout and contrast checks pass at 375 x 812, 812 x 375, 1280 x 800 and
+  800 x 1280 dp, including 200% text and disabled animations. Each of 14 main
+  controls is reachable at 48 dp or larger. Seven profile fields, six checkboxes,
+  the ADR selector and four routing preference controls meet the same minimum.
+  Maps actions retain their complete labels at 200% text. Screenshot review caught
+  split navigation labels and a clipped download-status action before fixing them.
+- Native coverage errors now test both endpoints. Missing or malformed bounds
+  remain undeclared, and a bounding rectangle never proves coverage inside it.
+  Real native-fixture checks cover an outside destination, the reversed direction,
+  the conservative interior advice and fresh audit counters after failures.
+- Open Code Review 1.12.12 delegation mode selects files and resolves rules;
+  Codex performs the review locally without a new external LLM endpoint. Peer
+  review and actual device checks supplement it. QA-runner preflight and
+  preference-read bugs found during review are fixed with regression checks.
+- The public Romania map remains unchanged. Coherent cross-border maps and
+  country-union installation remain separate work; no new Europe coverage or
+  real-road certification is claimed by this UI update.
+
 ## 0.5.0-dev, 2026-10-06
 
 - 37 Java tests and 17 Python tests pass; Android lint reports no issues.
@@ -17,8 +479,8 @@
   Disabling route hierarchy pruning fixes the observed distance anomaly; passing
   that search option into edge-walk matching initially caused a native SIGSEGV.
   Only the audit's copy omits the option, preserving every truck/access check.
-  Audited Shortest Galați–Bucharest improves 244.9284 to 226.3575 km, and
-  Galați–Nădlac 741.0014 to 722.3086 km. See [collaboration](docs/COLLABORATION.md).
+  Audited Shortest GalaÈ›iâ€“Bucharest improves 244.9284 to 226.3575 km, and
+  GalaÈ›iâ€“NÄƒdlac 741.0014 to 722.3086 km. See [collaboration](docs/COLLABORATION.md).
 - A redesigned map-first UI, visible-viewport route fit, automatic guidance zoom
   and look-ahead following are exercised on Android 8/API 26 and Android 17/API 37.
   Camera checks cover every route geometry point, pan suspension, recenter and
@@ -30,7 +492,7 @@
 - Dark mode changes both actual map and control colors. Light/dark selection
   survives restart and switching during guidance preserves the foreground service
   and following. Physical Tab S9 appearance switching also passes.
-- The 22-control UI sweeps exercise actual Galați routes in all three preferences,
+- The 22-control UI sweeps exercise actual GalaÈ›i routes in all three preferences,
   search feedback, endpoints/restart, GPX document export, truck form, map metadata,
   system import picker, zoom, About and portrait/landscape. Additional checks cover
   profile precision/invalid values, favourites/map picking, delivery permission
@@ -253,6 +715,22 @@ port, e.g. `emulator-5556`.
 All intermediate Android versions and physical devices, real driving, successful
 voice synthesis, continental-scale routing/performance, country-specific law/ADR
 accuracy, full European maps, cross-package trips, multi-stop navigation, complete
-geocoding, lane guidance and live information. The CI workflow has been prepared
-but has not run on a public repository. This is a debug-signed development build;
+geocoding, lane guidance and live information. Current exact-head CI is tracked
+in publication receipts. This is a debug-signed development build;
 release signing, public hosting and the full product request remain unfinished.
+
+## Failed cold-open selection recovery
+
+The real Android 8/API26 activity previously switched the saved native map mode
+off after a malformed installed manifest refused cold opening. That bypassed
+the native selection checks on subsequent installations. The recovery path now
+releases runtime actors without changing the persisted country selection.
+The deliberate legacy prototype-map switch still disables native mode.
+
+`python tools/audit_saved_map_recovery.py --device emulator-5554` injects one
+invalid manifest field on a dedicated idle emulator, checks the actual activity
+error and retained selection, then restores the original manifest and all four
+preference files exactly. Healthy reopening of the restored map is checked.
+`--prior` verifies the historical mode-loss behavior on the preceding APK.
+This guard test does not provide a user-facing repair workflow for damaged maps
+or validate real driving, tablet recovery or European map storage.

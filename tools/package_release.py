@@ -12,7 +12,7 @@ apk=dist/f'EuroRig-{version}.apk'
 shutil.copy2(root/'app/build/outputs/apk/debug/app-debug.apk',apk)
 
 (dist/(apk.name+'.sha256')).write_text(hashlib.sha256(apk.read_bytes()).hexdigest()+'  '+apk.name+'\n')
-folders=['app/src','routing/src','tools','docs','maps','gradle','.github']
+folders=['app/src','routing/src','tools','docs','maps','gradle','.github','design-system']
 files=['AGENTS.md','README.md','ROADMAP.md','VERIFICATION.md','LICENSE','CONTRIBUTING.md','THIRD_PARTY_NOTICES.md','.gitignore','.gitattributes',
        'build.gradle','settings.gradle','gradle.properties','app/build.gradle','routing/build.gradle',
        'gradlew','gradlew.bat','analysis/REFERENCE.md']

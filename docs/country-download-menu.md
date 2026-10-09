@@ -1,0 +1,102 @@
+# Country download menu
+
+The country chooser uses original EuroRig controls and the app's shared light/dark
+palette: a circular country flag, bold country name, actual compressed download
+size, and a blue download action. Countries are sorted by their displayed names.
+Names and sizes wrap; the list scrolls independently of the fixed footer. Both
+the country identity and its icon are accessible actions with at least 48 dp
+touch targets. Flags are decorative device-font glyphs, with an ISO-code fallback.
+
+Catalogue format 1 remains compatible with the published Romania entry. Optional
+`country` is an uppercase two-letter country code. A regional entry also supplies
+`region_name`; entries for that country become a row with a chevron, the summed
+download size and the number of regions. Region rows show their individual
+download sizes. The Back button and Android Back return to the country list.
+Region IDs remain distinct presentation IDs. The current installer rejects
+regional entries and duplicate country contributors before downloading: they
+would otherwise replace the same country rather than retain all of its regions.
+The first coherent Europe release requires whole-country packages.
+Malformed IDs, duplicate IDs, invalid sizes and conflicting region groups are
+rejected. The chooser accepts at most 512 entries and uses the transport client's
+128 GiB maximum for an individual package.
+
+Sizes use decimal MB/GB and come from catalogue `bytes`, not reference-app labels.
+They describe transport size, not installed size. Russia is excluded by country
+code and legacy ID. The all-Europe action is disabled and visually muted until
+`europe_complete` is true and there are published packages. Unpublished countries
+are not displayed as downloadable maps.
+
+The public catalogue currently contains Romania only. Regional presentation is
+tested with a local synthetic catalogue; that does not publish regional maps or
+establish seamless routing between downloaded regions. Coherent country-set
+activation is implemented and tested with original artificial country fixtures;
+real geographic cross-border coverage and full Europe remain unverified.
+
+Maps → Manage installed countries lists the countries active for offline use.
+Remove opens a confirmation and warns when removing the last country. Cancelling
+keeps the map; successful last-country removal returns to an empty installation.
+Removal is disabled during guidance, simulation, another map change or downloads.
+Other contributors and their shared tiles remain when one country is removed.
+Older maps with a recognized country name or code can also be managed; unknown
+older identities refuse removal with an explanation and retain their map.
+
+Large text stacks the removal action below the country identity and lets the
+heading scroll with the list. The maps menu keeps its full status behind Status
+at large text sizes so the landscape list remains reachable. Both interfaces use
+the existing native controls and semantic light/dark palette.
+
+Run `python tools/audit_country_menu.py --device emulator-5554` on a dedicated
+emulator with a map installed. The audit serves its own temporary catalogue,
+checks real native action bounds, sizes, region navigation, malformed/empty
+catalogues, 200% text, disabled motion, and both themes. It preserves existing
+map/settings preferences and restores display, font and animation settings.
+Private screenshots and receipts are written to `analysis/private/country-menu`.
+Review the screenshots separately; the automated checks cannot establish visual
+quality or physical-device performance.
+
+## Download queue and retained packages
+
+Every whole country in an accepted queue is installed in order. A verified
+download is marked installed only after its native/display candidate activates.
+Successful queued and manual deferred installs remove their redundant archive and ready-file entry;
+failed installations retain the verified package for recovery. Guidance or a map
+change blocks activation, retains the download and stops the remaining queue.
+Downloaded countries shows packages waiting to be installed. Manage installed
+countries shows active offline coverage.
+
+The queue mechanics are checked against original artificial RO/HU tile partitions
+through the actual service and a local HTTP fixture. These are not real country
+coverage. On a dedicated emulator starting with one Romania map and no download
+directory, build fixtures with `tools/build_country_set_fixtures.py`, then run
+`python tools/audit_download_queue.py --device <emulator-serial> --fixtures
+<fixture-directory> --case complete`. Cases `mismatched` and `regional` check
+failure preservation and refusal before transfer. The audit backs up the selected
+map and four preference files, restores them, and keeps receipts private. It uses
+an owned ADB reverse port and removes that mapping afterward. Safety checks remain
+enabled with Python optimization. It never clears app data or operates a tablet.
+
+Both install paths use the same helper. Cleanup runs after verified activation
+and source closure, and accepts only regular packages inside the private download
+directory. If deletion fails, the country remains installed and its archive and
+ready entry are retained with an explanation. External file imports are untouched.
+Cases `manual`, `manual-mismatched`, `manual-retained` and `manual-unsafe` exercise
+the actual picker, failed-generation preservation, cleanup failure and refusal of
+a source outside the download directory. Manual fixtures use `adb push` followed
+by a checksum check; binary shell stdin was observed to truncate a fixture.
+
+Restarting a queue checks the active country contributor against the catalogue's
+exact archive SHA-256. A downloaded installation records this identity inside its
+installed manifest, so composition and removal preserve the surviving countries'
+receipts. The worker verifies all installed payloads once per selected directory
+in that queue before skipping a transfer. A new map selection requires another
+check. Removed countries and changed archives download again; a corrupt installed
+set refuses rather than claiming that it is already installed. Older maps without
+a transport receipt download normally. External imports discard transport claims
+from their supplied manifest. Deferred downloads are rehashed before installation.
+
+Cases `restart`, `restart-removed`, `restart-changed`, `restart-corrupt` and
+`manual-checksum` exercise these paths. The changed case modifies transport bytes
+without changing the artificial geographic data. These small controls establish
+queue behavior, not real country coverage, full Europe performance or storage.
+Physical testing, real coherent countries and the complete Europe
+installed/temporary storage budgets remain required work.

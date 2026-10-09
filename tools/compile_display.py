@@ -51,7 +51,7 @@ def compile_display(sources,destination,name,seeds=None):
             level INTEGER NOT NULL, large INTEGER NOT NULL, south REAL,west REAL,north REAL,east REAL,shape TEXT NOT NULL);
         CREATE TABLE cells(lat INTEGER,lon INTEGER,road INTEGER,PRIMARY KEY(lat,lon,road)) WITHOUT ROWID;
         CREATE TABLE places(id INTEGER PRIMARY KEY,label TEXT NOT NULL,lat REAL,lon REAL,kind TEXT);
-        CREATE VIRTUAL TABLE search USING fts4(text,tokenize=unicode61);
+        CREATE VIRTUAL TABLE search USING fts4(text,tokenize=unicode61,matchinfo=fts3);
     ''')
     bounds=[90.0,180.0,-90.0,-180.0];missing=0;source_info=[]
     def place(identifier,label,lat,lon,kind):
@@ -100,7 +100,7 @@ def compile_display(sources,destination,name,seeds=None):
               'places':database.execute('SELECT count(*) FROM places').fetchone()[0],'missing_geometry':missing,
               'attribution':'© OpenStreetMap contributors · ODbL 1.0','cell_size':CELL}
         database.executemany('INSERT INTO metadata VALUES(?,?)',[(k,json.dumps(v,ensure_ascii=False)) for k,v in meta.items()])
-        database.executescript('CREATE INDEX road_level ON roads(level,south);CREATE INDEX road_large ON roads(large,level,south);CREATE INDEX place_area ON places(kind,lat);ANALYZE;')
+        database.executescript("CREATE INDEX road_level ON roads(level,south);CREATE INDEX road_large ON roads(large,level,south);CREATE INDEX place_area ON places(kind,lat) WHERE kind IN ('city','town','village');ANALYZE;")
         database.commit()
         if database.execute('PRAGMA integrity_check').fetchone()[0]!='ok':raise ValueError('Display database failed integrity check')
         print('Indexed',roads,'roads and',meta['places'],'places',flush=True)

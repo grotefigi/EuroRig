@@ -1,5 +1,31 @@
 # EuroRig 0.5 UI and navigation audit
 
+## 0.6 visual and accessibility follow-up, 2026-10-07
+
+The follow-up keeps the tested navigation behaviour and replaces visual tokens
+and controls using the installed UI UX Pro Max guidance. Opaque light/dark cards,
+system fonts, original vector icons, blue primary actions, a red Stop action and
+native focus/ripple feedback add no UI library or font dependency. The launcher
+uses the same blue/night colours. See `design-system/eurorig/MASTER.md`.
+
+Both API 26 and API 37 pass the existing 22-check UI sweep. Native camera,
+arrow/progress and profile/ADR checks pass on both. API 37 passes injected GPS
+loss/recovery/stop and theme switching during guidance. Focused map and profile
+audits exercise the existing flows; no physical drive or spoken-output result
+is inferred from them.
+
+`tools/audit_design.py` checks actual touch bounds, control reachability and
+paired contrast across small phones, landscape and tablets, with 200% system
+text and disabled animations. Scrolling landscape controls are measured when
+fully reachable. Dialog checks verify all profile fields, checkboxes, the ADR
+selector, routing options and Maps actions at 48 dp or larger. Visual inspection
+found and corrected split dock labels and a clipped download-status label.
+
+Open Code Review delegation mode and the independent peer review cover the
+changed UI and routing/QA files. A colour-only styling cache has no conflicting
+foreground/outline states in the current flow; no speculative state machinery
+was added. Europe/cross-border and real-road limitations below still apply.
+
 Test date: 2026-10-06. API 26 and API 37 use dedicated emulators. The physical
 Galaxy Tab S9 runs Android 16/API 36. Private screenshots, GPS/reference evidence
 and account information are not included in the public source archive.

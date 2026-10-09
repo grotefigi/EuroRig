@@ -4,8 +4,8 @@ import android.app.*;
 import android.content.*;
 import android.os.*;
 import org.eurorig.maps.DownloadClient;
-import org.json.*;
 import org.eurorig.routing.Graph;
+import org.json.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
@@ -13,16 +13,43 @@ import java.util.*;
 /** User-started map downloads, independent of offline navigation. */
 public final class MapDownloadService extends Service {
     static volatile boolean running;
-    static volatile String status="Country maps are downloaded once, then used offline.";
+    static final String IDLE="Country maps are downloaded once, then used offline.";
+    static volatile String status=IDLE;
+    /**
+     * Process-wide run identity. A download runs on its own thread and can outlive the service that
+     * started it, so every write to the shared running/status state is scoped to the run that owns it:
+     * a finished run must never clear a later run's flag of a later run's status.
+     */
+    private static volatile int runId;
+    static int currentRun(){return runId;}
+    /** Ownership moves under one lock: the worker thread reads and writes it while start intents arrive. */
+    static synchronized int beginRun(){return ++runId;}
+    static boolean ownsRun(int run){return run==runId;}
+    /** Publishes only for the owning run, and reports whether the text was published. */
+    static synchronized boolean publish(int run,String text){if(run!=runId)return false;status=text;return true;}
+    static synchronized void finish(int run){if(run==runId)running=false;}
+    /** A client may not exist yet when a pause arrives on a freshly created instance. */
+    static void cancelQuietly(DownloadClient client){if(client!=null)client.cancel();}
     private volatile boolean cancelled;
     private DownloadClient client;
+    private int ownedRun=-1;
     private long lastNotification;
     public void onCreate(){super.onCreate();client=new DownloadClient(BuildConfig.DEBUG);getSystemService(NotificationManager.class).createNotificationChannel(new NotificationChannel("maps","Map downloads",NotificationManager.IMPORTANCE_LOW));}
     @android.annotation.SuppressLint("ApplySharedPref") // Download worker persists a verified file before process termination.
     public int onStartCommand(Intent intent,int flags,int id){
         if(intent==null)return START_NOT_STICKY;
         if("PAUSE".equals(intent.getAction())){pause();return START_NOT_STICKY;}
-        if(running)return START_NOT_STICKY;
+        if(running){
+            // A download is already running. The service must still enter the foreground (returning
+            // after startForegroundService() without startForeground() is a platform crash), but an
+            // instance that owns no thread must not stay there: the running thread belongs to another
+            // instance, so nothing else would ever stop this one or take its notification down.
+            startForeground(2,notification(status));
+            if(ownedRun!=currentRun())stopSelf(id);
+            return START_NOT_STICKY;
+        }
+        final int run=beginRun();
+        ownedRun=run;
         running=true;cancelled=false;status="Opening country catalogue…";startForeground(2,notification(status));
         final String country=intent.getStringExtra("country");
         new Thread(()->{
@@ -32,46 +59,103 @@ public final class MapDownloadService extends Service {
                 JSONObject catalog=new JSONObject(new String(client.catalog(url),StandardCharsets.UTF_8));
                 if(catalog.getInt("format")!=1||!catalog.getString("native_version").equals("0.6.3"))throw new IOException("Unsupported map catalogue");
                 JSONArray maps=catalog.getJSONArray("maps");ArrayList<JSONObject> queue=new ArrayList<>();
-                HashSet<String> ids=new HashSet<>();
+                if(maps.length()>512)throw new IOException("Too many country packages");
+                HashSet<String> ids=new HashSet<>(),countries=new HashSet<>();
                 for(int i=0;i<maps.length();i++){
                     JSONObject entry=maps.getJSONObject(i);String mapId=entry.getString("id");
+                    if(entry.has("country")&&!entry.getString("country").matches("[A-Z]{2}"))throw new IOException("Invalid country code");
                     if(!ids.add(mapId))throw new IOException("Duplicate country in map catalogue");
-                    if(mapId.equals("russia")||mapId.startsWith("russia-"))continue;
-                    if(country==null||country.equals(mapId))queue.add(entry);
+                    String code=CountryFlag.code(mapId,entry.optString("country",""));
+                    if(code.equals("RU")||mapId.equals("russia")||mapId.startsWith("russia-"))continue;
+                    if(country==null||country.equals(mapId)||country.equals("country:"+code)){
+                        if(entry.has("region_name")||!code.isEmpty()&&!countries.add(code))throw new IOException("Regional packages cannot be combined by this map release. Choose a whole-country package.");
+                        queue.add(entry);
+                    }
                 }
                 if(country==null&&!catalog.optBoolean("europe_complete",false))throw new IOException("All-Europe maps are not published yet. Download a published country instead.");
                 if(queue.isEmpty())throw new IOException("This country has not been published in the catalogue");
+                Set<String> verifiedSelections=new HashSet<>();
                 for(JSONObject map:queue){
                     if(cancelled)throw new InterruptedIOException("Map download paused");
                     String name=map.getString("name"),mapId=map.getString("id");
+                    if(Store.worker.submit(()->alreadyInstalled(this,map,verifiedSelections)).get()){
+                        if(cancelled)throw new InterruptedIOException("Map download paused");
+                        update(run,name+" already installed for offline navigation");continue;
+                    }
                     String address=new java.net.URL(new java.net.URL(url),map.getString("url")).toString();
-                    File file=client.download(address,map.getString("sha256"),map.getLong("bytes"),new File(getFilesDir(),"downloads"),mapId,()->cancelled,(done,total)->update("Downloading "+name+" · "+Math.round(done*100.0/total)+"%"));
-                    update("Checking "+name+"…");
-                    getSharedPreferences("maps",0).edit().putString("ready_"+mapId,name+"|"+file.getName()).commit();
-                    if(!Store.navigating&&(country!=null||Store.graph==null)){
+                    File file=client.download(address,map.getString("sha256"),map.getLong("bytes"),new File(getFilesDir(),"downloads"),mapId,()->cancelled,(done,total)->update(run,"Downloading "+name+" · "+Math.round(done*100.0/total)+"%"));
+                    update(run,"Checking "+name+"…");
+                    if(!getSharedPreferences("maps",0).edit().putString("ready_"+mapId,name+"|"+file.getName()).commit())throw new IOException("Could not save the downloaded package. Its file is retained for recovery.");
+                    if(cancelled)throw new InterruptedIOException("Map download paused");
+                    {
                         final java.util.concurrent.CountDownLatch installed=new java.util.concurrent.CountDownLatch(1);
                         final Exception[] failure={null};
+                        final boolean[] activated={false};
                         Store.worker.execute(()->{
                             if(!Store.beginInstall()){installed.countDown();return;}
-                            try(InputStream in=new FileInputStream(file)){
-                            Graph graph=RegionPackages.install(this,in);Store.graph=graph;Store.originChosen=false;Store.destinationChosen=false;Store.route=null;Store.start=0;Store.end=Math.min(1,graph.nodes.length-1);Store.setRegionEndpoints();
+                            try{
+                            installDownloaded(this,file);activated[0]=true;
                         }catch(Exception|LinkageError e){failure[0]=new IOException(e.getMessage(),e);}finally{Store.installing=false;installed.countDown();}});
                         installed.await();if(failure[0]!=null)throw failure[0];
+                        if(!activated[0]){update(run,name+" downloaded · stop guidance or wait for map changes, then install from Downloaded countries");break;}
+                        if(!file.exists()){
+                            update(run,name+" installed for offline navigation");
+                        }else update(run,name+" installed · downloaded archive could not be removed");
                     }
-                    update(name+(Store.navigating?" downloaded · install after guidance stops":" ready for offline navigation"));
                 }
-            }catch(Exception e){status=cancelled?"Downloads paused. Press download to resume.":"Map download: "+e.getMessage();}
-            finally{running=false;stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}
+            }catch(Exception e){publish(run,cancelled?"Downloads paused. Press download to resume.":"Map download: "+e.getMessage());}
+            finally{if(ownsRun(run)){stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}finish(run);}
         },"EuroRig map download").start();return START_NOT_STICKY;
     }
-    private void update(String text){status=text;long now=SystemClock.elapsedRealtime();if(now-lastNotification>1000){getSystemService(NotificationManager.class).notify(2,notification(text));lastNotification=now;}}
+    /** Both queued and deferred installs retire only their own archive after activation and close. */
+    static Graph installDownloaded(Context context,File file)throws IOException{
+        File directory=new File(context.getFilesDir(),"downloads");
+        if(!file.getName().matches("[a-z][a-z0-9-]{0,63}-[a-f0-9]{64}\\.eurorig")
+                ||!java.nio.file.Files.isDirectory(directory.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                ||!java.nio.file.Files.isRegularFile(file.toPath(),java.nio.file.LinkOption.NOFOLLOW_LINKS)
+                ||!directory.getCanonicalFile().equals(file.getParentFile().getCanonicalFile()))
+            throw new IOException("Invalid downloaded country package path");
+        String hash=file.getName().substring(file.getName().length()-72,file.getName().length()-8);
+        try{if(!hash.equals(RegionPackages.digest(file)))throw new IOException("Downloaded country package checksum mismatch");}
+        catch(java.security.NoSuchAlgorithmException e){throw new IOException("Cannot verify downloaded country package",e);}
+        Graph graph;try(InputStream input=new FileInputStream(file)){graph=RegionPackages.install(context,input,hash);}
+        if(file.delete()){
+            android.content.SharedPreferences preferences=context.getSharedPreferences("maps",0);
+            android.content.SharedPreferences.Editor cleanup=preferences.edit();
+            for(Map.Entry<String,?> entry:preferences.getAll().entrySet())
+                if(entry.getKey().startsWith("ready_")&&entry.getValue() instanceof String&&((String)entry.getValue()).endsWith("|"+file.getName()))cleanup.remove(entry.getKey());
+            cleanup.apply();
+        }
+        return graph;
+    }
+    /** Worker-serialized check: only exact installed transport identity may avoid transfer. */
+    private static boolean alreadyInstalled(Context context,JSONObject map,Set<String> verifiedSelections)throws IOException,JSONException{
+        String code=CountryFlag.code(map.getString("id"),map.optString("country",""));
+        String hash=map.getString("sha256");
+        if(!hash.matches("[a-fA-F0-9]{64}")||map.getLong("bytes")<=0||map.getLong("bytes")>128L*1024*1024*1024
+                ||!map.getString("id").matches("[a-z][a-z0-9-]{0,63}"))throw new IOException("Invalid country-map metadata");
+        if(!context.getSharedPreferences("settings",0).getBoolean("native",false)||!Store.beginInstall())return false;
+        try{
+            String selected=context.getSharedPreferences("settings",0).getString("region","");
+            if(!selected.matches("[0-9a-f-]{36}"))throw new IOException("Invalid saved region selection");
+            File directory=new File(context.getFilesDir(),"regions/"+selected);
+            JSONObject descriptor=CountrySets.manifest(directory);
+            if(descriptor.optInt("format")!=4&&!descriptor.has("download_sha256"))return false;
+            File country=CountrySets.countries(directory).get(code);
+            if(country==null||!hash.equalsIgnoreCase(CountrySets.manifest(country).optString("download_sha256","")))return false;
+            // One full payload check per immutable selected directory in this queue; map changes use a new UUID.
+            if(!verifiedSelections.contains(selected)){TileIndex.validateInstalled(directory);verifiedSelections.add(selected);}
+            return true;
+        }finally{Store.installing=false;}
+    }
+    private void update(int run,String text){if(!publish(run,text))return;long now=SystemClock.elapsedRealtime();if(now-lastNotification>1000){getSystemService(NotificationManager.class).notify(2,notification(text));lastNotification=now;}}
     private Notification notification(String text){
         PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         PendingIntent pause=PendingIntent.getService(this,2,new Intent(this,MapDownloadService.class).setAction("PAUSE"),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
         return new Notification.Builder(this,"maps").setSmallIcon(R.drawable.ic_truck).setContentTitle("EuroRig · Country maps").setContentText(text).setContentIntent(open).setOngoing(true).addAction(new Notification.Action.Builder(null,"Pause",pause).build()).build();
     }
-    private void pause(){cancelled=true;status="Downloads paused. Press download to resume.";client.cancel();}
+    private void pause(){cancelled=true;if(running)publish(currentRun(),"Downloads paused. Press download to resume.");cancelQuietly(client);}
     public void onTimeout(int startId,int type){pause();stopSelf();}
     public IBinder onBind(Intent intent){return null;}
-    public void onDestroy(){cancelled=true;if(client!=null)client.cancel();super.onDestroy();}
+    public void onDestroy(){cancelled=true;cancelQuietly(client);super.onDestroy();}
 }
