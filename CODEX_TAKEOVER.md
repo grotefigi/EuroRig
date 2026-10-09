@@ -37,6 +37,8 @@ The main remaining work is a coherent Europe excluding Russia, independently val
 
 Use `README.md`, `ROADMAP.md`, `VERIFICATION.md`, `AGENTS.md`, `docs/DEVICE_REQUIREMENTS.md`, `docs/map-storage.md`, and `docs/region-package-format.md` as the project sources of truth. `analysis/private/` is intentionally ignored; do not copy private screenshots, tablet preferences, real GPS evidence, or raw logs into public issues or commits. Map data is OpenStreetMap-derived and carries ODbL attribution requirements. Do not copy Eurowag/RoadLords code, map data, icons or other proprietary assets.
 
+The API 26 candidate's code came from tree `de3acc26923524fcb3eafbba4be6f065873f16df`. Its debug APK was 37,997,939 bytes, SHA-256 `7254946ea77ce66c10be35e12cc2e33adf1ed9f3582bd275ccebe70b656ab6f0`; its Android test APK was 2,443,597 bytes, SHA-256 `a7d5a55f851a3991353e4ccaab922c7abbd2bc1bb8a72df8480322a53d8ffea6`. These local artifacts are not GitHub release assets. The public source later received a verification-documentation-only edit before this handoff; rebuild locally and record the hashes before using a new APK.
+
 ## Skills to enable in the new Codex account
 
 The following 20 skills were available in the source Codex session. Install or enable all of them in the new Codex account; if a skill is already bundled, verify it is available instead of duplicating it. Add the same skills to Hermes when that app supports them. If a platform cannot install an item, record that limitation rather than claiming it is installed.
