@@ -19,4 +19,5 @@ android {
 dependencies {
     implementation project(':routing')
     implementation 'io.github.rallista:valhalla-mobile:0.6.3'
+    testImplementation 'junit:junit:4.13.2'
 }

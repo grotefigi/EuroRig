@@ -20,13 +20,15 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
     private boolean indexedOnly;
     private boolean countrySetsOnly;
     private boolean corridorsOnly;
+    private boolean renderOnly;
     private String qaRegion;
-    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));cameraOnly="true".equals(arguments.getString("cameraOnly"));cameraCorpus="true".equals(arguments.getString("cameraCorpus"));gzipOnly="true".equals(arguments.getString("gzipOnly"));mapLifecycleOnly="true".equals(arguments.getString("mapLifecycleOnly"));indexedOnly="true".equals(arguments.getString("indexedOnly"));countrySetsOnly="true".equals(arguments.getString("countrySetsOnly"));corridorsOnly="true".equals(arguments.getString("corridorsOnly"));qaRegion=arguments.getString("qaRegion");start();}
+    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));cameraOnly="true".equals(arguments.getString("cameraOnly"));cameraCorpus="true".equals(arguments.getString("cameraCorpus"));gzipOnly="true".equals(arguments.getString("gzipOnly"));mapLifecycleOnly="true".equals(arguments.getString("mapLifecycleOnly"));indexedOnly="true".equals(arguments.getString("indexedOnly"));countrySetsOnly="true".equals(arguments.getString("countrySetsOnly"));corridorsOnly="true".equals(arguments.getString("corridorsOnly"));renderOnly="true".equals(arguments.getString("renderOnly"));qaRegion=arguments.getString("qaRegion");start();}
     public void onStart(){
         Bundle result=new Bundle();
         try{
             if(countrySetsOnly){CountrySetChecks.run(getTargetContext(),packagePath);result.putString("stream","PASS: isolated native country-set install/reopen/removal, shared ownership, generation rollback and truck restrictions\n");finish(-1,result);return;}
             if(indexedOnly){IndexedPackageChecks.run(getTargetContext(),packagePath);result.putString("stream","PASS: format3 v1/v2 activation/reopen, truck and ADR routes; twenty invalid imports preserve active map; no retained v2 TAR\n");finish(-1,result);return;}
+            if(renderOnly){checkRender();result.putString("stream","PASS: map render pixels: cached extent keeps signs and labels in its overscan strips and rejects anchors at its edge; every casing is under every road colour at a junction\n");finish(-1,result);return;}
             if(mapLifecycleOnly){MapLifecycleChecks.run(this);result.putString("stream","PASS: attached map reloads after detach/reuse; obsolete callbacks preserve current pending query\n");finish(-1,result);return;}
             if(gzipOnly){GzipTileChecks.run(getTargetContext(),getContext());result.putString("stream","PASS: JNI .gph.gz fixture parity; .gz and empty controls refuse routes; tile bytes retained\n");finish(-1,result);return;}
             if(corridorsOnly){CorridorChecks.run(getTargetContext(),qaRegion);result.putString("stream","PASS: native corridor measurements written; inspect individual outcomes\n");finish(-1,result);return;}
@@ -36,7 +38,7 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
                 if(cameraCorpus)route=CorridorChecks.run(getTargetContext(),qaRegion);
                 else{Store.load(getTargetContext());route=Store.calculate(Store.graph,Store.start,Store.end,Store.truck);}
                 require(route!=null,"Camera checks need a successful native route");
-                checkCamera(route);result.putString("stream","PASS: actual map viewport, navigation zoom, every route fix follows, pan/rotation, route trail removal and heading arrow pixels\n");finish(-1,result);return;
+                checkCamera(route);result.putString("stream","PASS: actual map viewport, navigation zoom, every route fix follows, pan/rotation, route trail removal, heading arrow pixels and cached extent signs/labels\n");finish(-1,result);return;
             }
             require(!Arrays.asList(getTargetContext().getAssets().list("")).contains("andorra-routing.tar"),"No bundled maps");
             Store.load(getTargetContext());require(Store.graph==null,"First launch has no map");
@@ -92,7 +94,12 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
         }catch(Throwable e){result.putString("stream","FAIL: "+android.util.Log.getStackTraceString(e));finish(1,result);}
     }
     private void checkCamera(Router.Route route)throws Throwable{
-        Throwable[] failure={null};runOnMainSync(()->{try{CameraChecks.run(getTargetContext(),route);RouteDisplayChecks.run(getTargetContext());}catch(Throwable e){failure[0]=e;}});
+        Throwable[] failure={null};runOnMainSync(()->{try{CameraChecks.run(getTargetContext(),route);RouteDisplayChecks.run(getTargetContext());MapExtentChecks.run(getTargetContext());RoadLayerChecks.run(getTargetContext());}catch(Throwable e){failure[0]=e;}});
+        if(failure[0]!=null)throw failure[0];
+    }
+    /** The map render pixel checks need no installed country; they build their own networks. */
+    private void checkRender()throws Throwable{
+        Throwable[] failure={null};runOnMainSync(()->{try{RouteDisplayChecks.run(getTargetContext());MapExtentChecks.run(getTargetContext());RoadLayerChecks.run(getTargetContext());}catch(Throwable e){failure[0]=e;}});
         if(failure[0]!=null)throw failure[0];
     }
     private static void require(boolean value,String message){if(!value)throw new AssertionError(message);}

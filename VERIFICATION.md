@@ -1,5 +1,28 @@
 # Verification
 
+## Cached map rendering and guidance-session ownership (2026-10-09)
+
+The combined development candidate passes 47 host unit checks, Android app/test
+assembly and lint (zero errors, four existing warnings). Cache reuse now requires
+the entire viewport at the current scale to be covered. Restriction signs and
+labels retain their overscan positions, signed cell coordinates remain distinct,
+and road casings draw below all road colours. Actual Android 8 pixel controls pass
+in light and dark themes; the old sign-cell implementation fails its regression
+control. Switching the app theme and relaunching retains both preference and
+rendered palette. A real legacy Romania installation retains the controlled
+13.9 km Bucharest route, camera and progress checks; its separate profile/ADR
+fixtures do not establish geographic restriction coverage.
+
+Arrival speech completion carries its own trip identity, and an old reroute
+completion cannot clear a later trip's reroute state. Four host overlap controls
+pass. Audible arrival, background GPS and driving validation remain pending.
+
+Both combined APKs were installed, pulled back and independently hashed on a
+dedicated API26 emulator. Private device settings remain unchanged across the
+binding gate. No driver tablet or public map was replaced. Emulator measurements
+still show pan/zoom stutter; these correctness gates do not establish low-device
+performance, whole-Europe size or release readiness.
+
 ## Settlement index storage follow-up (2026-10-08)
 
 The compiler now uses a partial `place_area` index matching the app's settlement

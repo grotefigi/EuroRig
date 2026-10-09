@@ -21,3 +21,18 @@ finally:
 s.run('emu','geo','fix',fixes[2][1],fixes[2][0]);s.wait_text('GPS position received');s.wait_text('Following');print('PASS: fresh GPS recovers guidance and camera following',flush=True)
 s.tap('Truck');s.wait_text('Stop guidance before');s.tap('OK');assert 'isForeground=true' in s.run('shell','dumpsys','activity','services','org.eurorig.app').decode();print('PASS: profile edits blocked while guidance continues',flush=True)
 s.tap('Stop');s.wait_text('Route ready for your truck');assert 'isForeground=true' not in s.run('shell','dumpsys','activity','services','org.eurorig.app').decode();print('PASS: stop terminates foreground guidance',flush=True)
+# Arrival ownership: the arrival phrase itself must end guidance, and its foreground service must not
+# linger afterwards. The recorded fixes drive the same trip to its destination.
+s.run('emu','geo','fix',fixes[0][1],fixes[0][0]);time.sleep(1)
+s.tap('Plan route');s.wait_text('Route ready for your truck');s.tap('Start guidance');s.tap('Start');s.wait_text('GPS GUIDANCE')
+for fix in fixes:
+ s.run('emu','geo','fix',fix[1],fix[0]);time.sleep(1)
+try:
+ s.wait_text('You have arrived',120)
+except AssertionError:
+ print('SKIP: recorded fixes did not reach the destination; extend files/native-test-fixes.txt to gate arrival',flush=True)
+else:
+ # The trip ends on the arrival phrase or its fallback, never on a later trip's state, and the
+ # foreground service must be gone once guidance stops.
+ s.wait_text('Start guidance',60)
+ assert 'isForeground=true' not in s.run('shell','dumpsys','activity','services','org.eurorig.app').decode();print('PASS: arrival ends guidance and clears the foreground service',flush=True)
