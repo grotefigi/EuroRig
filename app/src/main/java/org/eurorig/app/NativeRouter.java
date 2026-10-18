@@ -18,6 +18,9 @@ final class NativeRouter implements AutoCloseable {
      */
     private static final double ENDPOINT_METRES=RestrictionRule.ENDPOINT_METRES;
     private final Valhalla engine;
+    /** Restrictions the route had to accept, verbatim, for the driver to see. */
+    private volatile String warning="";
+    String restrictionWarning(){return warning;}
     NativeRouter(Context context,File tiles) throws IOException {
         try{RegionPackages.validateTar(tiles);}
         catch(IOException e){throw new IOException("Installed routing map is missing or damaged. Download or import the country map again.",e);}
@@ -68,6 +71,7 @@ final class NativeRouter implements AutoCloseable {
             JSONObject query=request(lat,lon,endLat,endLon,truck,mode,delivery);
             JSONArray excluded=new JSONArray();JSONObject response=null,candidate=null;double restrictedMetres=0;String failure="";
             long[] auditedWays=null;Map<Long,RestrictionRule> auditedRules=Collections.emptyMap();
+            Set<String> warnings=new TreeSet<>();
             for(int attempt=0;attempt<12;attempt++){
                 if(excluded.length()>0)query.put("exclude_locations",excluded);
                 try{response=new JSONObject(engine.routeRaw(query.toString()));}
@@ -99,9 +103,12 @@ final class NativeRouter implements AutoCloseable {
                         Math.max(Geo.distance(geometry.get(begin).lat,geometry.get(begin).lon,endLat,endLon),Geo.distance(geometry.get(end).lat,geometry.get(end).lon,endLat,endLon)),
                         atEndpoint&&toOrigin<=ENDPOINT_METRES);
                     if(reason!=null){
+                        // Uncertainty is surfaced to the driver, never routed as a prohibition:
+                        // an unverified tag must not make a lawful corridor unroutable.
+                        if(rule!=null&&rule.uncertainOnly()){warnings.add(reason);continue;}
                         // The road under the vehicle cannot be avoided by routing. Record the
                         // restricted distance and keep the route; never exclude the endpoint.
-                        if(atEndpoint){restrictedMetres+=edge.getDouble("length")*1000;continue;}
+                        if(atEndpoint){restrictedMetres+=edge.getDouble("length")*1000;warnings.add(reason);continue;}
                         failure=reason;excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));rejected=true;break;
                     }
                     if(rule!=null&&rule.accessLimited())restrictedMetres+=edge.getDouble("length")*1000;
@@ -110,6 +117,7 @@ final class NativeRouter implements AutoCloseable {
                 if(attempt==11)throw new IllegalStateException("No verified route for this profile: "+failure);
             }
             if(candidate!=null)response=candidate;
+            warning=warnings.isEmpty()?"":String.join("; ",warnings);
             if(response==null)throw new IllegalStateException("No truck route");
             if(response.has("error")||response.has("message"))throw new IllegalStateException(response.optString("error",response.optString("message")));
             if(response.optJSONArray("warnings")!=null&&response.getJSONArray("warnings").length()>0)

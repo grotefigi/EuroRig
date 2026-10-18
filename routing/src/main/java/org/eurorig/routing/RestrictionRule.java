@@ -16,9 +16,24 @@ public final class RestrictionRule {
     public final double height,width,length,weight,axle;
     public final int flags;
     public final Map<String,String> tags;
+    /** Classification written by tools/restriction_kind.py; 0 when the pack predates it. */
+    public final int kind;
+    public final String evidence;
+    public static final int HARD=1,ACCESS=2,UNCERTAIN=4,PREFERENCE=8;
     public RestrictionRule(double height,double width,double length,double weight,double axle,int flags,Map<String,String> tags){
-        this.height=height;this.width=width;this.length=length;this.weight=weight;this.axle=axle;this.flags=flags;this.tags=tags;
+        this(height,width,length,weight,axle,flags,tags,0,"");
     }
+    public RestrictionRule(double height,double width,double length,double weight,double axle,int flags,Map<String,String> tags,int kind,String evidence){
+        this.height=height;this.width=width;this.length=length;this.weight=weight;this.axle=axle;this.flags=flags;this.tags=tags;
+        this.kind=kind;this.evidence=evidence==null?"":evidence;
+    }
+    /** True when the record states a limit a vehicle must meet, rather than a guess. */
+    public boolean certain(){return (kind&(HARD|ACCESS))!=0;}
+    /**
+     * Tags exist but cannot be verified (conditional, unpublished rating, unparsable value).
+     * Uncertainty must not be routed as a prohibition: exclude only what is known impossible.
+     */
+    public boolean uncertainOnly(){return kind!=0&&(kind&(HARD|ACCESS))==0&&(kind&UNCERTAIN)!=0;}
     public boolean accessLimited(){return (flags&Graph.BLOCKED)!=0;}
     public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination){
         return violation(truck,permittedDelivery,metresFromDestination,false);

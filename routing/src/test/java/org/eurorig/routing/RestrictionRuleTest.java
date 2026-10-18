@@ -62,6 +62,20 @@ public class RestrictionRuleTest {
         assertFalse("a restriction 300 m out is routable around",RestrictionRule.atEndpoint(300,5000));
         assertFalse(RestrictionRule.atEndpoint(5000,300));
     }
+    /** Uncertainty is surfaced, never routed as a prohibition (RR-04). */
+    @Test public void uncertaintyIsReportedButNotProhibited(){
+        RestrictionRule guessed=new RestrictionRule(0,0,0,0,0,Graph.UNCERTAIN,
+            Map.of("maxweight:conditional","3.5 @ (22:00-06:00)"),RestrictionRule.UNCERTAIN,"maxweight:conditional");
+        assertTrue(guessed.uncertainOnly());
+        assertFalse(guessed.certain());
+        RestrictionRule measured=new RestrictionRule(0,0,0,3.5,0,Graph.BLOCKED,
+            Map.of("maxweight","3.5"),RestrictionRule.HARD,"maxweight=3.5");
+        assertFalse("a stated limit is not uncertainty",measured.uncertainOnly());
+        assertTrue(measured.certain());
+        RestrictionRule legacy=new RestrictionRule(0,0,0,3.5,0,Graph.BLOCKED,Map.of("maxweight","3.5"));
+        assertEquals("packs without classification keep the old behaviour",0,legacy.kind);
+        assertFalse(legacy.uncertainOnly());
+    }
     @Test public void weightLimitUnderTheStartingVehicleIsStillAViolation(){
         RestrictionRule rule=rule(0,0,3.5,Graph.BLOCKED,Map.of("maxweight","3.5","oneway","yes"));
         Truck truck=new Truck(3.89,2.5,17,41,10,false,false,true,true,5,80,0,0);

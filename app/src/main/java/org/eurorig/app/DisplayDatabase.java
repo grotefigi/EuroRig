@@ -11,6 +11,8 @@ import java.util.*;
 final class DisplayDatabase implements AutoCloseable {
     private final SQLiteDatabase database;
     final boolean restrictionEvidence;
+    /** Packs built after the normalised classification carry kind/evidence on every rule. */
+    final boolean classified;
     private final boolean spatialIndex;
     final String name,attribution,date;
     final double[] bounds;
@@ -22,6 +24,7 @@ final class DisplayDatabase implements AutoCloseable {
             if(opened.getVersion()!=1)throw new IOException("Unsupported display database version");
             database=opened;
             restrictionEvidence=hasTable("road_rules");spatialIndex=hasTable("large_cells");
+            classified=restrictionEvidence&&hasColumn("road_rules","kind");
             name=new JSONArray("["+metadata("name")+"]").getString(0);
             attribution=new JSONArray("["+metadata("attribution")+"]").getString(0);
             JSONArray bbox=new JSONArray(metadata("bounds"));bounds=new double[4];for(int i=0;i<4;i++)bounds[i]=bbox.getDouble(i);
@@ -39,6 +42,11 @@ final class DisplayDatabase implements AutoCloseable {
     }
     private boolean hasTable(String name){
         try(Cursor c=database.rawQuery("SELECT 1 FROM sqlite_master WHERE name=?",new String[]{name})){return c.moveToFirst();}
+    }
+    private boolean hasColumn(String table,String column){
+        try(Cursor c=database.rawQuery("PRAGMA table_info(\""+table+"\")",null)){
+            while(c.moveToNext())if(column.equals(c.getString(1)))return true;return false;
+        }
     }
     private String metadata(String key)throws IOException{
         try(Cursor c=database.rawQuery("SELECT value FROM metadata WHERE key=?",new String[]{key})){
@@ -113,9 +121,11 @@ final class DisplayDatabase implements AutoCloseable {
         for(int offset=0;offset<ids.size();offset+=400){
             int count=Math.min(400,ids.size()-offset);String[] args=new String[count];StringJoiner placeholders=new StringJoiner(",");
             for(int i=0;i<count;i++){args[i]=Long.toString(ids.get(offset+i));placeholders.add("?");}
-            try(Cursor rows=database.rawQuery("SELECT r.id,coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0),coalesce(q.tags,'{}') FROM roads r LEFT JOIN road_rules q ON q.way=r.id WHERE r.id IN ("+placeholders+")",args)){
+            String extra=classified?",coalesce(q.kind,0),coalesce(q.evidence,'')":"";
+            try(Cursor rows=database.rawQuery("SELECT r.id,coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0),coalesce(q.tags,'{}')"+extra+" FROM roads r LEFT JOIN road_rules q ON q.way=r.id WHERE r.id IN ("+placeholders+")",args)){
                 while(rows.moveToNext()){
-                    result.put(rows.getLong(0),new RestrictionRule(rows.getDouble(1),rows.getDouble(2),rows.getDouble(3),rows.getDouble(4),rows.getDouble(5),rows.getInt(6),parseTags(rows.getString(7))));
+                    int kind=classified?rows.getInt(8):0;String evidence=classified?rows.getString(9):"";
+                    result.put(rows.getLong(0),new RestrictionRule(rows.getDouble(1),rows.getDouble(2),rows.getDouble(3),rows.getDouble(4),rows.getDouble(5),rows.getInt(6),parseTags(rows.getString(7)),kind,evidence));
                 }
             }
         }
