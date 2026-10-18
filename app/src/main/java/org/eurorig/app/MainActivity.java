@@ -171,7 +171,7 @@ public final class MainActivity extends Activity {
         Truck shown=Store.truck;
         // Loaded mass and permitted maximum mass are different facts; never collapse them.
         profile.setText(shown.exceedsPermittedMass()
-            ?String.format(Locale.getDefault(),"%.1f t loaded  ·  %.1f t permitted  ·  %.2f m high",shown.weight,shown.permittedWeight,shown.height)
+            ?String.format(Locale.getDefault(),"%.1f t loaded  ·  EXCEEDS permitted %.1f t  ·  %.2f m high",shown.weight,shown.permittedWeight,shown.height)
             :String.format(Locale.getDefault(),"%.1f t  ·  %.2f m high",shown.weight,shown.height));
         if(g==null){status.setText(busy?"Opening maps…":MapDownloadService.running?MapDownloadService.status:"No maps installed");endpoints.setText(R.string.download_country_start);endpoints.setVisibility(View.VISIBLE);instruction.setText(R.string.first_country);stats.setText(R.string.choose_first_map);map.updateGraph(null);map.invalidate();updateMapControls();return;}
         status.setText(MapDownloadService.running?MapDownloadService.status:g.demo?"DEVELOPMENT BUILD · Fictional training map":Store.navigating?"GPS GUIDANCE · Offline · Development build":"Offline · "+g.name);
@@ -179,7 +179,7 @@ public final class MainActivity extends Activity {
         Router.Route r=Store.route;
         if(active){instruction.setText(simulating?getString(R.string.simulated_instruction,Store.guidance):Store.guidance);stats.setText(String.format(Locale.getDefault(),"%.1f km remaining%s\n%s",Store.remaining/1000,simulating?" · Fictional roads":"",fresh?"GPS position received":"Waiting for a fresh GPS fix"));}
         else if(r!=null){String caution=Store.restrictionWarning();
-        instruction.setText(Store.arrived?(g.demo?"Training route complete":"You have arrived"):r.edges.isEmpty()?"Start and destination are the same":caution.isEmpty()?"Route ready for your truck":caution);stats.setText(String.format(Locale.getDefault(),"%.1f km  ·  ≈ %s  ·  %s",r.metres/1000,duration(r.seconds),r.nativeGeometry()?(Store.deliveryAccess?"Shortest delivery":Store.mode.title)+(r.restrictedMetres>0?" · "+Math.round(r.restrictedMetres)+" m restricted access":""):"Tagged restrictions checked"));}
+        instruction.setText(Store.arrived?(g.demo?"Training route complete":"You have arrived"):r.edges.isEmpty()?"Start and destination are the same":caution.isEmpty()?"Route ready for your truck":caution);stats.setText(String.format(Locale.getDefault(),"%.1f km  ·  ≈ %s  ·  %s",r.metres/1000,duration(r.seconds),r.nativeGeometry()?(Store.deliveryAccess?"Shortest delivery":Store.mode.title)+(r.restrictedMetres>0?" · "+Math.round(r.restrictedMetres)+" m restricted access":"")+"  ·  map data, not a legal guarantee":"Tagged restrictions checked"));}
         else{instruction.setText(R.string.select_destination);stats.setText(R.string.choose_destination);}
         map.updateGraph(Store.graph);
         if(active&&!guidanceWasActive&&fresh){map.locate(Store.lat,Store.lon);guidanceWasActive=true;}

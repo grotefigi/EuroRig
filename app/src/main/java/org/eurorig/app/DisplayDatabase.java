@@ -165,6 +165,66 @@ final class DisplayDatabase implements AutoCloseable {
         }
         return chosen==null?null:new double[]{chosen[1],chosen[2]};
     }
+    /** One recorded restriction, positioned on the road it applies to. */
+    static final class MappedRestriction{
+        final long way;final double lat,lon;final String label;final int kind;
+        MappedRestriction(long way,double lat,double lon,String label,int kind){
+            this.way=way;this.lat=lat;this.lon=lon;this.label=label;this.kind=kind;
+        }
+    }
+
+    /**
+     * Restrictions recorded on roads inside the viewport, positioned at each road's midpoint.
+     * This reads the same normalised records the router audits; there is no second parser.
+     */
+    synchronized List<MappedRestriction> restrictionsInView(double south,double west,double north,double east,int limit){
+        ArrayList<MappedRestriction> found=new ArrayList<>();
+        if(!restrictionEvidence)return found;
+        String columns=classified?",coalesce(q.kind,0),coalesce(q.evidence,'')":",0,''";
+        String[] args={""+south,""+north,""+west,""+east,""+limit};
+        try(Cursor rows=database.rawQuery("SELECT r.id,r.level,r.shape,coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0)"+columns
+                +" FROM roads r JOIN road_rules q ON q.way=r.id WHERE r.north>=? AND r.south<=? AND r.east>=? AND r.west<=? AND r.level<=4 LIMIT ?",args)){
+            while(rows.moveToNext()){
+                double height=rows.getDouble(3),width=rows.getDouble(4),length=rows.getDouble(5),weight=rows.getDouble(6),axle=rows.getDouble(7);
+                int kind=rows.getInt(9);String evidence=rows.getString(10);
+                if(kind==0&&(height<=0&&width<=0&&length<=0&&weight<=0&&axle<=0))continue;
+                if((kind&RestrictionRule.PREFERENCE)!=0&&(kind&(RestrictionRule.HARD|RestrictionRule.ACCESS|RestrictionRule.UNCERTAIN))==0)continue;
+                String label=label(height,width,length,weight,axle,kind,evidence);
+                if(label==null)continue;
+                List<Graph.Node> shape;
+                try{shape=NativeRouter.decode(rows.getString(2));}catch(RuntimeException malformed){continue;}
+                if(shape.isEmpty())continue;
+                Graph.Node point=shape.get(shape.size()/2);
+                found.add(new MappedRestriction(rows.getLong(0),point.lat,point.lon,label,kind));
+            }
+        }
+        return found;
+    }
+
+    /** Short label carrying the recorded value, not a guess about the road. */
+    private static String label(double height,double width,double length,double weight,double axle,int kind,String evidence){
+        if(height>0)return trim(height)+" m high";
+        if(weight>0)return trim(weight)+" t";
+        if(axle>0)return trim(axle)+" t/axle";
+        if(width>0)return trim(width)+" m wide";
+        if(length>0)return trim(length)+" m long";
+        if((kind&RestrictionRule.ACCESS)!=0){
+            String text=evidence==null?"":evidence;
+            if(text.contains("hgv=no")||text.contains("vehicle=no")||text.contains("motor_vehicle=no"))return "No HGV";
+            if(text.contains("destination"))return "Access: destination";
+            if(text.contains("delivery"))return "Access: delivery";
+            if(text.contains("private"))return "Private";
+            return "Restricted access";
+        }
+        if((kind&RestrictionRule.UNCERTAIN)!=0)return "Unverified limit";
+        return null;
+    }
+
+    private static String trim(double value){
+        String text=java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
+        return text;
+    }
+
     private static Map<String,String> parseTags(String json){
         HashMap<String,String> tags=new HashMap<>();
         try{JSONObject source=new JSONObject(json);Iterator<String> keys=source.keys();while(keys.hasNext()){String key=keys.next();tags.put(key,source.getString(key));}}

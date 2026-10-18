@@ -46,6 +46,9 @@ final class RoadMapView extends FrameLayout {
     private final MapView view;
     private MapLibreMap map;
     private Style style;
+    private final java.util.List<android.widget.TextView> chips=new java.util.ArrayList<>();
+    private java.util.List<DisplayDatabase.MappedRestriction> overlayRestrictions=java.util.Collections.emptyList();
+    private double overlaySouth=Double.NaN,overlayWest=Double.NaN,overlayNorth=Double.NaN,overlayEast=Double.NaN;
     private Graph graph;
     private Router.Route route;
     private boolean following;
@@ -93,12 +96,14 @@ final class RoadMapView extends FrameLayout {
             pick.picked(node);
             return true;
         });
+        map.addOnCameraMoveListener(this::positionRestrictions);
         map.addOnCameraIdleListener(()->{
             if (map==null) return;
             LatLng target=map.getCameraPosition().target;
             latitude=target.getLatitude();
             longitude=target.getLongitude();
             zoomLevel=map.getCameraPosition().zoom;
+            refreshRestrictions();
             if (cameraChanged!=null) cameraChanged.run();
         });
         map.setStyle(new Style.Builder().fromJson(styleJson),loaded->{
@@ -219,6 +224,82 @@ final class RoadMapView extends FrameLayout {
             }
         }
     }
+
+    /** Recorded restrictions in view, drawn from the same normalised records the router audits. */
+    private void refreshRestrictions() {
+        if (map==null || style==null) return;
+        if (zoomLevel<13.5) { clearRestrictions(); return; }
+        org.maplibre.android.geometry.LatLngBounds bounds=null;
+        try { bounds=map.getProjection().getVisibleRegion().latLngBounds; } catch (RuntimeException ignored) { }
+        if (bounds==null) return;
+        double south=bounds.getLatSouth(),north=bounds.getLatNorth(),west=bounds.getLonWest(),east=bounds.getLonEast();
+        // Panning a little keeps the existing chips; only a real move re-reads the database.
+        if (Math.abs(south-overlaySouth)<0.0008 && Math.abs(north-overlayNorth)<0.0008
+                && Math.abs(west-overlayWest)<0.0008 && Math.abs(east-overlayEast)<0.0008) { positionRestrictions(); return; }
+        if (Store.display==null) { android.util.Log.i("Overlay","no display database"); clearRestrictions(); return; }
+        java.util.List<DisplayDatabase.MappedRestriction> found;
+        try { found=Store.display.restrictionsInView(south,west,north,east,40); }
+        catch (RuntimeException failed) { android.util.Log.i("Overlay","query failed: "+failed); clearRestrictions(); return; }
+        overlaySouth=south;overlayWest=west;overlayNorth=north;overlayEast=east;
+        overlayRestrictions=found;
+        android.util.Log.i("Overlay",String.format(java.util.Locale.ROOT,"zoom %.1f bounds %.3f,%.3f,%.3f,%.3f -> %d restrictions",zoomLevel,south,west,north,east,found.size()));
+        rebuildRestrictions();
+    }
+
+    private void clearRestrictions() {
+        for (android.widget.TextView chip:chips) removeView(chip);
+        chips.clear();
+        overlayRestrictions=java.util.Collections.emptyList();
+        overlaySouth=overlayWest=overlayNorth=overlayEast=Double.NaN;
+    }
+
+    private void rebuildRestrictions() {
+        for (android.widget.TextView chip:chips) removeView(chip);
+        chips.clear();
+        for (DisplayDatabase.MappedRestriction item:overlayRestrictions) {
+            android.widget.TextView chip=new android.widget.TextView(getContext());
+            chip.setText(item.label);
+            chip.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,9f);
+            chip.setSingleLine(true);
+            chip.setTextColor(0xFFFFFFFF);
+            chip.setPadding(dp(6),dp(2),dp(6),dp(2));
+            android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
+            background.setCornerRadius(dp(4));
+            background.setColor((item.kind&org.eurorig.routing.RestrictionRule.HARD)!=0?0xFFB3261E
+                    :(item.kind&org.eurorig.routing.RestrictionRule.ACCESS)!=0?0xFFB26A00
+                    :0xFF5F6368);
+            chip.setBackground(background);
+            chip.setContentDescription(item.label+" on this road");
+            addView(chip,new android.widget.FrameLayout.LayoutParams(
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                    android.view.ViewGroup.LayoutParams.WRAP_CONTENT));
+            chips.add(chip);
+        }
+        // Text views have no measured size until the next layout pass.
+        post(this::positionRestrictions);
+    }
+
+    private void positionRestrictions() {
+        if (map==null || chips.isEmpty()) return;
+        java.util.List<android.graphics.RectF> placed=new java.util.ArrayList<>();
+        for (int i=0;i<chips.size();i++) {
+            DisplayDatabase.MappedRestriction item=overlayRestrictions.get(i);
+            android.graphics.PointF screen=map.getProjection().toScreenLocation(new LatLng(item.lat,item.lon));
+            android.widget.TextView chip=chips.get(i);
+            float left=screen.x-chip.getWidth()/2f,top=screen.y-chip.getHeight()/2f;
+            android.graphics.RectF box=new android.graphics.RectF(left,top,left+chip.getWidth(),top+chip.getHeight());
+            // Basic declutter: one label per patch of screen, nearest-first ordering from the query.
+            boolean overlaps=false;
+            for (android.graphics.RectF other:placed) if (android.graphics.RectF.intersects(box,other)) { overlaps=true; break; }
+            if (chip.getWidth()==0) { chip.setVisibility(android.view.View.VISIBLE); continue; }
+            if (overlaps) { chip.setVisibility(android.view.View.INVISIBLE); continue; }
+            chip.setVisibility(android.view.View.VISIBLE);
+            chip.setX(left); chip.setY(top);
+            placed.add(box);
+        }
+    }
+
+    private int dp(int value) { return Math.round(value*getResources().getDisplayMetrics().density); }
 
     boolean following() { return following; }
 
