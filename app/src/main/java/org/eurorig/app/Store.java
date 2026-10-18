@@ -54,7 +54,8 @@ final class Store {
         mode=RoutingMode.saved(context.getSharedPreferences("settings",0).getString("routing_mode","ECONOMICAL"));
         try { truck=new Truck(measurement(p,"height",4),measurement(p,"width",2.55),measurement(p,"length",16.5),
             measurement(p,"weight",40),measurement(p,"axle",11.5),p.getBoolean("hazmat",false),
-            p.getBoolean("tolls",false),p.getBoolean("ferries",true),p.getBoolean("unpaved",true),p.getInt("axles",5),measurement(p,"top_speed",80),p.getInt("hazardous_load",p.getBoolean("hazmat",false)?1:0),p.getInt("tunnel_code",0)); }
+            p.getBoolean("tolls",false),p.getBoolean("ferries",true),p.getBoolean("unpaved",true),p.getInt("axles",5),measurement(p,"top_speed",80),p.getInt("hazardous_load",p.getBoolean("hazmat",false)?1:0),p.getInt("tunnel_code",0),
+            measurement(p,"permitted",measurement(p,"weight",40))); }
         catch(IllegalArgumentException e) { truck=Truck.standard(); }
         if(graph!=null&&route==null){
             SharedPreferences saved=context.getSharedPreferences("endpoints",0);
@@ -106,6 +107,7 @@ final class Store {
         truck=t;route=null;
         c.getSharedPreferences("truck",0).edit().putString("height",Double.toString(t.height)).putString("width",Double.toString(t.width))
             .putString("length",Double.toString(t.length)).putString("weight",Double.toString(t.weight)).putString("axle",Double.toString(t.axleWeight))
+            .putString("permitted",Double.toString(t.permittedWeight))
             .putBoolean("hazmat",t.hazmat).putBoolean("tolls",t.avoidTolls).putBoolean("ferries",t.avoidFerries)
             .putBoolean("unpaved",t.avoidUnpaved).putInt("axles",t.axles).putString("top_speed",Double.toString(t.topSpeed)).putInt("hazardous_load",t.hazardousLoad).putInt("tunnel_code",t.tunnelCode).apply();
     }

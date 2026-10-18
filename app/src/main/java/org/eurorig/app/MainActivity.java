@@ -168,7 +168,11 @@ public final class MainActivity extends Activity {
         plan.setAlpha(plan.isEnabled()?1:.45f);drive.setAlpha(drive.isEnabled()?1:.45f);
         plan.setText(busy?"Working…":g==null?"Download maps":"Plan route");drive.setText(active?"Stop":g!=null&&g.demo?"Simulate route":"Start guidance");
         modeButton.setText(Store.deliveryAccess?"Delivery":Store.mode.title);modeButton.setContentDescription("Route preferences: "+Store.mode.title+(Store.deliveryAccess?", permitted delivery access":""));
-        profile.setText(String.format(Locale.getDefault(),"%.1f t  ·  %.2f m high",Store.truck.weight,Store.truck.height));
+        Truck shown=Store.truck;
+        // Loaded mass and permitted maximum mass are different facts; never collapse them.
+        profile.setText(shown.exceedsPermittedMass()
+            ?String.format(Locale.getDefault(),"%.1f t loaded  ·  %.1f t permitted  ·  %.2f m high",shown.weight,shown.permittedWeight,shown.height)
+            :String.format(Locale.getDefault(),"%.1f t  ·  %.2f m high",shown.weight,shown.height));
         if(g==null){status.setText(busy?"Opening maps…":MapDownloadService.running?MapDownloadService.status:"No maps installed");endpoints.setText(R.string.download_country_start);endpoints.setVisibility(View.VISIBLE);instruction.setText(R.string.first_country);stats.setText(R.string.choose_first_map);map.updateGraph(null);map.invalidate();updateMapControls();return;}
         status.setText(MapDownloadService.running?MapDownloadService.status:g.demo?"DEVELOPMENT BUILD · Fictional training map":Store.navigating?"GPS GUIDANCE · Offline · Development build":"Offline · "+g.name);
         endpoints.setText(getString(R.string.route_endpoints,Store.originChosen?label(Store.start):"Choose starting point",Store.destinationChosen?label(Store.end):"Choose destination"));endpoints.setVisibility(active?View.GONE:View.VISIBLE);
@@ -236,8 +240,8 @@ public final class MainActivity extends Activity {
     private void truckDialog(){
         ScrollView scroll=new ScrollView(this);LinearLayout box=vertical();box.setPadding(dp(20),dp(8),dp(20),dp(8));scroll.addView(box);
         box.setFocusableInTouchMode(true);box.requestFocus();
-        Truck t=Store.truck;String[] names={"Height (m)","Width (m)","Length (m)","Loaded gross weight (t)","Maximum loaded axle weight (t)","Total truck and trailer axles","Maximum speed (km/h)"};double[] values={t.height,t.width,t.length,t.weight,t.axleWeight,t.axles,t.topSpeed};EditText[] fields=new EditText[7];
-        for(int i=0;i<7;i++){box.addView(text(names[i],13,MUTED));fields[i]=new EditText(this);fields[i].setContentDescription(names[i]);fields[i].setSelectAllOnFocus(true);fields[i].setSingleLine();fields[i].setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);fields[i].setText(java.math.BigDecimal.valueOf(values[i]).stripTrailingZeros().toPlainString());box.addView(fields[i]);}
+        Truck t=Store.truck;String[] names={"Height (m)","Width (m)","Length (m)","Loaded gross weight now (t)","Permitted maximum mass (t), from the vehicle documents","Maximum loaded axle weight (t)","Total truck and trailer axles","Maximum speed (km/h)"};double[] values={t.height,t.width,t.length,t.weight,t.permittedWeight,t.axleWeight,t.axles,t.topSpeed};EditText[] fields=new EditText[8];
+        for(int i=0;i<8;i++){box.addView(text(names[i],13,MUTED));fields[i]=new EditText(this);fields[i].setContentDescription(names[i]);fields[i].setSelectAllOnFocus(true);fields[i].setSingleLine();fields[i].setInputType(android.text.InputType.TYPE_CLASS_NUMBER|android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL);fields[i].setText(java.math.BigDecimal.valueOf(values[i]).stripTrailingZeros().toPlainString());box.addView(fields[i]);}
         String[] options={"General hazardous material","Avoid toll roads","Avoid ferries","Avoid unpaved roads"};boolean[] checks={(t.hazardousLoad&1)!=0,t.avoidTolls,t.avoidFerries,t.avoidUnpaved};CheckBox[] boxes=new CheckBox[4];
         for(int i=0;i<4;i++){boxes[i]=new CheckBox(this);boxes[i].setText(options[i]);boxes[i].setChecked(checks[i]);box.addView(boxes[i]);}
         CheckBox water=new CheckBox(this),explosives=new CheckBox(this);
@@ -249,10 +253,10 @@ public final class MainActivity extends Activity {
         AlertDialog dialog=new AlertDialog.Builder(this).setTitle("Your truck").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",null).create();dialog.show();
         dialog.getWindow().setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE|WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_HIDDEN);
         dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v->{try{
-            double[] n=new double[7];for(int i=0;i<7;i++)n[i]=Double.parseDouble(fields[i].getText().toString().replace(',','.'));
-            if(n[5]!=Math.rint(n[5]))throw new IllegalArgumentException("Axle count must be a whole number.");
+            double[] n=new double[8];for(int i=0;i<8;i++)n[i]=Double.parseDouble(fields[i].getText().toString().replace(',','.'));
+            if(n[6]!=Math.rint(n[6]))throw new IllegalArgumentException("Axle count must be a whole number.");
             int load=(boxes[0].isChecked()?1:0)|(water.isChecked()?2:0)|(explosives.isChecked()?4:0),code=tunnel.getSelectedItemPosition()==0?0:tunnel.getSelectedItemPosition()+1;
-            Store.saveTruck(this,new Truck(n[0],n[1],n[2],n[3],n[4],load!=0,boxes[1].isChecked(),boxes[2].isChecked(),boxes[3].isChecked(),(int)n[5],n[6],load,code));dialog.dismiss();refresh();
+            Store.saveTruck(this,new Truck(n[0],n[1],n[2],n[3],n[5],load!=0,boxes[1].isChecked(),boxes[2].isChecked(),boxes[3].isChecked(),(int)n[6],n[7],load,code,n[4]));dialog.dismiss();refresh();
         }catch(IllegalArgumentException e){error(e instanceof NumberFormatException?"Enter all measurements as numbers.":e.getMessage());}});
     }
     private void routingOptions(){
