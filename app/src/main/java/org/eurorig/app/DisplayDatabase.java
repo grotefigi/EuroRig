@@ -165,25 +165,51 @@ final class DisplayDatabase implements AutoCloseable {
         }
         return chosen==null?null:new double[]{chosen[1],chosen[2]};
     }
-    /** One recorded restriction, positioned on the road it applies to. */
+    /** One recorded restriction with the geometry it applies to and everything needed to explain it. */
     static final class MappedRestriction{
-        final long way;final double lat,lon;final String label;final int kind;
-        MappedRestriction(long way,double lat,double lon,String label,int kind){
-            this.way=way;this.lat=lat;this.lon=lon;this.label=label;this.kind=kind;
+        final long way;final List<Graph.Node> shape;final String label;final int kind;
+        final double height,width,length,weight,axle;final String evidence;final boolean exceeded;
+        MappedRestriction(long way,List<Graph.Node> shape,String label,int kind,
+                          double height,double width,double length,double weight,double axle,
+                          String evidence,boolean exceeded){
+            this.way=way;this.shape=shape;this.label=label;this.kind=kind;
+            this.height=height;this.width=width;this.length=length;this.weight=weight;this.axle=axle;
+            this.evidence=evidence==null?"":evidence;this.exceeded=exceeded;
         }
+        /** Would this record actually affect the given vehicle? */
+        boolean affects(Truck truck){
+            if(height>0&&truck.height>height)return true;
+            if(width>0&&truck.width>width)return true;
+            if(length>0&&truck.length>length)return true;
+            if(weight>0&&truck.weight>weight)return true;
+            if(axle>0&&truck.axleWeight>axle)return true;
+            // Class prohibitions apply to every HGV, whatever its measurements.
+            return (kind&RestrictionRule.ACCESS)!=0;
+        }
+        /** Physical/legal limit this vehicle exceeds: never a delivery exception. */
+        boolean physicallyBlocked(){ return exceeded; }
     }
 
     /**
-     * Restrictions recorded on roads inside the viewport, positioned at each road's midpoint.
-     * This reads the same normalised records the router audits; there is no second parser.
+     * Restrictions recorded on roads inside the viewport, with the road geometry they cover.
+     * Reads the same normalised records the router audits; there is no second parser.
      */
     synchronized List<MappedRestriction> restrictionsInView(double south,double west,double north,double east,int limit){
         ArrayList<MappedRestriction> found=new ArrayList<>();
         if(!restrictionEvidence)return found;
+        Truck truck=Store.truck;
         String columns=classified?",coalesce(q.kind,0),coalesce(q.evidence,'')":",0,''";
-        String[] args={""+south,""+north,""+west,""+east,""+limit};
+        // The 0.02 degree cell index turns a full bbox scan into a handful of range probes
+        // (150 ms -> 7 ms here); the bbox form is only a fallback for packs without it.
+        boolean indexed=hasTable("cells");
+        String from=" FROM roads r JOIN road_rules q ON q.way=r.id WHERE ";
+        String where=indexed?"r.id IN (SELECT road FROM cells WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?)"
+                :"r.north>=? AND r.south<=? AND r.east<=? AND r.west<=?";
+        String[] args=indexed
+                ?new String[]{""+(int)Math.floor(south/.02),""+(int)Math.floor(north/.02),""+(int)Math.floor(west/.02),""+(int)Math.floor(east/.02),""+limit}
+                :new String[]{""+south,""+north,""+west,""+east,""+limit};
         try(Cursor rows=database.rawQuery("SELECT r.id,r.level,r.shape,coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0)"+columns
-                +" FROM roads r JOIN road_rules q ON q.way=r.id WHERE r.north>=? AND r.south<=? AND r.east>=? AND r.west<=? AND r.level<=4 LIMIT ?",args)){
+                +from+where+" AND r.level<=4 LIMIT ?",args)){
             while(rows.moveToNext()){
                 double height=rows.getDouble(3),width=rows.getDouble(4),length=rows.getDouble(5),weight=rows.getDouble(6),axle=rows.getDouble(7);
                 int kind=rows.getInt(9);String evidence=rows.getString(10);
@@ -193,9 +219,10 @@ final class DisplayDatabase implements AutoCloseable {
                 if(label==null)continue;
                 List<Graph.Node> shape;
                 try{shape=NativeRouter.decode(rows.getString(2));}catch(RuntimeException malformed){continue;}
-                if(shape.isEmpty())continue;
-                Graph.Node point=shape.get(shape.size()/2);
-                found.add(new MappedRestriction(rows.getLong(0),point.lat,point.lon,label,kind));
+                if(shape.size()<2)continue;
+                boolean exceeded=(height>0&&truck.height>height)||(width>0&&truck.width>width)||(length>0&&truck.length>length)
+                        ||(weight>0&&truck.weight>weight)||(axle>0&&truck.axleWeight>axle);
+                found.add(new MappedRestriction(rows.getLong(0),shape,label,kind,height,width,length,weight,axle,evidence,exceeded));
             }
         }
         return found;
@@ -221,8 +248,7 @@ final class DisplayDatabase implements AutoCloseable {
     }
 
     private static String trim(double value){
-        String text=java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
-        return text;
+        return java.math.BigDecimal.valueOf(value).stripTrailingZeros().toPlainString();
     }
 
     private static Map<String,String> parseTags(String json){

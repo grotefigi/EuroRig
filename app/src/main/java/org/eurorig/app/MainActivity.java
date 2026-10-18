@@ -178,7 +178,10 @@ public final class MainActivity extends Activity {
         endpoints.setText(getString(R.string.route_endpoints,Store.originChosen?label(Store.start):"Choose starting point",Store.destinationChosen?label(Store.end):"Choose destination"));endpoints.setVisibility(active?View.GONE:View.VISIBLE);
         Router.Route r=Store.route;
         if(active){instruction.setText(simulating?getString(R.string.simulated_instruction,Store.guidance):Store.guidance);stats.setText(String.format(Locale.getDefault(),"%.1f km remaining%s\n%s",Store.remaining/1000,simulating?" · Fictional roads":"",fresh?"GPS position received":"Waiting for a fresh GPS fix"));}
-        else if(r!=null){String caution=Store.restrictionWarning();
+        else if(r!=null){
+        if(Store.relocationFrom()!=null&&map!=null)map.showRelocation(Store.relocatedAtOrigin(),Store.relocationFrom(),Store.relocationTo(),Store.relocationMetres());
+        else if(map!=null)map.clearRelocation();
+        String caution=Store.restrictionWarning();
         instruction.setText(Store.arrived?(g.demo?"Training route complete":"You have arrived"):r.edges.isEmpty()?"Start and destination are the same":caution.isEmpty()?"Route ready for your truck":caution);stats.setText(String.format(Locale.getDefault(),"%.1f km  ·  ≈ %s  ·  %s",r.metres/1000,duration(r.seconds),r.nativeGeometry()?(Store.deliveryAccess?"Shortest delivery":Store.mode.title)+(r.restrictedMetres>0?" · "+Math.round(r.restrictedMetres)+" m restricted access":"")+"  ·  map data, not a legal guarantee":"Tagged restrictions checked"));}
         else{instruction.setText(R.string.select_destination);stats.setText(R.string.choose_destination);}
         map.updateGraph(Store.graph);
@@ -257,7 +260,9 @@ public final class MainActivity extends Activity {
             double[] n=new double[8];for(int i=0;i<8;i++)n[i]=Double.parseDouble(fields[i].getText().toString().replace(',','.'));
             if(n[6]!=Math.rint(n[6]))throw new IllegalArgumentException("Axle count must be a whole number.");
             int load=(boxes[0].isChecked()?1:0)|(water.isChecked()?2:0)|(explosives.isChecked()?4:0),code=tunnel.getSelectedItemPosition()==0?0:tunnel.getSelectedItemPosition()+1;
-            Store.saveTruck(this,new Truck(n[0],n[1],n[2],n[3],n[5],load!=0,boxes[1].isChecked(),boxes[2].isChecked(),boxes[3].isChecked(),(int)n[6],n[7],load,code,n[4]));dialog.dismiss();refresh();
+            Store.saveTruck(this,new Truck(n[0],n[1],n[2],n[3],n[5],load!=0,boxes[1].isChecked(),boxes[2].isChecked(),boxes[3].isChecked(),(int)n[6],n[7],load,code,n[4]));dialog.dismiss();
+            if(map!=null)map.invalidateRestrictions();
+            refresh();
         }catch(IllegalArgumentException e){error(e instanceof NumberFormatException?"Enter all measurements as numbers.":e.getMessage());}});
     }
     private void routingOptions(){
@@ -269,11 +274,18 @@ public final class MainActivity extends Activity {
         }
         choices.check(900+Store.mode.ordinal());box.addView(choices);
         CheckBox access=new CheckBox(this);access.setText(R.string.delivery_permission);access.setChecked(Store.deliveryAccess);box.addView(access);
+        CheckBox everyRestriction=new CheckBox(this);
+        everyRestriction.setText("Show every recorded restriction, not only the ones affecting this truck");
+        everyRestriction.setChecked(Store.showAllRestrictions);box.addView(everyRestriction);
         box.addView(text("Delivery access is limited to 2 km from the destination. It uses shortest routing and preserves height, width, length, gross/axle weight, ADR and turn restrictions. Unknown limits, barriers and bridges on restricted access are excluded. Permission applies to this trip on this device.",12,MUTED));
         ScrollView scroll=new ScrollView(this);scroll.addView(box);
         new AlertDialog.Builder(this).setTitle("Route preferences").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{
             Store.mode=RoutingMode.values()[choices.indexOfChild(choices.findViewById(choices.getCheckedRadioButtonId()))];Store.deliveryAccess=access.isChecked();Store.route=null;
-            getSharedPreferences("settings",0).edit().putString("routing_mode",Store.mode.name()).apply();refresh();
+            Store.showAllRestrictions=everyRestriction.isChecked();
+            getSharedPreferences("settings",0).edit().putString("routing_mode",Store.mode.name())
+                .putBoolean("show_all_restrictions",Store.showAllRestrictions).apply();
+            if(map!=null)map.invalidateRestrictions();
+            refresh();
         }).show();
     }
     private void calculate(){

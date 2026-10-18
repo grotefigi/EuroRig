@@ -20,6 +20,14 @@ final class NativeRouter implements AutoCloseable {
     private final Valhalla engine;
     /** Restrictions the route had to accept, verbatim, for the driver to see. */
     private volatile String warning="";
+    /** Set when the start or destination had to move off a road this truck may not use. */
+    private volatile boolean relocationAtOrigin;
+    private volatile double[] relocationFrom,relocationTo;
+    private volatile double relocationMetres;
+    boolean relocatedAtOrigin(){return relocationAtOrigin;}
+    double[] relocationFrom(){return relocationFrom;}
+    double[] relocationTo(){return relocationTo;}
+    double relocationMetres(){return relocationMetres;}
     String restrictionWarning(){return warning;}
     NativeRouter(Context context,File tiles) throws IOException {
         try{RegionPackages.validateTar(tiles);}
@@ -151,6 +159,7 @@ final class NativeRouter implements AutoCloseable {
             if((delivery||truck.tunnelCode!=0||(truck.hazardousLoad&6)!=0)&&(display==null||!display.restrictionEvidence))
                 throw new IllegalStateException("Install the updated country map with restriction evidence before using delivery access or detailed ADR routing");
             double[] start={lat,lon},finish={endLat,endLon};
+            relocationAtOrigin=false;relocationFrom=null;relocationTo=null;relocationMetres=0;
             Plan plan=null;String relocation="";
             for(int pass=0;pass<3;pass++){
                 plan=planRoute(start[0],start[1],finish[0],finish[1],truck,mode,delivery,display);
@@ -158,11 +167,25 @@ final class NativeRouter implements AutoCloseable {
                 boolean moved=false;
                 if(plan.originHard){
                     double[] alternative=accessPoint(start[0],start[1],truck,display);
-                    if(alternative!=null){relocation=String.format(java.util.Locale.ROOT,"Start moved %.0f m: the requested point is on a road this truck may not use",Geo.distance(start[0],start[1],alternative[0],alternative[1]));start=alternative;moved=true;}
+                    if(alternative!=null){
+                        relocationMetres=Geo.distance(start[0],start[1],alternative[0],alternative[1]);
+                        relocationAtOrigin=true;relocationFrom=new double[]{start[0],start[1]};relocationTo=alternative;
+                        android.util.Log.i("Relocation",String.format(java.util.Locale.ROOT,
+                                "origin moved %.0f m from %.5f,%.5f to %.5f,%.5f (%s)",relocationMetres,start[0],start[1],alternative[0],alternative[1],plan.failure));
+                        relocation=String.format(java.util.Locale.ROOT,"Start moved %.0f m: the requested point is on a road this truck may not use",relocationMetres);
+                        start=alternative;moved=true;
+                    }
                 }
                 if(!moved&&plan.destinationHard){
                     double[] alternative=accessPoint(finish[0],finish[1],truck,display);
-                    if(alternative!=null){relocation=String.format(java.util.Locale.ROOT,"Destination moved %.0f m: the requested point is on a road this truck may not use",Geo.distance(finish[0],finish[1],alternative[0],alternative[1]));finish=alternative;moved=true;}
+                    if(alternative!=null){
+                        relocationMetres=Geo.distance(finish[0],finish[1],alternative[0],alternative[1]);
+                        relocationAtOrigin=false;relocationFrom=new double[]{finish[0],finish[1]};relocationTo=alternative;
+                        android.util.Log.i("Relocation",String.format(java.util.Locale.ROOT,
+                                "destination moved %.0f m from %.5f,%.5f to %.5f,%.5f (%s)",relocationMetres,finish[0],finish[1],alternative[0],alternative[1],plan.failure));
+                        relocation=String.format(java.util.Locale.ROOT,"Destination moved %.0f m: the requested point is on a road this truck may not use",relocationMetres);
+                        finish=alternative;moved=true;
+                    }
                 }
                 if(!moved)throw new IllegalStateException(plan.failure+" - no road this truck may use within "+(int)ENDPOINT_METRES+" m of the requested point");
             }
