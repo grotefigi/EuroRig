@@ -72,8 +72,8 @@ final class NativeRouter implements AutoCloseable {
     }
 
     /** A road this truck may legally and physically use, within the endpoint radius. */
-    private double[] accessPoint(double lat,double lon,Truck truck,DisplayDatabase display){
-        return display==null?null:display.legalAccessPoint(lat,lon,truck,ENDPOINT_METRES);
+    private double[] accessPoint(double lat,double lon,Truck truck,DisplayDatabase display,Set<Long> skip){
+        return display==null?null:display.legalAccessPoint(lat,lon,truck,ENDPOINT_METRES,skip);
     }
 
     /** Result of one audited attempt sequence. */
@@ -81,6 +81,8 @@ final class NativeRouter implements AutoCloseable {
         JSONObject response;long[] ways;Map<Long,RestrictionRule> rules=Collections.emptyMap();
         double restrictedMetres;Set<String> warnings=new TreeSet<>();String failure="";
         boolean originHard,destinationHard;
+        /** Road that caused the endpoint rejection, so the relocation search never picks it again. */
+        long failedWay;
     }
 
     /**
@@ -126,12 +128,27 @@ final class NativeRouter implements AutoCloseable {
                 Graph.Node point=new Graph.Node((a.lat+b.lat)/2,(a.lon+b.lon)/2,"");RestrictionRule rule=rules.get(way);
                 double toOrigin=Geo.distance(point.lat,point.lon,lat,lon),toDestination=Geo.distance(point.lat,point.lon,endLat,endLon);
                 double metresToDestination=Math.max(Geo.distance(geometry.get(begin).lat,geometry.get(begin).lon,endLat,endLon),Geo.distance(geometry.get(end).lat,geometry.get(end).lon,endLat,endLon));
+                // A one-way record only applies to the direction it faces. The pack keeps the OSM
+                // way's node order, so the way's bearing at this point is the reference; when it
+                // cannot be read the record stays conservative for both directions.
+                int travel=RestrictionRule.DIR_UNKNOWN;
+                if(rule!=null&&rule.directional()&&display!=null){
+                    double wayBearing=display.wayBearing(way,point.lat,point.lon);
+                    if(Double.isFinite(wayBearing)){
+                        double heading=Geo.bearing(geometry.get(begin),geometry.get(Math.min(end,begin+1)));
+                        double delta=Math.abs(((wayBearing-heading+540)%360)-180);
+                        travel=delta<90?RestrictionRule.DIR_FORWARD:RestrictionRule.DIR_BACKWARD;
+                        android.util.Log.i("Direction",String.format(java.util.Locale.ROOT,
+                                "way %d travel %s heading %.0f way %.0f",way,
+                                travel==RestrictionRule.DIR_FORWARD?"forward":"backward",heading,wayBearing));
+                    }else android.util.Log.i("Direction","way "+way+" geometry unavailable: applying both ways");
+                }
                 String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null)
-                    :rule.violation(truck,delivery,metresToDestination,toOrigin<=ENDPOINT_METRES);
+                    :rule.violation(truck,delivery,metresToDestination,toOrigin<=ENDPOINT_METRES,travel);
                 if(reason!=null){
                     if(rule!=null&&rule.hard(truck)){
                         // Reported so the endpoint can be moved. Never excluded, never accepted.
-                        failure=reason;
+                        failure=reason;plan.failedWay=way;
                         if(toOrigin<=ENDPOINT_METRES)originHard=true;else if(toDestination<=ENDPOINT_METRES)destinationHard=true;
                         rejected=true;break;
                     }
@@ -141,7 +158,7 @@ final class NativeRouter implements AutoCloseable {
                     excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));
                     rejected=true;break;
                 }
-                if(rule!=null&&rule.accessLimited())restricted+=edge.getDouble("length")*1000;
+                if(rule!=null&&rule.accessLimited()&&rule.applies(travel))restricted+=edge.getDouble("length")*1000;
             }
             plan.warnings.addAll(notes);
             if(!rejected){plan.response=response;plan.restrictedMetres=restricted;candidate=response;break;}
@@ -161,14 +178,19 @@ final class NativeRouter implements AutoCloseable {
             double[] start={lat,lon},finish={endLat,endLon};
             relocationAtOrigin=false;relocationFrom=null;relocationTo=null;relocationMetres=0;
             Plan plan=null;String relocation="";
+            // Roads already proved unusable for this truck at an endpoint: never offer them again.
+            Set<Long> unusable=new LinkedHashSet<>();
             for(int pass=0;pass<3;pass++){
                 plan=planRoute(start[0],start[1],finish[0],finish[1],truck,mode,delivery,display);
                 if(!plan.originHard&&!plan.destinationHard)break;
+                if(plan.failedWay>0)unusable.add(plan.failedWay);
                 boolean moved=false;
                 if(plan.originHard){
-                    double[] alternative=accessPoint(start[0],start[1],truck,display);
-                    if(alternative!=null){
-                        relocationMetres=Geo.distance(start[0],start[1],alternative[0],alternative[1]);
+                    double[] alternative=accessPoint(start[0],start[1],truck,display,unusable);
+                    double metres=alternative==null?-1:Geo.distance(start[0],start[1],alternative[0],alternative[1]);
+                    // A candidate at the requested point is not an alternative: it would loop.
+                    if(alternative!=null&&metres>1.0){
+                        relocationMetres=metres;
                         relocationAtOrigin=true;relocationFrom=new double[]{start[0],start[1]};relocationTo=alternative;
                         android.util.Log.i("Relocation",String.format(java.util.Locale.ROOT,
                                 "origin moved %.0f m from %.5f,%.5f to %.5f,%.5f (%s)",relocationMetres,start[0],start[1],alternative[0],alternative[1],plan.failure));
@@ -177,9 +199,10 @@ final class NativeRouter implements AutoCloseable {
                     }
                 }
                 if(!moved&&plan.destinationHard){
-                    double[] alternative=accessPoint(finish[0],finish[1],truck,display);
-                    if(alternative!=null){
-                        relocationMetres=Geo.distance(finish[0],finish[1],alternative[0],alternative[1]);
+                    double[] alternative=accessPoint(finish[0],finish[1],truck,display,unusable);
+                    double metres=alternative==null?-1:Geo.distance(finish[0],finish[1],alternative[0],alternative[1]);
+                    if(alternative!=null&&metres>1.0){
+                        relocationMetres=metres;
                         relocationAtOrigin=false;relocationFrom=new double[]{finish[0],finish[1]};relocationTo=alternative;
                         android.util.Log.i("Relocation",String.format(java.util.Locale.ROOT,
                                 "destination moved %.0f m from %.5f,%.5f to %.5f,%.5f (%s)",relocationMetres,finish[0],finish[1],alternative[0],alternative[1],plan.failure));
@@ -187,7 +210,7 @@ final class NativeRouter implements AutoCloseable {
                         finish=alternative;moved=true;
                     }
                 }
-                if(!moved)throw new IllegalStateException(plan.failure+" - no road this truck may use within "+(int)ENDPOINT_METRES+" m of the requested point");
+                if(!moved)throw new IllegalStateException(plan.failure+" - no other road this truck may use within "+(int)ENDPOINT_METRES+" m of the requested point");
             }
             if(plan==null||plan.response==null)throw new IllegalStateException("No truck route");
             JSONObject response=plan.response;
@@ -214,7 +237,8 @@ final class NativeRouter implements AutoCloseable {
             Graph.Edge[] edges=new Graph.Edge[Math.max(0,nodes.size()-1)];
             for(int i=0;i<edges.length;i++){
                 long way=auditedWays==null?i:auditedWays[i];RestrictionRule rule=auditedRules.get(way);
-                edges[i]=rule==null?new Graph.Edge(i,i+1,way,"Route","road",0,0,0,0,0,0,50):new Graph.Edge(i,i+1,way,"Route","road",rule.height,rule.width,rule.length,rule.weight,rule.axle,rule.flags,50);
+                edges[i]=rule==null?new Graph.Edge(i,i+1,way,"Route","road",0,0,0,0,0,0,50)
+                        :new Graph.Edge(i,i+1,way,"Route","road",rule.height,rule.width,rule.length,rule.weight,rule.axle,rule.flags,50,rule.kind,rule.evidence);
             }
             Graph graph=new Graph("Valhalla truck route","© OpenStreetMap contributors · ODbL 1.0","Installed routing snapshot",false,
                 nodes.toArray(new Graph.Node[0]),edges,Collections.emptyList());

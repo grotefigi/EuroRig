@@ -14,6 +14,7 @@ import org.eurorig.routing.Geo;
 import org.eurorig.routing.Truck;
 import org.eurorig.routing.MapCamera;
 import org.eurorig.routing.Router;
+import org.eurorig.routing.RouteSection;
 import org.maplibre.android.MapLibre;
 import org.maplibre.android.camera.CameraUpdateFactory;
 import org.maplibre.android.geometry.LatLng;
@@ -41,8 +42,9 @@ final class RoadMapView extends FrameLayout {
 
     interface Pick { void picked(int node); }
 
-    private static final String ROUTE_SOURCE="route-source";
-    private static final String RESTRICTED_SOURCE="restricted-source";
+    /** One route source per classification, in the same order as RouteSection's constants. */
+    private static final String[] ROUTE_SOURCES={"route-plain","route-access","route-uncertain","route-prohibited"};
+    private static final String[] ROUTE_COLOURS={"#0073FF","#B26A00","#5F6368","#B3261E"};
     private static MapTiles sharedTiles;
 
     private final MapView view;
@@ -51,6 +53,8 @@ final class RoadMapView extends FrameLayout {
     private final java.util.List<android.widget.TextView> chips=new java.util.ArrayList<>();
     private java.util.List<DisplayDatabase.MappedRestriction> overlayRestrictions=java.util.Collections.emptyList();
     private double overlaySouth=Double.NaN,overlayWest=Double.NaN,overlayNorth=Double.NaN,overlayEast=Double.NaN;
+    /** Route the overlay was last built for, so a new plan is never served from the old cache. */
+    private Router.Route overlayRoute;
     private final java.util.List<Graph.Node> overlayChips=new java.util.ArrayList<>();
     private final java.util.concurrent.ExecutorService overlayWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
     private int overlayGeneration;
@@ -192,47 +196,55 @@ final class RoadMapView extends FrameLayout {
 
     private void drawRoute() {
         if (style==null) return;
-        List<Point> line=new ArrayList<>();
-        List<Point> blocked=new ArrayList<>();
-        boolean broken=false;
-        if (route!=null) {
-            Graph.Node previous=null;
-            for (Graph.Edge edge:route.edges) {
-                Graph.Node a=route.graph.nodes[edge.from];
-                Graph.Node b=route.graph.nodes[edge.to];
-                if (previous==null || previous.lat!=a.lat || previous.lon!=a.lon) {
-                    line.add(Point.fromLngLat(a.lon,a.lat));
+        // One colour per classification the audit itself assigned to these edges, so the painted
+        // route and the routing decision cannot disagree. Sections keep their own start and end:
+        // a restricted stretch is never joined to the next one by a straight line across a gap.
+        List<RouteSection> sections=route==null?java.util.Collections.<RouteSection>emptyList()
+                :RouteSection.of(route.edges,Store.truck);
+        List<Feature>[] features=new List[]{new ArrayList<>(),new ArrayList<>(),new ArrayList<>(),new ArrayList<>()};
+        List<Feature> casing=new ArrayList<>();
+        for (RouteSection section:sections) {
+            List<Point> line=new ArrayList<>();
+            for (int i=section.start;i<section.end&&i<route.edges.size();i++) {
+                Graph.Edge edge=route.edges.get(i);
+                Graph.Node a=route.graph.nodes[edge.from],b=route.graph.nodes[edge.to];
+                if (line.isEmpty()) line.add(Point.fromLngLat(a.lon,a.lat));
+                else {
+                    Point last=line.get(line.size()-1);
+                    if (last.latitude()!=a.lat||last.longitude()!=a.lon) line.add(Point.fromLngLat(a.lon,a.lat));
                 }
-                if ((edge.flags&Graph.BLOCKED)!=0) blocked.add(Point.fromLngLat(b.lon,b.lat));
                 line.add(Point.fromLngLat(b.lon,b.lat));
-                previous=b;
             }
+            if (line.size()<2) continue;
+            LineString geometry=LineString.fromLngLats(line);
+            features[section.cls].add(Feature.fromGeometry(geometry));
+            casing.add(Feature.fromGeometry(geometry));
         }
-        GeoJsonSource existing=style.getSourceAs(ROUTE_SOURCE);
-        if (existing!=null) {
-            existing.setGeoJson(line.size()<2?FeatureCollection.fromFeatures(new Feature[0])
-                    :FeatureCollection.fromFeature(Feature.fromGeometry(LineString.fromLngLats(line))));
-        } else if (line.size()>=2 && map!=null) {
-            style.addSource(new GeoJsonSource(ROUTE_SOURCE,
-                    FeatureCollection.fromFeature(Feature.fromGeometry(LineString.fromLngLats(line)))));
-            style.addLayer(new LineLayer("route-casing",ROUTE_SOURCE).withProperties(
-                    PropertyFactory.lineColor("#FFFFFF"),PropertyFactory.lineWidth(11f),
-                    PropertyFactory.lineCap("round"),PropertyFactory.lineJoin("round")));
-            style.addLayer(new LineLayer("route-line",ROUTE_SOURCE).withProperties(
-                    PropertyFactory.lineColor("#0073FF"),PropertyFactory.lineWidth(7f),
-                    PropertyFactory.lineCap("round"),PropertyFactory.lineJoin("round")));
-        }
-        if (blocked.size()>=2) {
-            GeoJsonSource restricted=style.getSourceAs(RESTRICTED_SOURCE);
-            FeatureCollection features=FeatureCollection.fromFeature(
-                    Feature.fromGeometry(LineString.fromLngLats(blocked)));
-            if (restricted!=null) restricted.setGeoJson(features);
-            else {
-                style.addSource(new GeoJsonSource(RESTRICTED_SOURCE,features));
-                style.addLayer(new LineLayer("restricted-line",RESTRICTED_SOURCE).withProperties(
-                        PropertyFactory.lineColor("#E86826"),PropertyFactory.lineWidth(7f)));
-            }
-        }
+        applyRouteLayer("route-casing",casing,"#FFFFFF",11f,null);
+        for (int cls=0;cls<features.length;cls++)
+            applyRouteLayer(ROUTE_SOURCES[cls],features[cls],ROUTE_COLOURS[cls],7f,"route-casing");
+        int[] counts=new int[4];double[] metres=new double[4];
+        for (RouteSection section:sections){counts[section.cls]++;metres[section.cls]+=section.metres;}
+        android.util.Log.i("Route",String.format(java.util.Locale.ROOT,
+                "sections plain %d/%.0fm access %d/%.0fm unverified %d/%.0fm prohibited %d/%.0fm",
+                counts[0],metres[0],counts[1],metres[1],counts[2],metres[2],counts[3],metres[3]));
+    }
+
+    /** Drop the painted route: the vehicle profile or the plan changed. */
+    void clearRoute() { if (route==null) { clearRelocation(); return; } route=null; clearRelocation(); drawRoute(); }
+
+    /** Replace or create one route source and its line layer, keeping the stacking order. */
+    private void applyRouteLayer(String name,List<Feature> features,String colour,float width,String below) {
+        FeatureCollection collection=FeatureCollection.fromFeatures(features.toArray(new Feature[0]));
+        GeoJsonSource existing=style.getSourceAs(name);
+        if (existing!=null) { existing.setGeoJson(collection); return; }
+        if (features.isEmpty()) return;
+        style.addSource(new GeoJsonSource(name,collection));
+        LineLayer layer=new LineLayer(name+"-line",name).withProperties(
+                PropertyFactory.lineColor(colour),PropertyFactory.lineWidth(width),
+                PropertyFactory.lineCap("round"),PropertyFactory.lineJoin("round"));
+        if (below!=null&&style.getLayer(below)!=null) style.addLayerAbove(layer,below);
+        else style.addLayer(layer);
     }
 
     /**
@@ -242,22 +254,28 @@ final class RoadMapView extends FrameLayout {
      */
     private void refreshRestrictions() {
         if (map==null || style==null) return;
-        if (zoomLevel<13.0) { clearRestrictions(); return; }
+        final java.util.Set<Long> routeWays=new java.util.HashSet<>();
+        final Router.Route current=Store.route;
+        if(Store.routeOnlyRestrictions&&current!=null)for(Graph.Edge edge:current.edges)routeWays.add(edge.way);
+        // With no route filter the overlay is a viewport read and only pays off when zoomed in.
+        if (zoomLevel<13.0 && routeWays.isEmpty()) { clearRestrictions(); return; }
         org.maplibre.android.geometry.LatLngBounds bounds;
         try { bounds=map.getProjection().getVisibleRegion().latLngBounds; } catch (RuntimeException notReady) { return; }
         if (bounds==null) return;
         final double south=bounds.getLatSouth(),north=bounds.getLatNorth(),west=bounds.getLonWest(),east=bounds.getLonEast();
-        if (Math.abs(south-overlaySouth)<0.0008 && Math.abs(north-overlayNorth)<0.0008
+        if (current==overlayRoute && Math.abs(south-overlaySouth)<0.0008 && Math.abs(north-overlayNorth)<0.0008
                 && Math.abs(west-overlayWest)<0.0008 && Math.abs(east-overlayEast)<0.0008) { positionRestrictions(); return; }
         final DisplayDatabase display=Store.display;
         if (display==null) { clearRestrictions(); return; }
         final Truck truck=Store.truck;
         final boolean showAll=Store.showAllRestrictions;
+        final boolean routeOnly=Store.routeOnlyRestrictions;
         final int token=++overlayGeneration;
         overlayWorker.execute(()->{
             long started=System.nanoTime();
             java.util.List<DisplayDatabase.MappedRestriction> found;
-            try { found=display.restrictionsInView(south,west,north,east,150); }
+            try { found=routeWays.isEmpty()?display.restrictionsInView(south,west,north,east,150)
+                    :display.restrictionsOnWays(routeWays,150); }
             catch (RuntimeException failed) {
                 android.util.Log.i("Overlay","query failed: "+failed);
                 found=java.util.Collections.emptyList();
@@ -269,7 +287,13 @@ final class RoadMapView extends FrameLayout {
             buckets.put("restriction-access",new java.util.ArrayList<>());
             buckets.put("restriction-uncertain",new java.util.ArrayList<>());
             for (DisplayDatabase.MappedRestriction item:found) {
-                if (!showAll && !item.affects(truck)) continue;
+                // Route-relevant mode: only records the current route actually travels over, and on
+                // those roads always keep unverified data visible (uncertainty is never decluttered).
+                boolean routeMode=!routeWays.isEmpty();
+                if (!routeMode && !showAll && !item.affects(truck)) continue;
+                if (routeMode && !showAll && !item.affects(truck)
+                        && (item.kind&org.eurorig.routing.RestrictionRule.UNCERTAIN)==0) continue;
+                if (routeMode && !routeWays.contains(item.way)) continue;
                 String bucket=(item.kind&org.eurorig.routing.RestrictionRule.HARD)!=0?"restriction-hard"
                         :(item.kind&org.eurorig.routing.RestrictionRule.ACCESS)!=0?"restriction-access"
                         :"restriction-uncertain";
@@ -287,7 +311,7 @@ final class RoadMapView extends FrameLayout {
             long built=System.nanoTime();
             post(()->{
                 if (token!=overlayGeneration) return;
-                overlaySouth=south;overlayWest=west;overlayNorth=north;overlayEast=east;
+                overlaySouth=south;overlayWest=west;overlayNorth=north;overlayEast=east;overlayRoute=current;
                 overlayRestrictions=finalShown;
                 for (java.util.Map.Entry<String,FeatureCollection> entry:collections.entrySet())
                     applySegmentLayer(entry.getKey(),entry.getValue());
@@ -392,6 +416,14 @@ final class RoadMapView extends FrameLayout {
         if (item.kind==org.eurorig.routing.RestrictionRule.UNCERTAIN
                 || (item.kind&org.eurorig.routing.RestrictionRule.UNCERTAIN)!=0)
             text.append("Uncertainty: this tag is present but not verified; conditional restrictions are not enforced.\n");
+        boolean oneway=(item.kind&(org.eurorig.routing.RestrictionRule.FORWARD|org.eurorig.routing.RestrictionRule.BACKWARD))!=0;
+        if (oneway) {
+            boolean forward=(item.kind&org.eurorig.routing.RestrictionRule.FORWARD)!=0;
+            boolean backward=(item.kind&org.eurorig.routing.RestrictionRule.BACKWARD)!=0;
+            text.append("Direction: recorded for travel ").append(forward&&backward?"in both directions"
+                    :forward?"along the OSM way only (not against it)":"against the OSM way only (not with it)")
+                .append("; the audit applies it in that direction only.\n");
+        }
         if (item.exceeded) text.append("This truck exceeds the recorded limit.\n");
         else if ((item.kind&org.eurorig.routing.RestrictionRule.HARD)!=0) text.append("This truck is within the recorded limit.\n");
         if ((item.kind&org.eurorig.routing.RestrictionRule.ACCESS)!=0)

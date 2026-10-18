@@ -182,8 +182,21 @@ public final class MainActivity extends Activity {
         if(Store.relocationFrom()!=null&&map!=null)map.showRelocation(Store.relocatedAtOrigin(),Store.relocationFrom(),Store.relocationTo(),Store.relocationMetres());
         else if(map!=null)map.clearRelocation();
         String caution=Store.restrictionWarning();
-        instruction.setText(Store.arrived?(g.demo?"Training route complete":"You have arrived"):r.edges.isEmpty()?"Start and destination are the same":caution.isEmpty()?"Route ready for your truck":caution);stats.setText(String.format(Locale.getDefault(),"%.1f km  ·  ≈ %s  ·  %s",r.metres/1000,duration(r.seconds),r.nativeGeometry()?(Store.deliveryAccess?"Shortest delivery":Store.mode.title)+(r.restrictedMetres>0?" · "+Math.round(r.restrictedMetres)+" m restricted access":"")+"  ·  map data, not a legal guarantee":"Tagged restrictions checked"));}
-        else{instruction.setText(R.string.select_destination);stats.setText(R.string.choose_destination);}
+        instruction.setText(Store.arrived?(g.demo?"Training route complete":"You have arrived"):r.edges.isEmpty()?"Start and destination are the same":caution.isEmpty()?"Route ready for your truck":caution);
+        List<RouteSection> sections=RouteSection.of(r.edges,Store.truck);
+        double accessMetres=RouteSection.metresOf(sections,RouteSection.AUTHORISED_ACCESS);
+        double unverifiedMetres=RouteSection.metresOf(sections,RouteSection.UNVERIFIED);
+        StringBuilder summary=new StringBuilder(String.format(Locale.getDefault(),"%.1f km  ·  ≈ %s  ·  %s",r.metres/1000,duration(r.seconds),r.nativeGeometry()?(Store.deliveryAccess?"Shortest delivery":Store.mode.title):"Tagged restrictions checked"));
+        if(accessMetres>0)summary.append(String.format(Locale.getDefault(),"  ·  %d m access-restricted",Math.round(accessMetres)));
+        if(unverifiedMetres>0)summary.append(String.format(Locale.getDefault(),"  ·  %d m not verified",Math.round(unverifiedMetres)));
+        summary.append("  ·  map data, not a legal guarantee");
+        stats.setText(summary.toString());
+        // The painted route and this explanation come from the same sections; tapping explains them.
+        boolean explained=accessMetres>0||unverifiedMetres>0;
+        stats.setContentDescription(explained?"Route with restricted sections. Tap for details.":null);
+        stats.setOnClickListener(explained?v->routeSectionsDialog(sections):null);
+        stats.setClickable(explained);}
+        else{instruction.setText(R.string.select_destination);stats.setText(R.string.choose_destination);map.clearRoute();}
         map.updateGraph(Store.graph);
         if(active&&!guidanceWasActive&&fresh){map.locate(Store.lat,Store.lon);guidanceWasActive=true;}
         if(active&&fresh)map.updatePosition();else map.invalidate();
@@ -192,6 +205,20 @@ public final class MainActivity extends Activity {
     }
     private String label(int node){if(Store.graph==null)return "";Graph.Node n=Store.graph.nodes[node];return n.label.isEmpty()?String.format(Locale.ROOT,"%.5f, %.5f",n.lat,n.lon):n.label;}
     private String duration(double seconds){long minutes=Math.max(1,Math.round(seconds/60));return minutes<60?String.format(Locale.getDefault(),"%d min",minutes):String.format(Locale.getDefault(),"%d h %02d min",minutes/60,minutes%60);}
+    /** Per-section explanations for the colours painted on the route. */
+    private void routeSectionsDialog(List<RouteSection> sections){
+        StringBuilder text=new StringBuilder();
+        for(RouteSection section:sections){
+            if(section.cls==RouteSection.PLAIN)continue;
+            text.append(section.label()).append(" · ").append(Math.round(section.metres)).append(" m\n");
+            if(!section.evidence.isEmpty())text.append("Recorded: ").append(section.evidence).append('\n');
+            text.append(section.explanation()).append("\n\n");
+        }
+        if(text.length()==0)text.append("No applicable restriction was recorded on this route.\n\n");
+        text.append("Map data is not a legal guarantee.");
+        new AlertDialog.Builder(this).setTitle("Route restrictions").setMessage(text.toString())
+            .setPositiveButton("Close",null).show();
+    }
     private boolean canChangeMap(){if(busy||Store.installing){Toast.makeText(this,"Please wait for the map or route to finish loading",Toast.LENGTH_SHORT).show();return false;}if(Store.navigating||simulating){error("Stop guidance before changing the route, map or truck.");return false;}return true;}
     private boolean editable(){if(busy||Store.installing){Toast.makeText(this,"Please wait for the map or route to finish loading",Toast.LENGTH_SHORT).show();return false;}if(Store.navigating||simulating){error("Stop guidance before changing the route, map or truck.");return false;}if(Store.graph==null){mapsDialog();return false;}return true;}
     private void choosePoint(int node){new AlertDialog.Builder(this).setTitle(label(node)).setItems(new String[]{"Set destination","Set starting point","Save favourite"},(d,i)->{if(i==2){saveFavourite(node);return;}selectedPoint(node,i==1);}).show();}
@@ -277,13 +304,18 @@ public final class MainActivity extends Activity {
         CheckBox everyRestriction=new CheckBox(this);
         everyRestriction.setText("Show every recorded restriction, not only the ones affecting this truck");
         everyRestriction.setChecked(Store.showAllRestrictions);box.addView(everyRestriction);
+        CheckBox routeOnly=new CheckBox(this);
+        routeOnly.setText("Only restrictions on the current route");
+        routeOnly.setChecked(Store.routeOnlyRestrictions);box.addView(routeOnly);
         box.addView(text("Delivery access is limited to 2 km from the destination. It uses shortest routing and preserves height, width, length, gross/axle weight, ADR and turn restrictions. Unknown limits, barriers and bridges on restricted access are excluded. Permission applies to this trip on this device.",12,MUTED));
         ScrollView scroll=new ScrollView(this);scroll.addView(box);
         new AlertDialog.Builder(this).setTitle("Route preferences").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{
             Store.mode=RoutingMode.values()[choices.indexOfChild(choices.findViewById(choices.getCheckedRadioButtonId()))];Store.deliveryAccess=access.isChecked();Store.route=null;
             Store.showAllRestrictions=everyRestriction.isChecked();
+            Store.routeOnlyRestrictions=routeOnly.isChecked();
             getSharedPreferences("settings",0).edit().putString("routing_mode",Store.mode.name())
-                .putBoolean("show_all_restrictions",Store.showAllRestrictions).apply();
+                .putBoolean("show_all_restrictions",Store.showAllRestrictions)
+                .putBoolean("route_only_restrictions",Store.routeOnlyRestrictions).apply();
             if(map!=null)map.invalidateRestrictions();
             refresh();
         }).show();

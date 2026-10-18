@@ -12,6 +12,8 @@ final class Store {
     static NativeRouter nativeRouter;
     /** Overlay filter: false shows only records that affect the current truck. */
     static boolean showAllRestrictions;
+    /** Overlay filter: with a route, show only records on the roads that route uses. */
+    static boolean routeOnlyRestrictions;
     /** Restrictions the last route had to accept or work around; shown to the driver, never hidden. */
     static String restrictionWarning(){return nativeRouter==null?"":nativeRouter.restrictionWarning();}
     static boolean relocatedAtOrigin(){return nativeRouter!=null&&nativeRouter.relocatedAtOrigin();}
@@ -60,6 +62,7 @@ final class Store {
         SharedPreferences p=context.getSharedPreferences("truck",0);
         voiceEnabled=context.getSharedPreferences("settings",0).getBoolean("voice",true);
         showAllRestrictions=context.getSharedPreferences("settings",0).getBoolean("show_all_restrictions",false);
+        routeOnlyRestrictions=context.getSharedPreferences("settings",0).getBoolean("route_only_restrictions",false);
         mode=RoutingMode.saved(context.getSharedPreferences("settings",0).getString("routing_mode","ECONOMICAL"));
         try { truck=new Truck(measurement(p,"height",4),measurement(p,"width",2.55),measurement(p,"length",16.5),
             measurement(p,"weight",40),measurement(p,"axle",11.5),p.getBoolean("hazmat",false),

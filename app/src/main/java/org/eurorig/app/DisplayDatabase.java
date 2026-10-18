@@ -14,6 +14,8 @@ final class DisplayDatabase implements AutoCloseable {
     /** Packs built after the normalised classification carry kind/evidence on every rule. */
     final boolean classified;
     private final boolean spatialIndex;
+    /** Small cache of way geometry read only for one-way (directional) records. */
+    private final HashMap<Long,List<Graph.Node>> wayShapes=new HashMap<>();
     final String name,attribution,date;
     final double[] bounds;
     final Graph endpoints;
@@ -137,7 +139,7 @@ final class DisplayDatabase implements AutoCloseable {
      * the endpoint to a legal access point keeps graph connectivity, where excluding a circle around
      * the endpoint destroys it and produces a fabricated "no path".
      */
-    synchronized double[] legalAccessPoint(double lat,double lon,Truck truck,double radius){
+    synchronized double[] legalAccessPoint(double lat,double lon,Truck truck,double radius,Set<Long> skip){
         if(!restrictionEvidence)return null;
         double dLat=radius/111320.0,dLon=radius/(111320.0*Math.max(.2,Math.cos(Math.toRadians(lat))));
         String[] args={""+(lat-dLat),""+(lat+dLat),""+(lon-dLon),""+(lon+dLon)};
@@ -155,7 +157,10 @@ final class DisplayDatabase implements AutoCloseable {
         }
         double[] chosen=null;
         for(Map.Entry<Long,double[]> entry:nearest.entrySet()){
+            if(skip!=null&&skip.contains(entry.getKey()))continue;
             double[] candidate=entry.getValue();
+            // The requested point itself is not an alternative access point.
+            if(candidate[0]<=1.0)continue;
             // Prefer the road a truck would actually use: a minor track 3 m away is no substitute.
             double score=candidate[0]+(levels.get(entry.getKey())>3?radius:0);
             if(chosen!=null&&score>=chosen[0])continue;
@@ -165,6 +170,75 @@ final class DisplayDatabase implements AutoCloseable {
         }
         return chosen==null?null:new double[]{chosen[1],chosen[2]};
     }
+    /**
+     * Bearing of the recorded way geometry nearest this point, in the OSM way's node order.
+     * compile_display writes way nodes in order, so a :forward record really faces this bearing.
+     * Returns NaN when the way is absent or degenerate: callers must then stay conservative.
+     */
+    synchronized double wayBearing(long way,double lat,double lon){
+        List<Graph.Node> shape=wayShapes.get(way);
+        if(shape==null){
+            shape=Collections.emptyList();
+            try(Cursor rows=database.rawQuery("SELECT shape FROM roads WHERE id=?",new String[]{Long.toString(way)})){
+                if(rows.moveToNext())shape=NativeRouter.decode(rows.getString(0));
+            }catch(RuntimeException unreadable){
+                android.util.Log.i("Overlay","way geometry unreadable for "+way+": "+unreadable);
+            }
+            if(wayShapes.size()>64)wayShapes.clear();
+            wayShapes.put(way,shape);
+        }
+        double best=Double.MAX_VALUE,bearing=Double.NaN;
+        for(int i=0;i+1<shape.size();i++){
+            Graph.Node a=shape.get(i),b=shape.get(i+1);
+            double[] projection=Geo.project(lat,lon,a,b);
+            if(projection[1]<best&&Geo.distance(lat,lon,a.lat,a.lon)<3000){best=projection[1];bearing=Geo.bearing(a,b);}
+        }
+        return bearing;
+    }
+
+    /**
+     * Restrictions on an explicit set of ways, used by the route-relevant overlay. Filtering after
+     * a viewport LIMIT would silently drop the very records the route travels over, so the way set
+     * is part of the query instead of a post-filter.
+     */
+    synchronized List<MappedRestriction> restrictionsOnWays(Set<Long> ways,int limit){
+        ArrayList<MappedRestriction> found=new ArrayList<>();
+        if(!restrictionEvidence||ways==null||ways.isEmpty())return found;
+        Truck truck=Store.truck;
+        String columns=classified?",coalesce(q.kind,0),coalesce(q.evidence,'' )":",0,''";
+        ArrayList<Long> ids=new ArrayList<>(ways);
+        for(int offset=0;offset<ids.size()&&found.size()<limit;offset+=400){
+            int count=Math.min(400,ids.size()-offset);
+            StringJoiner placeholders=new StringJoiner(",");
+            String[] args=new String[count];
+            for(int i=0;i<count;i++){args[i]=Long.toString(ids.get(offset+i));placeholders.add("?");}
+            try(Cursor rows=database.rawQuery("SELECT r.id,r.level,r.shape,coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0)"+columns
+                    +" FROM roads r JOIN road_rules q ON q.way=r.id WHERE r.id IN ("+placeholders+") AND r.level<=4",args)){
+                while(rows.moveToNext()&&found.size()<limit){
+                    MappedRestriction item=read(rows,truck);
+                    if(item!=null)found.add(item);
+                }
+            }
+        }
+        return found;
+    }
+
+    /** Turn one joined roads+road_rules row into a record, or null when it carries nothing. */
+    private static MappedRestriction read(Cursor rows,Truck truck){
+        double height=rows.getDouble(3),width=rows.getDouble(4),length=rows.getDouble(5),weight=rows.getDouble(6),axle=rows.getDouble(7);
+        int kind=rows.getInt(9);String evidence=rows.getString(10);
+        if(kind==0&&(height<=0&&width<=0&&length<=0&&weight<=0&&axle<=0))return null;
+        if((kind&RestrictionRule.PREFERENCE)!=0&&(kind&(RestrictionRule.HARD|RestrictionRule.ACCESS|RestrictionRule.UNCERTAIN))==0)return null;
+        String label=label(height,width,length,weight,axle,kind,evidence);
+        if(label==null)return null;
+        List<Graph.Node> shape;
+        try{shape=NativeRouter.decode(rows.getString(2));}catch(RuntimeException malformed){return null;}
+        if(shape.size()<2)return null;
+        boolean exceeded=(height>0&&truck.height>height)||(width>0&&truck.width>width)||(length>0&&truck.length>length)
+                ||(weight>0&&truck.weight>weight)||(axle>0&&truck.axleWeight>axle);
+        return new MappedRestriction(rows.getLong(0),shape,label,kind,height,width,length,weight,axle,evidence,exceeded);
+    }
+
     /** One recorded restriction with the geometry it applies to and everything needed to explain it. */
     static final class MappedRestriction{
         final long way;final List<Graph.Node> shape;final String label;final int kind;
@@ -230,21 +304,24 @@ final class DisplayDatabase implements AutoCloseable {
 
     /** Short label carrying the recorded value, not a guess about the road. */
     private static String label(double height,double width,double length,double weight,double axle,int kind,String evidence){
-        if(height>0)return trim(height)+" m high";
-        if(weight>0)return trim(weight)+" t";
-        if(axle>0)return trim(axle)+" t/axle";
-        if(width>0)return trim(width)+" m wide";
-        if(length>0)return trim(length)+" m long";
-        if((kind&RestrictionRule.ACCESS)!=0){
-            String text=evidence==null?"":evidence;
-            if(text.contains("hgv=no")||text.contains("vehicle=no")||text.contains("motor_vehicle=no"))return "No HGV";
-            if(text.contains("destination"))return "Access: destination";
-            if(text.contains("delivery"))return "Access: delivery";
-            if(text.contains("private"))return "Private";
-            return "Restricted access";
+        String text=null;
+        if(height>0)text=trim(height)+" m high";
+        else if(weight>0)text=trim(weight)+" t";
+        else if(axle>0)text=trim(axle)+" t/axle";
+        else if(width>0)text=trim(width)+" m wide";
+        else if(length>0)text=trim(length)+" m long";
+        else if((kind&RestrictionRule.ACCESS)!=0){
+            String source=evidence==null?"":evidence;
+            if(source.contains("hgv=no")||source.contains("vehicle=no")||source.contains("motor_vehicle=no"))text="No HGV";
+            else if(source.contains("destination"))text="Access: destination";
+            else if(source.contains("delivery"))text="Access: delivery";
+            else if(source.contains("private"))text="Private";
+            else text="Restricted access";
         }
-        if((kind&RestrictionRule.UNCERTAIN)!=0)return "Unverified limit";
-        return null;
+        else if((kind&RestrictionRule.UNCERTAIN)!=0)text="Unverified limit";
+        // A record scoped to one travel direction must not read as if it applied both ways.
+        if(text!=null&&(kind&(RestrictionRule.FORWARD|RestrictionRule.BACKWARD))!=0)text+=" · one way";
+        return text;
     }
 
     private static String trim(double value){
