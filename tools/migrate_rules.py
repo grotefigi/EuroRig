@@ -11,6 +11,14 @@ from pathlib import Path
 from restriction_kind import classify
 
 TABLES = ("road_rules", "node_rules")
+# Bumped when the classifier's meaning changes. Older packs are reclassified in place, because a
+# stale bitmask that silently omits a directional limit is indistinguishable from a safe road.
+VERSION = "4"
+
+
+def stored_version(db):
+    row = db.execute("SELECT value FROM metadata WHERE key='restriction_version'").fetchone()
+    return (row[0] or "").strip('"') if row else "0"
 
 
 def columns(db, table):
@@ -21,6 +29,7 @@ def migrate(path):
     path = Path(path)
     db = sqlite3.connect(path)
     try:
+        restamp = stored_version(db) != VERSION
         changed = {}
         for table in TABLES:
             if not db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name=?", (table,)).fetchone():
@@ -33,14 +42,14 @@ def migrate(path):
             rows = db.execute(f'SELECT rowid,tags,kind,evidence FROM "{table}"').fetchall()
             updates = []
             for rowid, tags, kind, evidence in rows:
-                if kind is not None:
+                if kind is not None and not restamp:
                     continue
                 tags = json.loads(tags or "{}")
                 rule, reason = classify(tags, tags.get("highway"))
                 updates.append((rule, reason, rowid))
             db.executemany(f'UPDATE "{table}" SET kind=?,evidence=? WHERE rowid=?', updates)
             changed[table] = len(updates)
-        db.execute("INSERT OR REPLACE INTO metadata VALUES(?,?)", ("restriction_version", "2"))
+        db.execute("INSERT OR REPLACE INTO metadata VALUES(?,?)", ("restriction_version", VERSION))
         db.commit()
         if db.execute("PRAGMA integrity_check").fetchone()[0] != "ok":
             raise ValueError("Migration left the database inconsistent")

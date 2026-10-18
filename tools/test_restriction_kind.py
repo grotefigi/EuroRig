@@ -1,6 +1,7 @@
 import unittest
 
-from restriction_kind import ACCESS, HARD, PREFERENCE, UNCERTAIN, classify, has, parse_measure
+from restriction_kind import (ACCESS, BACKWARD, FORWARD, HARD, PREFERENCE, UNCERTAIN, classify, has,
+                              parse_measure, split_direction)
 
 
 class ClassificationTest(unittest.TestCase):
@@ -38,6 +39,51 @@ class ClassificationTest(unittest.TestCase):
         kind, evidence = classify({"maxweight": "3.5", "hgv": "no"}, "service")
         self.assertTrue(has(kind, HARD) and has(kind, ACCESS))
         self.assertIn("hgv=no", evidence)
+
+    def test_direction_scoped_limit_keeps_its_direction(self):
+        # Real RO-MD case: Strada Rahovei carries maxweight:backward=3.5.
+        kind, evidence = classify({"maxspeed": "RO:urban", "maxweight:backward": "3.5"}, "primary")
+        self.assertTrue(has(kind, HARD))
+        self.assertTrue(has(kind, BACKWARD))
+        self.assertFalse(has(kind, FORWARD))
+        self.assertIn("maxweight:backward=3.5", evidence)
+
+    def test_forward_height_limit_is_directional(self):
+        kind, _ = classify({"maxheight:forward": "3.5"}, "secondary")
+        self.assertTrue(has(kind, HARD) and has(kind, FORWARD))
+        self.assertFalse(has(kind, BACKWARD))
+
+    def test_both_ways_suffix_is_not_directional(self):
+        kind, _ = classify({"maxweight:both_ways": "7.5"}, "primary")
+        self.assertTrue(has(kind, HARD))
+        self.assertFalse(has(kind, FORWARD) or has(kind, BACKWARD))
+
+    def test_directional_access_keeps_its_direction(self):
+        kind, evidence = classify({"hgv:forward": "destination"}, "residential")
+        self.assertTrue(has(kind, ACCESS) and has(kind, FORWARD))
+        self.assertIn("hgv:forward=destination", evidence)
+
+    def test_directional_unparsable_value_stays_uncertain(self):
+        kind, _ = classify({"maxweight:backward": "signposted"}, "primary")
+        self.assertTrue(has(kind, UNCERTAIN) and has(kind, BACKWARD))
+        self.assertFalse(has(kind, HARD))
+
+    def test_split_direction(self):
+        self.assertEqual(("maxheight", FORWARD), split_direction("maxheight:forward"))
+        self.assertEqual(("maxheight", BACKWARD), split_direction("maxheight:backward"))
+        self.assertEqual(("maxheight", 0), split_direction("maxheight"))
+
+    def test_mixed_direction_evidence_stays_both_ways(self):
+        # Plain and directional limits on the same way collapse into one scalar per dimension,
+        # so the record must not claim to face a single direction.
+        kind, _ = classify({"maxweight": "7.5", "maxheight:forward": "3.5"}, "primary")
+        self.assertTrue(has(kind, HARD))
+        self.assertFalse(has(kind, FORWARD) or has(kind, BACKWARD))
+
+    def test_opposing_directions_stay_both_ways(self):
+        kind, _ = classify({"maxheight:forward": "3.5", "maxheight:backward": "4.5"}, "primary")
+        self.assertTrue(has(kind, HARD))
+        self.assertFalse(has(kind, FORWARD) or has(kind, BACKWARD))
 
     def test_units_are_normalised(self):
         self.assertAlmostEqual(3.5, parse_measure("3.5 t", {"t": 1.0}))

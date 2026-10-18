@@ -6,6 +6,25 @@ import static org.junit.Assert.*;
 
 public class RestrictionRuleTest {
     private RestrictionRule rule(double height,double width,double weight,int flags,Map<String,String> tags){return new RestrictionRule(height,width,0,weight,0,flags,tags);}
+    @Test public void oneWayLimitOnlyAppliesInItsDirection(){
+        // maxweight:backward=3.5 on a 41 t truck: prohibited against the way, allowed with it.
+        RestrictionRule rule=new RestrictionRule(0,0,0,3.5,0,0,Map.of("maxweight:backward","3.5"),RestrictionRule.HARD|RestrictionRule.BACKWARD,"maxweight:backward=3.5");
+        assertTrue(rule.directional());
+        assertNotNull(rule.violation(Truck.standard(),false,5000,false,RestrictionRule.DIR_BACKWARD));
+        assertNull(rule.violation(Truck.standard(),false,5000,false,RestrictionRule.DIR_FORWARD));
+        assertNotNull("unknown direction stays conservative",rule.violation(Truck.standard(),false,5000,false,RestrictionRule.DIR_UNKNOWN));
+    }
+    @Test public void twoWayRecordAppliesBothWays(){
+        RestrictionRule rule=new RestrictionRule(0,0,0,3.5,0,0,Map.of("maxweight","3.5"),RestrictionRule.HARD,"maxweight=3.5");
+        assertFalse(rule.directional());
+        assertNotNull(rule.violation(Truck.standard(),false,5000,false,RestrictionRule.DIR_FORWARD));
+        assertNotNull(rule.violation(Truck.standard(),false,5000,false,RestrictionRule.DIR_BACKWARD));
+    }
+    @Test public void directionNeverWaivesAHardLimitThatFacesTheDriver(){
+        RestrictionRule rule=new RestrictionRule(3.0,0,0,0,0,0,Map.of("maxheight:forward","3.0"),RestrictionRule.HARD|RestrictionRule.FORWARD,"maxheight:forward=3.0");
+        assertTrue("exceeding height is hard regardless of direction bits",rule.hard(Truck.standard()));
+        assertNotNull(rule.violation(Truck.standard(),true,10,false,RestrictionRule.DIR_FORWARD));
+    }
     @Test public void deliveryPermissionNeverOverridesDimensionsOrWeight(){
         Truck truck=Truck.standard();
         assertNotNull(rule(3.5,0,0,Graph.BLOCKED,Map.of("hgv","no")).violation(truck,true,50));

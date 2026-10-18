@@ -18,12 +18,22 @@ public final class Graph {
         public final long way;
         public final String name, kind;
         public final double height, width, length, weight, axle, speed;
+        /** Normalised classification from the pack (RestrictionRule.HARD/ACCESS/... + direction). */
+        public final int ruleKind;
+        /** Recorded tag text behind ruleKind; empty when the pack carried no evidence. */
+        public final String ruleEvidence;
         public double metres;
         public Edge(int from, int to, long way, String name, String kind, double height, double width,
                     double length, double weight, double axle, int flags, double speed) {
+            this(from,to,way,name,kind,height,width,length,weight,axle,flags,speed,0,"");
+        }
+        public Edge(int from, int to, long way, String name, String kind, double height, double width,
+                    double length, double weight, double axle, int flags, double speed,
+                    int ruleKind, String ruleEvidence) {
             this.from=from; this.to=to; this.way=way; this.name=name; this.kind=kind;
             this.height=height; this.width=width; this.length=length; this.weight=weight;
             this.axle=axle; this.flags=flags; this.speed=speed;
+            this.ruleKind=ruleKind; this.ruleEvidence=ruleEvidence==null?"":ruleEvidence;
         }
         public String blockedReason(Truck t) {
             if ((flags & BLOCKED)!=0) return "Truck access prohibited or unsupported restriction";

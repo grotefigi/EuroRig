@@ -11,6 +11,12 @@ Classes are a bitmask because one way can be several at once (a 3.5 t limit unde
     PREFERENCE  unsuitable by policy, not physically impossible
 """
 HARD, ACCESS, UNCERTAIN, PREFERENCE = 1, 2, 4, 8
+# Direction bits. A tag scoped to :forward applies to travel along the OSM way's node order,
+# :backward against it. Neither bit set means the record applies to both directions. Direction
+# bits are written by the pack, never inferred by the renderer, so the audit and the overlay
+# cannot disagree about which way a limit faces.
+FORWARD, BACKWARD = 16, 32
+DIRECTION_SUFFIXES = ((":forward", FORWARD), (":backward", BACKWARD), (":both_ways", 0))
 
 NUMERIC = ("maxheight", "maxwidth", "maxlength", "maxweight", "maxaxleload", "maxbogie")
 ACCESS_KEYS = ("access", "hgv", "vehicle", "motor_vehicle", "motorcar")
@@ -50,27 +56,50 @@ def parse_measure(text, unit_table):
     return None
 
 
+def split_direction(key):
+    """Return (base key, direction bit) for :forward/:backward/:both_ways scoped tags."""
+    for suffix, bit in DIRECTION_SUFFIXES:
+        if key.endswith(suffix):
+            return key[: -len(suffix)], bit
+    return key, 0
+
+
 def classify(tags, highway=None):
     """Return (kind bitmask, evidence) for one element's tags."""
     kind = 0
     evidence = []
+    directions = set()
+    undirected = False
     for key, value in tags.items():
-        if key in NUMERIC:
+        base, direction = split_direction(key)
+        if base in NUMERIC:
             if str(value).strip().lower() in NO_VALUE:
                 continue
-            unit_table = _MASS if key in ("maxweight", "maxaxleload", "maxbogie") else _LEN
+            unit_table = _MASS if base in ("maxweight", "maxaxleload", "maxbogie") else _LEN
             if parse_measure(value, unit_table) is None:
                 kind |= UNCERTAIN
             else:
                 kind |= HARD
             evidence.append(f"{key}={value}")
-        elif key.endswith(":conditional") or key.startswith(UNSUPPORTED):
+        elif key.endswith(":conditional") or base.startswith(UNSUPPORTED):
             # Present in the data, but not enforced: reported, never silently trusted.
             kind |= UNCERTAIN
             evidence.append(f"{key}={value}")
-        elif key in ACCESS_KEYS and str(value).lower() in ACCESS_DENY:
+        elif base in ACCESS_KEYS and str(value).lower() in ACCESS_DENY:
             kind |= ACCESS
             evidence.append(f"{key}={value}")
+        else:
+            continue
+        if direction:
+            directions.add(direction)
+        else:
+            undirected = True
+    # Direction bits are only written when every recorded limit on the way faces one single
+    # direction. The numeric columns hold one scalar per dimension (the smallest of both
+    # directions), so mixed evidence cannot be represented exactly; those records stay
+    # conservative and apply both ways instead of silently waiving one of them.
+    if directions and not undirected and len(directions) == 1:
+        kind |= directions.pop()
     if highway is not None and highway in UNSUITABLE:
         kind |= PREFERENCE
         evidence.append(f"highway={highway}")

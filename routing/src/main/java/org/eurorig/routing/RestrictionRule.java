@@ -20,6 +20,14 @@ public final class RestrictionRule {
     public final int kind;
     public final String evidence;
     public static final int HARD=1,ACCESS=2,UNCERTAIN=4,PREFERENCE=8;
+    /**
+     * Direction bits written by tools/restriction_kind.py. A tag scoped to :forward applies to
+     * travel along the OSM way's node order, :backward against it. No bit means both directions,
+     * and the audit then applies the record both ways. Direction is never guessed: when the travel
+     * direction cannot be established the record stays conservative.
+     */
+    public static final int FORWARD=16,BACKWARD=32;
+    public static final int DIR_UNKNOWN=0,DIR_FORWARD=1,DIR_BACKWARD=2;
     public RestrictionRule(double height,double width,double length,double weight,double axle,int flags,Map<String,String> tags){
         this(height,width,length,weight,axle,flags,tags,0,"");
     }
@@ -29,6 +37,18 @@ public final class RestrictionRule {
     }
     /** True when the record states a limit a vehicle must meet, rather than a guess. */
     public boolean certain(){return (kind&(HARD|ACCESS))!=0;}
+    /** One-way evidence: the recorded limit faces a single travel direction. */
+    public boolean directional(){return (kind&(FORWARD|BACKWARD))!=0;}
+    /**
+     * Does this record apply to travel in the given direction along the way?
+     * Unknown direction answers true: an unresolved direction must never waive a limit.
+     */
+    public boolean applies(int travel){
+        if(!directional()||travel==DIR_UNKNOWN)return true;
+        boolean forward=(kind&FORWARD)!=0,backward=(kind&BACKWARD)!=0;
+        if(forward&&backward)return true;
+        return forward?travel==DIR_FORWARD:travel==DIR_BACKWARD;
+    }
     /**
      * Tags exist but cannot be verified (conditional, unpublished rating, unparsable value).
      * Uncertainty must not be routed as a prohibition: exclude only what is known impossible.
@@ -39,6 +59,15 @@ public final class RestrictionRule {
         return violation(truck,permittedDelivery,metresFromDestination,false);
     }
     public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination,boolean originEgress){
+        return violation(truck,permittedDelivery,metresFromDestination,originEgress,DIR_UNKNOWN);
+    }
+    /**
+     * @param travel direction of travel along the way, from {@link #DIR_UNKNOWN} when it could not
+     *               be established. A one-way record that does not face this direction is not a
+     *               violation; an unknown direction is treated as both ways.
+     */
+    public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination,boolean originEgress,int travel){
+        if(!applies(travel))return null;
         if(height>0&&truck.height>height)return "Height limit "+height+" m";
         if(width>0&&truck.width>width)return "Width limit "+width+" m";
         if(length>0&&truck.length>length)return "Length limit "+length+" m";
@@ -77,14 +106,16 @@ public final class RestrictionRule {
      * A stated physical or legal limit this vehicle exceeds. Endpoint proximity never makes such a
      * road usable, and no delivery exception waives mass, height, width, length, axle or ADR limits.
      */
-    public boolean hard(Truck truck){
+    public boolean hard(Truck truck){return exceeds(truck)||hazardViolation(truck)!=null;}
+    /** The numeric part of {@link #hard}: measurements only, no ADR classes. */
+    public boolean exceeds(Truck truck){
         if(height>0&&truck.height>height)return true;
         if(width>0&&truck.width>width)return true;
         if(length>0&&truck.length>length)return true;
         if(weight>0&&truck.weight>weight)return true;
         if(axle>0&&truck.axleWeight>axle)return true;
         if(tags.containsKey("maxaxles"))try{if(truck.axles>Integer.parseInt(tags.get("maxaxles")))return true;}catch(NumberFormatException unknown){return true;}
-        return hazardViolation(truck)!=null;
+        return false;
     }
     public String hazardViolation(Truck truck){
         if(truck.hazmat&&"no".equals(tags.get("hazmat")))return "Hazardous goods prohibited";
