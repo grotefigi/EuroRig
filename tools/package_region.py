@@ -49,7 +49,55 @@ def package(tiles, display, destination, name, source, date):
         archive.write(tiles, 'routing.tar')
         archive.write(display, display_name)
         archive.writestr('manifest.json', json.dumps(manifest, ensure_ascii=False, indent=2))
+    normalise(destination)
+    verify_local_headers(destination)
     return manifest
+
+
+def normalise(destination):
+    """Rewrite the archive so every local header carries exact sizes.
+
+    A large entry written by a streaming writer can leave compressed size 0 in its local
+    header. Python's zipfile tolerates that via the central directory; Android's
+    java.util.zip.ZipInputStream does not and aborts the import with
+    "invalid entry compressed size (expected 0 but got N bytes)".
+    """
+    destination = Path(destination)
+    temporary = destination.with_name(destination.name + '.normalising')
+    with zipfile.ZipFile(destination) as source, \
+         zipfile.ZipFile(temporary, 'w', compression=zipfile.ZIP_DEFLATED,
+                         compresslevel=3, allowZip64=True) as target:
+        for entry in source.infolist():
+            info = zipfile.ZipInfo(entry.filename, date_time=entry.date_time)
+            info.compress_type = zipfile.ZIP_DEFLATED
+            info.external_attr = 0o644 << 16
+            with source.open(entry) as reader, target.open(info, 'w') as writer:
+                while True:
+                    block = reader.read(4 * 1024 * 1024)
+                    if not block:
+                        break
+                    writer.write(block)
+    temporary.replace(destination)
+
+
+def verify_local_headers(destination):
+    """Fail the build rather than ship an archive Android cannot import."""
+    with zipfile.ZipFile(destination) as archive:
+        entries = archive.infolist()
+    with Path(destination).open('rb') as stream:
+        for entry in entries:
+            stream.seek(entry.header_offset)
+            header = stream.read(30)
+            if len(header) != 30 or header[:4] != b'PK\x03\x04':
+                raise ValueError('Corrupt ZIP local header for ' + entry.filename)
+            flags = int.from_bytes(header[6:8], 'little')
+            compressed = int.from_bytes(header[18:22], 'little')
+            # java.util.zip.ZipInputStream rejects an entry whose local header leaves the
+            # size to a trailing data descriptor.
+            if flags & 0x08:
+                raise ValueError('ZIP entry relies on a data descriptor: ' + entry.filename)
+            if compressed != entry.compress_size:
+                raise ValueError('ZIP local header size mismatch for ' + entry.filename)
 
 
 if __name__ == '__main__':

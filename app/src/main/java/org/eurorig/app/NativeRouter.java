@@ -11,6 +11,12 @@ import java.util.*;
 
 /** Owns one memory-mapped Valhalla actor. Called only on Store.worker. */
 final class NativeRouter implements AutoCloseable {
+    /**
+     * A restriction inside this radius of the origin or destination cannot be routed around:
+     * the vehicle is already standing there, or must arrive there. Excluding it removes the
+     * only reachable endpoint and the engine then reports a fabricated "no path".
+     */
+    private static final double ENDPOINT_METRES=RestrictionRule.ENDPOINT_METRES;
     private final Valhalla engine;
     NativeRouter(Context context,File tiles) throws IOException {
         try{RegionPackages.validateTar(tiles);}
@@ -60,11 +66,18 @@ final class NativeRouter implements AutoCloseable {
             if((delivery||truck.tunnelCode!=0||(truck.hazardousLoad&6)!=0)&&(display==null||!display.restrictionEvidence))
                 throw new IllegalStateException("Install the updated country map with restriction evidence before using delivery access or detailed ADR routing");
             JSONObject query=request(lat,lon,endLat,endLon,truck,mode,delivery);
-            JSONArray excluded=new JSONArray();JSONObject response=null;double restrictedMetres=0;String failure="";
+            JSONArray excluded=new JSONArray();JSONObject response=null,candidate=null;double restrictedMetres=0;String failure="";
             long[] auditedWays=null;Map<Long,RestrictionRule> auditedRules=Collections.emptyMap();
             for(int attempt=0;attempt<12;attempt++){
                 if(excluded.length()>0)query.put("exclude_locations",excluded);
-                response=new JSONObject(engine.routeRaw(query.toString()));
+                try{response=new JSONObject(engine.routeRaw(query.toString()));}
+                catch(RuntimeException engineFailure){
+                    // An exclusion can seal the only approach to an endpoint, which the engine
+                    // reports as "no path". Keep the last route that passed the audit instead
+                    // of discarding a usable route.
+                    if(candidate!=null){response=candidate;break;}
+                    throw engineFailure;
+                }
                 if(display==null||!display.restrictionEvidence)break;
                 JSONObject leg=response.getJSONObject("trip").getJSONArray("legs").getJSONObject(0);
                 String shape=leg.getString("shape");List<Graph.Node> geometry=decode(shape);
@@ -73,23 +86,30 @@ final class NativeRouter implements AutoCloseable {
                     .put("filters",new JSONObject().put("action","include").put("attributes",new JSONArray().put("edge.way_id").put("edge.begin_shape_index").put("edge.end_shape_index").put("edge.length")));
                 JSONArray traced=new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
                 HashSet<Long> ways=new HashSet<>();for(int i=0;i<traced.length();i++)ways.add(traced.getJSONObject(i).getLong("way_id"));
-                Map<Long,RestrictionRule> rules=display.rulesFor(ways);auditedRules=rules;auditedWays=auditedWays(traced,geometry.size());boolean rejected=false;restrictedMetres=0;boolean originEgress=true;
+                Map<Long,RestrictionRule> rules=display.rulesFor(ways);auditedRules=rules;auditedWays=auditedWays(traced,geometry.size());boolean rejected=false;restrictedMetres=0;
                 for(int i=0;i<traced.length();i++){
                     JSONObject edge=traced.getJSONObject(i);int begin=edge.getInt("begin_shape_index"),end=edge.getInt("end_shape_index");
                     long way=edge.getLong("way_id");
                     int middle=(begin+end)/2;Graph.Node a=geometry.get(middle),b=geometry.get(Math.min(end,middle+1));
                     // Exclude inside the failed edge, not its junction shared by a valid detour.
                     Graph.Node point=new Graph.Node((a.lat+b.lat)/2,(a.lon+b.lon)/2,"");RestrictionRule rule=rules.get(way);
-                    originEgress=originEgress&&rule!=null&&rule.accessLimited()
-                        &&Geo.distance(geometry.get(end).lat,geometry.get(end).lon,lat,lon)<=250;
+                    double toOrigin=Geo.distance(point.lat,point.lon,lat,lon),toDestination=Geo.distance(point.lat,point.lon,endLat,endLon);
+                    boolean atEndpoint=toOrigin<=ENDPOINT_METRES||toDestination<=ENDPOINT_METRES;
                     String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null):rule.violation(truck,delivery,
-                        Math.max(Geo.distance(geometry.get(begin).lat,geometry.get(begin).lon,endLat,endLon),Geo.distance(geometry.get(end).lat,geometry.get(end).lon,endLat,endLon)),originEgress);
-                    if(reason!=null){failure=reason;excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));rejected=true;break;}
+                        Math.max(Geo.distance(geometry.get(begin).lat,geometry.get(begin).lon,endLat,endLon),Geo.distance(geometry.get(end).lat,geometry.get(end).lon,endLat,endLon)),
+                        atEndpoint&&toOrigin<=ENDPOINT_METRES);
+                    if(reason!=null){
+                        // The road under the vehicle cannot be avoided by routing. Record the
+                        // restricted distance and keep the route; never exclude the endpoint.
+                        if(atEndpoint){restrictedMetres+=edge.getDouble("length")*1000;continue;}
+                        failure=reason;excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));rejected=true;break;
+                    }
                     if(rule!=null&&rule.accessLimited())restrictedMetres+=edge.getDouble("length")*1000;
                 }
-                if(!rejected)break;
+                if(!rejected){candidate=response;break;}
                 if(attempt==11)throw new IllegalStateException("No verified route for this profile: "+failure);
             }
+            if(candidate!=null)response=candidate;
             if(response==null)throw new IllegalStateException("No truck route");
             if(response.has("error")||response.has("message"))throw new IllegalStateException(response.optString("error",response.optString("message")));
             if(response.optJSONArray("warnings")!=null&&response.getJSONArray("warnings").length()>0)

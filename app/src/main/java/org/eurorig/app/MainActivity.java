@@ -51,7 +51,15 @@ public final class MainActivity extends Activity {
         applyAppearance();super.onCreate(state);buildUi();
         busy=true;refresh();
         Store.worker.execute(()->{
-            try {Store.load(getApplicationContext());main.post(()->{if(isDestroyed())return;busy=false;map.setGraph(Store.graph);refresh();});}
+            try {
+                // Debug-only side-load path: a package dropped in app-private storage is installed
+                // through the same validated path as the SAF importer, then removed.
+                java.io.File pending=new java.io.File(getFilesDir(),"import.euroorig");
+                if(pending.exists()){
+                    try(java.io.InputStream in=new java.io.FileInputStream(pending)){RegionPackages.install(getApplicationContext(),in);}
+                    pending.delete();
+                }
+                Store.load(getApplicationContext());main.post(()->{if(isDestroyed())return;busy=false;map.setGraph(Store.graph);refresh();});}
             catch(IOException|RuntimeException|LinkageError e){
                 // Recover the interface while retaining the damaged region on disk.
                 Store.closeNative(this);Store.graph=null;

@@ -1,7 +1,7 @@
 plugins { id 'com.android.application' }
 android {
     namespace 'org.eurorig.app'
-    compileSdk 37
+    compileSdk 36
     buildToolsVersion '36.0.0'
     defaultConfig {
         applicationId 'org.eurorig.app'
@@ -14,9 +14,13 @@ android {
     }
     compileOptions { sourceCompatibility JavaVersion.VERSION_17; targetCompatibility JavaVersion.VERSION_17 }
     buildFeatures { buildConfig true }
-    buildTypes { release { minifyEnabled false } }
+    buildTypes {
+        release { minifyEnabled false }
+        debug { applicationIdSuffix '.dev' }
+    }
 }
 dependencies {
     implementation project(':routing')
     implementation 'io.github.rallista:valhalla-mobile:0.6.3'
+    implementation 'org.maplibre.gl:android-sdk:11.5.0'
 }

@@ -4,6 +4,15 @@ import java.util.Map;
 
 /** Conservative audit of mapped evidence; it never establishes road permission. */
 public final class RestrictionRule {
+    /**
+     * Inside this radius of an endpoint a restriction cannot be routed around: the vehicle is
+     * already standing there, or must arrive there. Excluding it removes the only reachable
+     * endpoint and the engine fabricates a "no path" failure.
+     */
+    public static final double ENDPOINT_METRES=250;
+    public static boolean atEndpoint(double metresFromOrigin,double metresFromDestination){
+        return metresFromOrigin<=ENDPOINT_METRES||metresFromDestination<=ENDPOINT_METRES;
+    }
     public final double height,width,length,weight,axle;
     public final int flags;
     public final Map<String,String> tags;

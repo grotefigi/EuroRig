@@ -49,4 +49,23 @@ public class RestrictionRuleTest {
         assertNotNull(rule(0,0,0,Graph.BLOCKED,Map.of("hgv","no")).violation(Truck.standard(),false,9000,true));
         assertNotNull(rule(3.5,0,0,Graph.BLOCKED,Map.of("access","private")).violation(Truck.standard(),false,9000,true));
     }
+    /**
+     * Regression for the Bucharest -> Chisinau false "no path": the truck starts on a
+     * maxweight=3.5 segment. Excluding an edge inside the endpoint radius removes the only
+     * reachable origin, so the restriction must be recorded instead of excluded there.
+     */
+    @Test public void endpointRadiusDecidesAvoidability(){
+        assertTrue(RestrictionRule.atEndpoint(0,0));
+        assertTrue(RestrictionRule.atEndpoint(120,5000));
+        assertTrue(RestrictionRule.atEndpoint(5000,80));
+        assertTrue("radius is inclusive",RestrictionRule.atEndpoint(RestrictionRule.ENDPOINT_METRES,99999));
+        assertFalse("a restriction 300 m out is routable around",RestrictionRule.atEndpoint(300,5000));
+        assertFalse(RestrictionRule.atEndpoint(5000,300));
+    }
+    @Test public void weightLimitUnderTheStartingVehicleIsStillAViolation(){
+        RestrictionRule rule=rule(0,0,3.5,Graph.BLOCKED,Map.of("maxweight","3.5","oneway","yes"));
+        Truck truck=new Truck(3.89,2.5,17,41,10,false,false,true,true,5,80,0,0);
+        assertNotNull("the limit still applies to the vehicle",rule.violation(truck,false,400000));
+        assertTrue("but it is not avoidable from the endpoint",RestrictionRule.atEndpoint(10,400000));
+    }
 }

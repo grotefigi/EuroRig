@@ -1,0 +1,58 @@
+{
+  "version": 8,
+  "name": "eurowag-local-offline",
+  "sources": {
+    "omt": {
+      "type": "vector",
+      "tiles": ["__TILE_URL__"],
+      "minzoom": 0,
+      "maxzoom": 14
+    }
+  },
+  "layers": [
+    { "id": "bg", "type": "background", "paint": { "background-color": "#F2EFE9" } },
+    { "id": "water", "type": "fill", "source": "omt", "source-layer": "water",
+      "paint": { "fill-color": "#A9C9DE" } },
+    { "id": "waterway", "type": "line", "source": "omt", "source-layer": "waterway",
+      "paint": { "line-color": "#A9C9DE", "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.5, 14, 3] } },
+    { "id": "landcover-wood", "type": "fill", "source": "omt", "source-layer": "landcover",
+      "filter": ["==", ["get", "class"], "wood"],
+      "paint": { "fill-color": "#CFE3C4", "fill-opacity": 0.8 } },
+    { "id": "landcover-other", "type": "fill", "source": "omt", "source-layer": "landcover",
+      "filter": ["in", ["get", "class"], ["literal", ["grass", "farmland"]]],
+      "paint": { "fill-color": "#E4EBD4", "fill-opacity": 0.7 } },
+    { "id": "landuse-residential", "type": "fill", "source": "omt", "source-layer": "landuse",
+      "filter": ["==", ["get", "class"], "residential"],
+      "paint": { "fill-color": "#E8E4DC", "fill-opacity": 0.6 } },
+    { "id": "boundary", "type": "line", "source": "omt", "source-layer": "boundary",
+      "filter": ["<=", ["get", "admin_level"], 4],
+      "paint": { "line-color": "#9A93A8", "line-width": 1.2, "line-dasharray": [4, 2] } },
+    { "id": "road-minor", "type": "line", "source": "omt", "source-layer": "transportation",
+      "filter": ["in", ["get", "class"], ["literal", ["minor", "service", "track", "path"]]],
+      "paint": {
+        "line-color": "#FFFFFF",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 10, 0.4, 14, 3, 18, 12]
+      } },
+    { "id": "road-tertiary", "type": "line", "source": "omt", "source-layer": "transportation",
+      "filter": ["in", ["get", "class"], ["literal", ["tertiary", "secondary"]]],
+      "paint": {
+        "line-color": "#FFFFFF",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 8, 0.6, 14, 5, 18, 18]
+      } },
+    { "id": "road-primary", "type": "line", "source": "omt", "source-layer": "transportation",
+      "filter": ["in", ["get", "class"], ["literal", ["primary", "trunk"]]],
+      "paint": {
+        "line-color": "#FBD98A",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 7, 0.8, 14, 7, 18, 26]
+      } },
+    { "id": "road-motorway", "type": "line", "source": "omt", "source-layer": "transportation",
+      "filter": ["==", ["get", "class"], "motorway"],
+      "paint": {
+        "line-color": "#F2A65A",
+        "line-width": ["interpolate", ["linear"], ["zoom"], 6, 1, 14, 8, 18, 30]
+      } },
+    { "id": "road-rail", "type": "line", "source": "omt", "source-layer": "transportation",
+      "filter": ["==", ["get", "class"], "rail"],
+      "paint": { "line-color": "#B9B3A8", "line-width": 1, "line-dasharray": [3, 3] } }
+  ]
+}
