@@ -280,6 +280,21 @@ final class RoadMapView extends FrameLayout {
                 android.util.Log.i("Overlay","query failed: "+failed);
                 found=java.util.Collections.emptyList();
             }
+            // A relocated endpoint must stay explainable: the road the truck could not use is part
+            // of the story even though the route does not travel over it.
+            final double[] requestedPoint=Store.relocationFrom();
+            if(requestedPoint!=null&&!routeWays.isEmpty()&&found instanceof java.util.ArrayList){
+                java.util.Set<Long> already=new java.util.HashSet<>();
+                for (DisplayDatabase.MappedRestriction item:found) already.add(item.way);
+                try {
+                    for (DisplayDatabase.MappedRestriction extra:display.restrictionsInView(
+                            requestedPoint[0]-0.003,requestedPoint[1]-0.003,
+                            requestedPoint[0]+0.003,requestedPoint[1]+0.003,25))
+                        if (already.add(extra.way)) found.add(extra);
+                } catch (RuntimeException failed) {
+                    android.util.Log.i("Overlay","relocation query failed: "+failed);
+                }
+            }
             long queried=System.nanoTime();
             java.util.List<DisplayDatabase.MappedRestriction> shown=new java.util.ArrayList<>();
             java.util.Map<String,java.util.List<Feature>> buckets=new java.util.LinkedHashMap<>();

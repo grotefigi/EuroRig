@@ -83,6 +83,8 @@ final class NativeRouter implements AutoCloseable {
         boolean originHard,destinationHard;
         /** Road that caused the endpoint rejection, so the relocation search never picks it again. */
         long failedWay;
+        /** First admitted access-restricted point, used to look for a shorter lawful approach. */
+        double[] firstRestricted;
     }
 
     /**
@@ -91,14 +93,18 @@ final class NativeRouter implements AutoCloseable {
      * and never accepted, because proximity to an endpoint proves neither legality nor clearance.
      */
     private Plan planRoute(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery,DisplayDatabase display){
-        try{return planRouteUnchecked(lat,lon,endLat,endLon,truck,mode,delivery,display);}
+        return planRoute(lat,lon,endLat,endLon,truck,mode,delivery,display,null);
+    }
+    private Plan planRoute(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery,DisplayDatabase display,double[] seedExclusion){
+        try{return planRouteUnchecked(lat,lon,endLat,endLon,truck,mode,delivery,display,seedExclusion);}
         catch(org.json.JSONException malformed){throw new IllegalStateException("Invalid routing response: "+malformed.getMessage(),malformed);}
     }
 
-    private Plan planRouteUnchecked(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery,DisplayDatabase display)throws org.json.JSONException{
+    private Plan planRouteUnchecked(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery,DisplayDatabase display,double[] seedExclusion)throws org.json.JSONException{
         Plan plan=new Plan();
         JSONObject query=request(lat,lon,endLat,endLon,truck,mode,delivery);
         JSONArray excluded=new JSONArray();JSONObject candidate=null;
+        if(seedExclusion!=null)excluded.put(new JSONObject().put("lat",seedExclusion[0]).put("lon",seedExclusion[1]));
         for(int attempt=0;attempt<12;attempt++){
             if(excluded.length()>0)query.put("exclude_locations",excluded);
             JSONObject response;
@@ -143,22 +149,27 @@ final class NativeRouter implements AutoCloseable {
                                 travel==RestrictionRule.DIR_FORWARD?"forward":"backward",heading,wayBearing));
                     }else android.util.Log.i("Direction","way "+way+" geometry unavailable: applying both ways");
                 }
+                AccessPolicy.Decision decision=AccessPolicy.decide(rule,truck,metresToDestination,toOrigin<=ENDPOINT_METRES,delivery,travel);
                 String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null)
-                    :rule.violation(truck,delivery,metresToDestination,toOrigin<=ENDPOINT_METRES,travel);
+                        :(decision.reason.isEmpty()?null:decision.reason);
                 if(reason!=null){
-                    if(rule!=null&&rule.hard(truck)){
+                    if(decision.blocked()&&rule!=null&&rule.hard(truck)){
                         // Reported so the endpoint can be moved. Never excluded, never accepted.
                         failure=reason;plan.failedWay=way;
                         if(toOrigin<=ENDPOINT_METRES)originHard=true;else if(toDestination<=ENDPOINT_METRES)destinationHard=true;
                         rejected=true;break;
                     }
                     // Uncertainty is surfaced, never routed as a prohibition (RR-04).
-                    if(rule!=null&&rule.uncertainOnly()){notes.add(reason);continue;}
+                    if(decision.unverified()){notes.add(reason);continue;}
                     failure=reason;
                     excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));
                     rejected=true;break;
                 }
-                if(rule!=null&&rule.accessLimited()&&rule.applies(travel))restricted+=edge.getDouble("length")*1000;
+                // Only travel the tag actually admits counts as restricted distance.
+                if(decision.admitted()){
+                    if(restricted==0)plan.firstRestricted=new double[]{point.lat,point.lon};
+                    restricted+=edge.getDouble("length")*1000;
+                }
             }
             plan.warnings.addAll(notes);
             if(!rejected){plan.response=response;plan.restrictedMetres=restricted;candidate=response;break;}
@@ -213,6 +224,22 @@ final class NativeRouter implements AutoCloseable {
                 if(!moved)throw new IllegalStateException(plan.failure+" - no other road this truck may use within "+(int)ENDPOINT_METRES+" m of the requested point");
             }
             if(plan==null||plan.response==null)throw new IllegalStateException("No truck route");
+            // Delivery access is minimised, not merely granted: one bounded attempt at another entry,
+            // accepted only when the alternative still passes the same audit with less restricted
+            // distance. It never converts a hard exclusion into an accepted edge.
+            if(delivery&&plan.restrictedMetres>0&&plan.firstRestricted!=null){
+                try{
+                    Plan alternative=planRoute(start[0],start[1],finish[0],finish[1],truck,mode,true,display,plan.firstRestricted);
+                    if(alternative.response!=null&&alternative.restrictedMetres<plan.restrictedMetres){
+                        android.util.Log.i("Delivery",String.format(java.util.Locale.ROOT,
+                                "shorter lawful approach: %.0f m instead of %.0f m restricted",
+                                alternative.restrictedMetres,plan.restrictedMetres));
+                        plan=alternative;
+                    }
+                }catch(RuntimeException noAlternative){
+                    android.util.Log.i("Delivery","no shorter lawful approach: "+noAlternative.getMessage());
+                }
+            }
             JSONObject response=plan.response;
             long[] auditedWays=plan.ways;Map<Long,RestrictionRule> auditedRules=plan.rules;
             double restrictedMetres=plan.restrictedMetres;

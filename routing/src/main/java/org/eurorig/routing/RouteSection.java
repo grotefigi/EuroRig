@@ -26,16 +26,36 @@ public final class RouteSection {
     public final double metres;
     public final long way;
     public final String evidence;
+    /** Advisory (speed/toll metadata) or a limit that may apply to this vehicle. */
+    public final int severity;
+    public static final int ADVISORY=0,POTENTIAL_LIMIT=1;
 
     RouteSection(int cls,int start,int end,double metres,long way,String evidence){
         this.cls=cls;this.start=start;this.end=end;this.metres=metres;this.way=way;
         this.evidence=evidence==null?"":evidence;
+        this.severity=severityOf(this.evidence);
+    }
+
+    /**
+     * Not all uncertainty is equal. A conditional speed or toll value cannot make a road
+     * impassable for this vehicle; an unevaluated clearance, mass or access value might. The
+     * warning text must keep that difference instead of flattening everything into "unknown".
+     */
+    static int severityOf(String evidence){
+        if(evidence==null||evidence.isEmpty())return POTENTIAL_LIMIT;
+        for(String tag:evidence.split(",")){
+            String key=tag.trim().split("=")[0];
+            if(key.startsWith("maxspeed")||key.startsWith("toll"))continue;
+            return POTENTIAL_LIMIT;
+        }
+        return ADVISORY;
     }
 
     public String label(){
         switch(cls){
             case AUTHORISED_ACCESS: return "Access-restricted section";
-            case UNVERIFIED: return "Not fully verified section";
+            case UNVERIFIED: return severity==ADVISORY?"Speed or toll condition, not evaluated"
+                    :"Not fully verified section";
             case PROHIBITED: return "Prohibited section";
             default: return "Ordinary road";
         }
@@ -47,13 +67,24 @@ public final class RouteSection {
                 return "Truck access is restricted here; the audit admitted this stretch only because the "
                         +"destination is on or next to it. Through traffic on this road is not permitted.";
             case UNVERIFIED:
-                return "A restriction is recorded here but cannot be evaluated (conditional, unparsable or "
-                        +"unsupported). The route neither proves nor disproves it, and it is not enforced.";
+                if(severity==ADVISORY)
+                    return "A conditional speed or toll value is recorded here. It is not evaluated, and it "
+                            +"cannot make this road impassable for the vehicle.";
+                return "A restriction that may limit this vehicle is recorded here but cannot be evaluated "
+                        +"(conditional, unparsable or unsupported). The route neither proves nor disproves it, "
+                        +"and it is not enforced.";
             case PROHIBITED:
                 return "A recorded physical or legal limit is exceeded by this vehicle. This section is "
                         +"shown for diagnosis only and must never be driven as part of a planned route.";
             default: return "No applicable restriction was recorded on this section.";
         }
+    }
+
+    public static double metresOfSeverity(List<RouteSection> sections,int cls,int severity){
+        double total=0;
+        for(RouteSection section:sections)
+            if(section.cls==cls&&section.severity==severity)total+=section.metres;
+        return total;
     }
 
     /**

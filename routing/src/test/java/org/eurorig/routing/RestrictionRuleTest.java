@@ -33,10 +33,12 @@ public class RestrictionRuleTest {
         assertNotNull(new RestrictionRule(0,0,12,0,10,Graph.BLOCKED,Map.of("hgv","no")).violation(truck,true,50));
     }
     @Test public void accessExceptionRequiresPermissionAndDestinationProximity(){
-        RestrictionRule rule=rule(0,0,0,Graph.BLOCKED,Map.of("hgv","no"));
+        RestrictionRule rule=rule(0,0,0,Graph.BLOCKED,Map.of("access","destination"));
         assertNotNull(rule.violation(Truck.standard(),false,50));
         assertNotNull(rule.violation(Truck.standard(),true,2001));
         assertNull(rule.violation(Truck.standard(),true,1999));
+        // hgv=no states no exception at all; permission and proximity cannot invent one.
+        assertNotNull(rule(0,0,0,Graph.BLOCKED,Map.of("hgv","no")).violation(Truck.standard(),true,1999));
     }
     @Test public void unknownBarriersAndBridgesStayBlocked(){
         for(Map<String,String> tags:new Map[]{Map.of("hgv","no","bridge","yes"),Map.of("hgv","no","barrier","gate")})

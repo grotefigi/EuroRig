@@ -67,40 +67,33 @@ public final class RestrictionRule {
      *               violation; an unknown direction is treated as both ways.
      */
     public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination,boolean originEgress,int travel){
-        if(!applies(travel))return null;
-        if(height>0&&truck.height>height)return "Height limit "+height+" m";
-        if(width>0&&truck.width>width)return "Width limit "+width+" m";
-        if(length>0&&truck.length>length)return "Length limit "+length+" m";
-        if(weight>0&&truck.weight>weight)return "Gross weight limit "+weight+" t";
-        if(axle>0&&truck.axleWeight>axle)return "Axle load limit "+axle+" t";
-        if(tags.containsKey("maxaxles"))try{if(truck.axles>Integer.parseInt(tags.get("maxaxles")))return "Maximum axle count exceeded";}catch(NumberFormatException unknown){return "Unknown maximum axle count";}
-        if((flags&Graph.UNCERTAIN)!=0){
-            boolean relevant=false;
-            for(String key:tags.keySet()){
-                if(key.startsWith("maxspeed")||key.startsWith("toll")||key.equals("maxaxles"))continue;
-                // Sign metadata and national default references do not declare a numeric clearance.
-                if(key.endsWith(":signed"))continue;
-                if("default".equals(tags.get(key))){
-                    if(key.equals("maxheight")&&truck.height<=4)continue;
-                    relevant=true;continue;
-                }
-                if(key.startsWith("hazmat")&&!truck.hazmat)continue;
-                if(key.matches("max(height|width|length|weight|axleload)(:(physical|hgv|forward|backward))*")&&!tags.get(key).matches("(?i)(none|unsigned|no|[0-9]+(\\.[0-9]+)?\\s*(t|tonnes|kg|lbs|m|cm|ft)?|[0-9]+'\\s*[0-9]+(\\.[0-9]+)?\"?)"))relevant=true;
-                if(key.contains(":conditional")||key.startsWith("maxweightrating")||key.startsWith("maxbogie")||key.startsWith("hgv:trailer")||key.startsWith("trailer")||key.startsWith("minspeed")||key.startsWith("max")&&key.contains(":")&&!key.endsWith(":physical")&&!key.endsWith(":hgv")&&!key.endsWith(":forward")&&!key.endsWith(":backward"))relevant=true;
+        AccessPolicy.Decision decision=AccessPolicy.decide(this,truck,metresFromDestination,originEgress,permittedDelivery,travel);
+        // Admitted access is not a violation: the caller counts its metres, and the driver sees it
+        // as an access-restricted section rather than an error.
+        if(decision.ok()||decision.admitted())return null;
+        return decision.reason;
+    }
+    /**
+     * True when the way carries tags this audit cannot evaluate (conditional, unparsable, sign
+     * metadata that hides a real limit). Speed and toll metadata are not prohibitions and do not
+     * make an edge uncertain.
+     */
+    public boolean relevantUncertainty(Truck truck){
+        if((flags&Graph.UNCERTAIN)==0)return false;
+        boolean relevant=false;
+        for(String key:tags.keySet()){
+            if(key.startsWith("maxspeed")||key.startsWith("toll")||key.equals("maxaxles"))continue;
+            // Sign metadata and national default references do not declare a numeric clearance.
+            if(key.endsWith(":signed"))continue;
+            if("default".equals(tags.get(key))){
+                if(key.equals("maxheight")&&truck.height<=4)continue;
+                relevant=true;continue;
             }
-            if(relevant||tags.isEmpty())return "Mapped conditional or unsupported restriction needs verification";
+            if(key.startsWith("hazmat")&&!truck.hazmat)continue;
+            if(key.matches("max(height|width|length|weight|axleload)(:(physical|hgv|forward|backward))*")&&!tags.get(key).matches("(?i)(none|unsigned|no|[0-9]+(\\.[0-9]+)?\\s*(t|tonnes|kg|lbs|m|cm|ft)?|[0-9]+'\\s*[0-9]+(\\.[0-9]+)?\"?)"))relevant=true;
+            if(key.contains(":conditional")||key.startsWith("maxweightrating")||key.startsWith("maxbogie")||key.startsWith("hgv:trailer")||key.startsWith("trailer")||key.startsWith("minspeed")||key.startsWith("max")&&key.contains(":")&&!key.endsWith(":physical")&&!key.endsWith(":hgv")&&!key.endsWith(":forward")&&!key.endsWith(":backward"))relevant=true;
         }
-        String hazardous=hazardViolation(truck);if(hazardous!=null)return hazardous;
-        if(accessLimited()){
-            String access="yes";
-            for(String key:new String[]{"access","vehicle","motor_vehicle","motorcar","hgv"})if(tags.containsKey(key))access=tags.get(key);
-            boolean leaving=originEgress&&(access.equals("private")||access.equals("destination")||access.equals("delivery"));
-            if(!leaving&&(!permittedDelivery||metresFromDestination>2000))return "Truck access restricted";
-            if(tags.containsKey("barrier")&&!"no".equals(tags.get("barrier")))return "Restricted access barrier needs verification";
-            if(tags.containsKey("bridge")&&!"no".equals(tags.get("bridge")))return "Bridge on restricted delivery access needs verification";
-            if(!access.equals("no")&&!access.equals("destination")&&!access.equals("delivery")&&!access.equals("private"))return "Unsupported access exception";
-        }
-        return null;
+        return relevant||tags.isEmpty();
     }
     /**
      * A stated physical or legal limit this vehicle exceeds. Endpoint proximity never makes such a

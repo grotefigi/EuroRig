@@ -91,6 +91,21 @@ public class RouteSectionTest {
         assertTrue(RouteSection.of(null,truck).isEmpty());
     }
 
+    @Test public void advisoryConditionsAreNotTheSameWarningAsAnUnknownLimit(){
+        Graph.Edge speed=new Graph.Edge(0,1,1,"A","secondary",0,0,0,0,0,Graph.UNCERTAIN,50,
+                RestrictionRule.UNCERTAIN,"maxspeed:conditional=30 @ (22:00-06:00)");
+        RouteSection advisory=RouteSection.of(List.of(speed),truck).get(0);
+        assertEquals(RouteSection.UNVERIFIED,advisory.cls);
+        assertEquals(RouteSection.ADVISORY,advisory.severity);
+        assertTrue(advisory.label().contains("not evaluated"));
+
+        Graph.Edge height=new Graph.Edge(0,1,2,"B","secondary",0,0,0,0,0,Graph.UNCERTAIN,50,
+                RestrictionRule.UNCERTAIN,"maxheight:conditional=3.5 @ (Mo-Fr)");
+        RouteSection limit=RouteSection.of(List.of(height),truck).get(0);
+        assertEquals(RouteSection.POTENTIAL_LIMIT,limit.severity);
+        assertTrue("a possibly applicable limit keeps its own warning",limit.label().contains("Not fully verified"));
+    }
+
     @Test public void explanationsNeverPromiseSafety(){
         Graph.Edge edge=new Graph.Edge(0,1,1,"A","residential",0,0,0,0,0,Graph.BLOCKED,30,RestrictionRule.ACCESS,"hgv=no");
         RouteSection section=RouteSection.of(List.of(edge),truck).get(0);

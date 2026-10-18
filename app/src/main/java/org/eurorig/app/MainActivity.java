@@ -186,9 +186,12 @@ public final class MainActivity extends Activity {
         List<RouteSection> sections=RouteSection.of(r.edges,Store.truck);
         double accessMetres=RouteSection.metresOf(sections,RouteSection.AUTHORISED_ACCESS);
         double unverifiedMetres=RouteSection.metresOf(sections,RouteSection.UNVERIFIED);
+        double advisoryMetres=RouteSection.metresOfSeverity(sections,RouteSection.UNVERIFIED,RouteSection.ADVISORY);
+        double limitMetres=unverifiedMetres-advisoryMetres;
         StringBuilder summary=new StringBuilder(String.format(Locale.getDefault(),"%.1f km  ·  ≈ %s  ·  %s",r.metres/1000,duration(r.seconds),r.nativeGeometry()?(Store.deliveryAccess?"Shortest delivery":Store.mode.title):"Tagged restrictions checked"));
         if(accessMetres>0)summary.append(String.format(Locale.getDefault(),"  ·  %d m access-restricted",Math.round(accessMetres)));
-        if(unverifiedMetres>0)summary.append(String.format(Locale.getDefault(),"  ·  %d m not verified",Math.round(unverifiedMetres)));
+        if(limitMetres>0)summary.append(String.format(Locale.getDefault(),"  ·  %d m not verified",Math.round(limitMetres)));
+        if(advisoryMetres>0)summary.append(String.format(Locale.getDefault(),"  ·  %d m condition not evaluated",Math.round(advisoryMetres)));
         summary.append("  ·  map data, not a legal guarantee");
         stats.setText(summary.toString());
         // The painted route and this explanation come from the same sections; tapping explains them.
