@@ -131,6 +131,40 @@ final class DisplayDatabase implements AutoCloseable {
         }
         return result;
     }
+    /**
+     * Nearest point within radius that lies on a road with no applicable hard limit for this truck.
+     * Used when the requested origin or destination sits on a road the vehicle may not use: moving
+     * the endpoint to a legal access point keeps graph connectivity, where excluding a circle around
+     * the endpoint destroys it and produces a fabricated "no path".
+     */
+    synchronized double[] legalAccessPoint(double lat,double lon,Truck truck,double radius){
+        if(!restrictionEvidence)return null;
+        double dLat=radius/111320.0,dLon=radius/(111320.0*Math.max(.2,Math.cos(Math.toRadians(lat))));
+        String[] args={""+(lat-dLat),""+(lat+dLat),""+(lon-dLon),""+(lon+dLon)};
+        HashMap<Long,double[]> nearest=new HashMap<>();HashMap<Long,Integer> levels=new HashMap<>();
+        try(Cursor rows=database.rawQuery("SELECT id,level,shape FROM roads WHERE north>=? AND south<=? AND east>=? AND west<=? LIMIT 800",args)){
+            while(rows.moveToNext()){
+                long id=rows.getLong(0);int level=rows.getInt(1);
+                for(Graph.Node point:NativeRouter.decode(rows.getString(2))){
+                    double distance=Geo.distance(point.lat,point.lon,lat,lon);
+                    if(distance>radius)continue;
+                    double[] current=nearest.get(id);
+                    if(current==null||distance<current[0]){nearest.put(id,new double[]{distance,point.lat,point.lon});levels.put(id,level);}
+                }
+            }
+        }
+        double[] chosen=null;
+        for(Map.Entry<Long,double[]> entry:nearest.entrySet()){
+            double[] candidate=entry.getValue();
+            // Prefer the road a truck would actually use: a minor track 3 m away is no substitute.
+            double score=candidate[0]+(levels.get(entry.getKey())>3?radius:0);
+            if(chosen!=null&&score>=chosen[0])continue;
+            RestrictionRule rule=rulesFor(Collections.singleton(entry.getKey())).get(entry.getKey());
+            if(rule!=null&&rule.hard(truck))continue;
+            chosen=new double[]{score,candidate[1],candidate[2]};
+        }
+        return chosen==null?null:new double[]{chosen[1],chosen[2]};
+    }
     private static Map<String,String> parseTags(String json){
         HashMap<String,String> tags=new HashMap<>();
         try{JSONObject source=new JSONObject(json);Iterator<String> keys=source.keys();while(keys.hasNext()){String key=keys.next();tags.put(key,source.getString(key));}}

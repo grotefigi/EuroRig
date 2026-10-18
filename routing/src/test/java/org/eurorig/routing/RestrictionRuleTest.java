@@ -76,6 +76,43 @@ public class RestrictionRuleTest {
         assertEquals("packs without classification keep the old behaviour",0,legacy.kind);
         assertFalse(legacy.uncertainOnly());
     }
+    /**
+     * A stated limit is never waived by where the vehicle is standing. Proximity to the origin
+     * proves neither legality nor clearance, so the router must relocate the endpoint instead.
+     */
+    @Test public void hardLimitsAreNeverWaivedByEndpointProximity(){
+        Truck loaded = new Truck(3.89,2.5,17,41,10,false,false,true,true,5,80,0,0);
+        RestrictionRule bridge = rule(0,0,3.5,0,Map.of("maxweight","3.5"));
+        Truck weightLimited = new Truck(3.89,2.5,17,41,10,false,false,true,true,5,80,0,0);
+        Truck light = new Truck(3.89,2.5,17,3,1.5,false,false,true,true,5,80,0,0);
+        assertNotNull("41 t on a 3.5 t road is a violation even at the origin",bridge.violation(loaded,false,0,true));
+        assertTrue(bridge.hard(loaded));
+        assertNull("a 3 t vehicle may use it",bridge.violation(light,false,0,true));
+        assertFalse(bridge.hard(light));
+        assertTrue("a height limit under a bridge is hard at any distance",rule(3.0,0,0,0,Map.of("maxheight","3.0")).hard(loaded));
+    }
+
+    @Test public void deliveryWaivesAccessOnlyNeverMass(){
+        Truck loaded = new Truck(3.89,2.5,17,41,10,false,false,true,true,5,80,0,0);
+        RestrictionRule yard = rule(0,0,0,Graph.BLOCKED,Map.of("access","destination"));
+        assertNull("a proven destination delivery may enter",yard.violation(loaded,true,120,false));
+        assertNotNull("without the permission it may not",yard.violation(loaded,false,120,false));
+        assertFalse(yard.hard(loaded));
+        RestrictionRule limitedYard = rule(0,0,3.5,Graph.BLOCKED,Map.of("access","destination","maxweight","3.5"));
+        assertNotNull("delivery permission never waives a 3.5 t limit",limitedYard.violation(loaded,true,120,false));
+        assertTrue(limitedYard.hard(loaded));
+    }
+
+    /** The radius decides whether to relocate an endpoint; it never creates a right to drive. */
+    @Test public void endpointRadiusDoesNotChangeLegality(){
+        Truck loaded = new Truck(3.89,2.5,17,41,10,false,false,true,true,5,80,0,0);
+        RestrictionRule bridge = rule(0,0,3.5,0,Map.of("maxweight","3.5"));
+        for(double distance : new double[]{0,249,250,251,5000}){
+            assertTrue("hard at " + distance + " m from the destination",bridge.hard(loaded));
+            assertNotNull(bridge.violation(loaded,true,distance,true));
+        }
+    }
+
     @Test public void weightLimitUnderTheStartingVehicleIsStillAViolation(){
         RestrictionRule rule=rule(0,0,3.5,Graph.BLOCKED,Map.of("maxweight","3.5","oneway","yes"));
         Truck truck=new Truck(3.89,2.5,17,41,10,false,false,true,true,5,80,0,0);

@@ -73,6 +73,19 @@ public final class RestrictionRule {
         }
         return null;
     }
+    /**
+     * A stated physical or legal limit this vehicle exceeds. Endpoint proximity never makes such a
+     * road usable, and no delivery exception waives mass, height, width, length, axle or ADR limits.
+     */
+    public boolean hard(Truck truck){
+        if(height>0&&truck.height>height)return true;
+        if(width>0&&truck.width>width)return true;
+        if(length>0&&truck.length>length)return true;
+        if(weight>0&&truck.weight>weight)return true;
+        if(axle>0&&truck.axleWeight>axle)return true;
+        if(tags.containsKey("maxaxles"))try{if(truck.axles>Integer.parseInt(tags.get("maxaxles")))return true;}catch(NumberFormatException unknown){return true;}
+        return hazardViolation(truck)!=null;
+    }
     public String hazardViolation(Truck truck){
         if(truck.hazmat&&"no".equals(tags.get("hazmat")))return "Hazardous goods prohibited";
         if((truck.hazardousLoad&2)!=0&&"no".equals(tags.get("hazmat:water")))return "Water-polluting load prohibited";

@@ -62,61 +62,115 @@ final class NativeRouter implements AutoCloseable {
             .put("costing_options",new JSONObject().put("truck",truck))
             .put("units","kilometers").put("language","en-US").put("shape_format","polyline6");
     }
+
+    /** A road this truck may legally and physically use, within the endpoint radius. */
+    private double[] accessPoint(double lat,double lon,Truck truck,DisplayDatabase display){
+        return display==null?null:display.legalAccessPoint(lat,lon,truck,ENDPOINT_METRES);
+    }
+
+    /** Result of one audited attempt sequence. */
+    private static final class Plan{
+        JSONObject response;long[] ways;Map<Long,RestrictionRule> rules=Collections.emptyMap();
+        double restrictedMetres;Set<String> warnings=new TreeSet<>();String failure="";
+        boolean originHard,destinationHard;
+    }
+
+    /**
+     * Audit a route that does not carry an applicable hard limit. A hard limit on the origin or
+     * destination road is reported to the caller so the endpoint can be moved; it is never excluded
+     * and never accepted, because proximity to an endpoint proves neither legality nor clearance.
+     */
+    private Plan planRoute(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery,DisplayDatabase display){
+        try{return planRouteUnchecked(lat,lon,endLat,endLon,truck,mode,delivery,display);}
+        catch(org.json.JSONException malformed){throw new IllegalStateException("Invalid routing response: "+malformed.getMessage(),malformed);}
+    }
+
+    private Plan planRouteUnchecked(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery,DisplayDatabase display)throws org.json.JSONException{
+        Plan plan=new Plan();
+        JSONObject query=request(lat,lon,endLat,endLon,truck,mode,delivery);
+        JSONArray excluded=new JSONArray();JSONObject candidate=null;
+        for(int attempt=0;attempt<12;attempt++){
+            if(excluded.length()>0)query.put("exclude_locations",excluded);
+            JSONObject response;
+            try{response=new JSONObject(engine.routeRaw(query.toString()));}
+            catch(RuntimeException engineFailure){
+                // A relocated or excluded endpoint can strand the network. Keep the last route that
+                // passed the audit; it never carries a hard limit, because such a route is not a candidate.
+                if(candidate!=null){plan.response=candidate;break;}
+                throw engineFailure;
+            }
+            if(display==null||!display.restrictionEvidence){plan.response=response;break;}
+            JSONObject leg=response.getJSONObject("trip").getJSONArray("legs").getJSONObject(0);
+            String shape=leg.getString("shape");List<Graph.Node> geometry=decode(shape);
+            JSONObject trace=new JSONObject().put("encoded_polyline",shape).put("shape_match","edge_walk").put("costing","truck")
+                .put("costing_options",traceCosting(query))
+                .put("filters",new JSONObject().put("action","include").put("attributes",new JSONArray().put("edge.way_id").put("edge.begin_shape_index").put("edge.end_shape_index").put("edge.length")));
+            JSONArray traced=new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
+            HashSet<Long> ways=new HashSet<>();for(int i=0;i<traced.length();i++)ways.add(traced.getJSONObject(i).getLong("way_id"));
+            Map<Long,RestrictionRule> rules=display.rulesFor(ways);
+            plan.ways=auditedWays(traced,geometry.size());plan.rules=rules;
+            boolean rejected=false,originHard=false,destinationHard=false;double restricted=0;
+            Set<String> notes=new TreeSet<>();String failure=plan.failure;
+            for(int i=0;i<traced.length();i++){
+                JSONObject edge=traced.getJSONObject(i);int begin=edge.getInt("begin_shape_index"),end=edge.getInt("end_shape_index");
+                long way=edge.getLong("way_id");
+                int middle=(begin+end)/2;Graph.Node a=geometry.get(middle),b=geometry.get(Math.min(end,middle+1));
+                Graph.Node point=new Graph.Node((a.lat+b.lat)/2,(a.lon+b.lon)/2,"");RestrictionRule rule=rules.get(way);
+                double toOrigin=Geo.distance(point.lat,point.lon,lat,lon),toDestination=Geo.distance(point.lat,point.lon,endLat,endLon);
+                double metresToDestination=Math.max(Geo.distance(geometry.get(begin).lat,geometry.get(begin).lon,endLat,endLon),Geo.distance(geometry.get(end).lat,geometry.get(end).lon,endLat,endLon));
+                String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null)
+                    :rule.violation(truck,delivery,metresToDestination,toOrigin<=ENDPOINT_METRES);
+                if(reason!=null){
+                    if(rule!=null&&rule.hard(truck)){
+                        // Reported so the endpoint can be moved. Never excluded, never accepted.
+                        failure=reason;
+                        if(toOrigin<=ENDPOINT_METRES)originHard=true;else if(toDestination<=ENDPOINT_METRES)destinationHard=true;
+                        rejected=true;break;
+                    }
+                    // Uncertainty is surfaced, never routed as a prohibition (RR-04).
+                    if(rule!=null&&rule.uncertainOnly()){notes.add(reason);continue;}
+                    failure=reason;
+                    excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));
+                    rejected=true;break;
+                }
+                if(rule!=null&&rule.accessLimited())restricted+=edge.getDouble("length")*1000;
+            }
+            plan.warnings.addAll(notes);
+            if(!rejected){plan.response=response;plan.restrictedMetres=restricted;candidate=response;break;}
+            plan.failure=failure;
+            if(originHard||destinationHard){plan.originHard=originHard;plan.destinationHard=destinationHard;return plan;}
+            if(attempt==11)throw new IllegalStateException("No verified route for this profile: "+failure);
+        }
+        return plan;
+    }
+
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck) {return route(lat,lon,endLat,endLon,truck,null,false);}
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery) {
         try {
             DisplayDatabase display=Store.display;
             if((delivery||truck.tunnelCode!=0||(truck.hazardousLoad&6)!=0)&&(display==null||!display.restrictionEvidence))
                 throw new IllegalStateException("Install the updated country map with restriction evidence before using delivery access or detailed ADR routing");
-            JSONObject query=request(lat,lon,endLat,endLon,truck,mode,delivery);
-            JSONArray excluded=new JSONArray();JSONObject response=null,candidate=null;double restrictedMetres=0;String failure="";
-            long[] auditedWays=null;Map<Long,RestrictionRule> auditedRules=Collections.emptyMap();
-            Set<String> warnings=new TreeSet<>();
-            for(int attempt=0;attempt<12;attempt++){
-                if(excluded.length()>0)query.put("exclude_locations",excluded);
-                try{response=new JSONObject(engine.routeRaw(query.toString()));}
-                catch(RuntimeException engineFailure){
-                    // An exclusion can seal the only approach to an endpoint, which the engine
-                    // reports as "no path". Keep the last route that passed the audit instead
-                    // of discarding a usable route.
-                    if(candidate!=null){response=candidate;break;}
-                    throw engineFailure;
+            double[] start={lat,lon},finish={endLat,endLon};
+            Plan plan=null;String relocation="";
+            for(int pass=0;pass<3;pass++){
+                plan=planRoute(start[0],start[1],finish[0],finish[1],truck,mode,delivery,display);
+                if(!plan.originHard&&!plan.destinationHard)break;
+                boolean moved=false;
+                if(plan.originHard){
+                    double[] alternative=accessPoint(start[0],start[1],truck,display);
+                    if(alternative!=null){relocation=String.format(java.util.Locale.ROOT,"Start moved %.0f m: the requested point is on a road this truck may not use",Geo.distance(start[0],start[1],alternative[0],alternative[1]));start=alternative;moved=true;}
                 }
-                if(display==null||!display.restrictionEvidence)break;
-                JSONObject leg=response.getJSONObject("trip").getJSONArray("legs").getJSONObject(0);
-                String shape=leg.getString("shape");List<Graph.Node> geometry=decode(shape);
-                JSONObject trace=new JSONObject().put("encoded_polyline",shape).put("shape_match","edge_walk").put("costing","truck")
-                    .put("costing_options",traceCosting(query))
-                    .put("filters",new JSONObject().put("action","include").put("attributes",new JSONArray().put("edge.way_id").put("edge.begin_shape_index").put("edge.end_shape_index").put("edge.length")));
-                JSONArray traced=new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
-                HashSet<Long> ways=new HashSet<>();for(int i=0;i<traced.length();i++)ways.add(traced.getJSONObject(i).getLong("way_id"));
-                Map<Long,RestrictionRule> rules=display.rulesFor(ways);auditedRules=rules;auditedWays=auditedWays(traced,geometry.size());boolean rejected=false;restrictedMetres=0;
-                for(int i=0;i<traced.length();i++){
-                    JSONObject edge=traced.getJSONObject(i);int begin=edge.getInt("begin_shape_index"),end=edge.getInt("end_shape_index");
-                    long way=edge.getLong("way_id");
-                    int middle=(begin+end)/2;Graph.Node a=geometry.get(middle),b=geometry.get(Math.min(end,middle+1));
-                    // Exclude inside the failed edge, not its junction shared by a valid detour.
-                    Graph.Node point=new Graph.Node((a.lat+b.lat)/2,(a.lon+b.lon)/2,"");RestrictionRule rule=rules.get(way);
-                    double toOrigin=Geo.distance(point.lat,point.lon,lat,lon),toDestination=Geo.distance(point.lat,point.lon,endLat,endLon);
-                    boolean atEndpoint=toOrigin<=ENDPOINT_METRES||toDestination<=ENDPOINT_METRES;
-                    String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null):rule.violation(truck,delivery,
-                        Math.max(Geo.distance(geometry.get(begin).lat,geometry.get(begin).lon,endLat,endLon),Geo.distance(geometry.get(end).lat,geometry.get(end).lon,endLat,endLon)),
-                        atEndpoint&&toOrigin<=ENDPOINT_METRES);
-                    if(reason!=null){
-                        // Uncertainty is surfaced to the driver, never routed as a prohibition:
-                        // an unverified tag must not make a lawful corridor unroutable.
-                        if(rule!=null&&rule.uncertainOnly()){warnings.add(reason);continue;}
-                        // The road under the vehicle cannot be avoided by routing. Record the
-                        // restricted distance and keep the route; never exclude the endpoint.
-                        if(atEndpoint){restrictedMetres+=edge.getDouble("length")*1000;warnings.add(reason);continue;}
-                        failure=reason;excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));rejected=true;break;
-                    }
-                    if(rule!=null&&rule.accessLimited())restrictedMetres+=edge.getDouble("length")*1000;
+                if(!moved&&plan.destinationHard){
+                    double[] alternative=accessPoint(finish[0],finish[1],truck,display);
+                    if(alternative!=null){relocation=String.format(java.util.Locale.ROOT,"Destination moved %.0f m: the requested point is on a road this truck may not use",Geo.distance(finish[0],finish[1],alternative[0],alternative[1]));finish=alternative;moved=true;}
                 }
-                if(!rejected){candidate=response;break;}
-                if(attempt==11)throw new IllegalStateException("No verified route for this profile: "+failure);
+                if(!moved)throw new IllegalStateException(plan.failure+" - no road this truck may use within "+(int)ENDPOINT_METRES+" m of the requested point");
             }
-            if(candidate!=null)response=candidate;
+            if(plan==null||plan.response==null)throw new IllegalStateException("No truck route");
+            JSONObject response=plan.response;
+            long[] auditedWays=plan.ways;Map<Long,RestrictionRule> auditedRules=plan.rules;
+            double restrictedMetres=plan.restrictedMetres;
+            Set<String> warnings=plan.warnings;if(!relocation.isEmpty())warnings.add(relocation);
             warning=warnings.isEmpty()?"":String.join("; ",warnings);
             if(response==null)throw new IllegalStateException("No truck route");
             if(response.has("error")||response.has("message"))throw new IllegalStateException(response.optString("error",response.optString("message")));

@@ -10,6 +10,8 @@ import java.util.concurrent.*;
 final class Store {
     static volatile Graph graph;
     static NativeRouter nativeRouter;
+    /** Restrictions the last route had to accept or work around; shown to the driver, never hidden. */
+    static String restrictionWarning(){return nativeRouter==null?"":nativeRouter.restrictionWarning();}
     static volatile DisplayDatabase display;
     static volatile Router.Route route;
     static volatile Router.Route progressRoute;
