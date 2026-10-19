@@ -330,8 +330,15 @@ final class NativeRouter implements AutoCloseable {
             // The native binding throws a checked ValhallaException at runtime even though it is not
             // declared, so RuntimeException was the wrong catch: measured as
             // com.valhalla.valhalla.ValhallaException$Internal escaping to the outer handler.
+            String message=exactFailure.getMessage()==null?"":exactFailure.getMessage();
             android.util.Log.i("RouteRun",runId+" trace threw "+exactFailure.getClass().getName()
-                    +" : "+exactFailure.getMessage()+" at "+firstFrames(exactFailure));
+                    +" : "+message+" at "+firstFrames(exactFailure));
+            if(!message.contains("code=443")){
+                // Only the exact-match failure has a fallback. Corrupt tiles, missing data or an
+                // engine fault must surface as themselves, never as a reason to match fuzzily.
+                android.util.Log.i("RouteRun",runId+" no fallback: not a matching failure");
+                throw new IllegalStateException("Offline routing engine failed: "+message,exactFailure);
+            }
             if(geometry.size()!=2||display==null){
                 android.util.Log.i("Audit",String.format(java.util.Locale.ROOT,
                         "matcher=edge_walk failed, fallback not applicable (points=%d, display=%s): %s",
