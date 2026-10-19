@@ -76,7 +76,13 @@ public final class NavigationService extends Service implements LocationListener
         lastFix=SystemClock.elapsedRealtime();Store.fixTime=lastFix-age/1_000_000;
         if(l.hasBearing()&&l.hasSpeed()&&l.getSpeed()>=1)Store.bearing=l.getBearing();
         Progress.Fix fix=progress.update(Store.lat,Store.lon);Store.remaining=fix.remaining;Store.travelled=Store.route.metres-fix.remaining;
-        if(fix.arrived){Store.arrived=true;Store.guidance="You have arrived";speak(Store.guidance);stopSelf();return;}
+        if(fix.arrived){
+            Store.arrived=true;
+            // Reaching the end of the route is not the same as reaching the place asked for.
+            Store.guidance=Store.arrivalOffset()>Arrival.REACHED_METRES&&!Store.arrivalText().isEmpty()
+                    ?Store.arrivalText():"You have arrived";
+            speak(Store.guidance);stopSelf();return;
+        }
         if(fix.offRoute>70){
             Store.guidance="Off route · checking a new route";
             if(++offRouteFixes>=3 && !recalculating)reroute();

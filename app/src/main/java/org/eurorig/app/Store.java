@@ -27,6 +27,8 @@ final class Store {
     static double relocationMetres(){return nativeRouter==null?0:nativeRouter.relocationMetres();}
     /** Metres between the requested destination and the point the accepted route ends at. */
     static double arrivalOffset(){return nativeRouter==null?0:nativeRouter.arrivalOffsetMetres();}
+    /** Driver-facing wording for how the route ends, kept in one place with the audit. */
+    static String arrivalText(){return nativeRouter==null?"":nativeRouter.arrivalText();}
     static volatile DisplayDatabase display;
     static volatile Router.Route route;
     static volatile Router.Route progressRoute;

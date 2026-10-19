@@ -213,10 +213,10 @@ public final class MainActivity extends Activity {
      * road short of it. The gap is disclosed as a distance; it is not a claim of safe arrival.
      */
     private String arrivalText(Router.Route route){
-        double offset=Store.arrivalOffset();
-        if(offset>10)return String.format(Locale.getDefault(),
-                "Route ends %.0f m from the requested destination · final approach not verified",offset);
-        return "Route ready for your truck";
+        String disclosed=Store.arrivalText();
+        if(disclosed!=null&&!disclosed.isEmpty())return disclosed;
+        return Store.arrivalOffset()>10?"Route ends short of the requested destination · final approach not verified"
+                :"Route ready for your truck";
     }
 
     /** Per-section explanations for the colours painted on the route. */

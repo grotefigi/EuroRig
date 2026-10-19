@@ -28,12 +28,15 @@ final class NativeRouter implements AutoCloseable {
     private volatile String runId="none";
     /** Distance between the requested destination and the point the route actually ends at. */
     private volatile double arrivalOffsetMetres;
+    /** What the driver is told when the route ends short of the requested destination. */
+    private volatile String arrivalText="";
     String runId(){return runId;}
     boolean relocatedAtOrigin(){return relocationAtOrigin;}
     double[] relocationFrom(){return relocationFrom;}
     double[] relocationTo(){return relocationTo;}
     double relocationMetres(){return relocationMetres;}
     double arrivalOffsetMetres(){return arrivalOffsetMetres;}
+    String arrivalText(){return arrivalText;}
     String restrictionWarning(){return warning;}
     NativeRouter(Context context,File tiles) throws IOException {
         try{RegionPackages.validateTar(tiles);}
@@ -98,6 +101,8 @@ final class NativeRouter implements AutoCloseable {
         long failedWay;
         /** First admitted access-restricted point, used to look for a shorter lawful approach. */
         double[] firstRestricted;
+        /** How the final edge of the accepted route was established, for arrival disclosure. */
+        boolean lastAdmitted,lastUnverified;
     }
 
     /**
@@ -190,6 +195,8 @@ final class NativeRouter implements AutoCloseable {
                     excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));
                     rejected=true;break;
                 }
+                plan.lastAdmitted=decision.admitted();
+                plan.lastUnverified=decision.unverified();
                 // Only travel the tag actually admits counts as restricted distance.
                 if(decision.admitted()){
                     if(restricted==0)plan.firstRestricted=new double[]{point.lat,point.lon};
@@ -300,7 +307,10 @@ final class NativeRouter implements AutoCloseable {
             // The engine snaps endpoints to edges. Record how far the routed end really is from the
             // requested destination so the driver is never told an unverified approach was reached.
             Graph.Node routedStart=nodes.get(0),routedEnd=nodes.get(nodes.size()-1);
-            arrivalOffsetMetres=Geo.distance(requestedEndLat,requestedEndLon,routedEnd.lat,routedEnd.lon);
+            Arrival.Status arrival=Arrival.describe(requestedEndLat,requestedEndLon,routedEnd.lat,routedEnd.lon,
+                    plan.lastAdmitted?Arrival.Certainty.ADMITTED_ACCESS
+                            :plan.lastUnverified?Arrival.Certainty.UNVERIFIED:Arrival.Certainty.VERIFIED);
+            arrivalOffsetMetres=arrival.metres;arrivalText=arrival.text;
             android.util.Log.i("Snap",String.format(java.util.Locale.ROOT,
                     "requested end %.5f,%.5f routed end %.5f,%.5f offset %.0f m",
                     requestedEndLat,requestedEndLon,routedEnd.lat,routedEnd.lon,arrivalOffsetMetres));
