@@ -363,7 +363,7 @@ public final class MainActivity extends Activity {
             requestPermissions(Build.VERSION.SDK_INT>=33?new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION,Manifest.permission.POST_NOTIFICATIONS}:new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},100);return;
         }
         LocationManager manager=getSystemService(LocationManager.class);
-        if(!manager.isProviderEnabled(LocationManager.GPS_PROVIDER)){error("Enable device location, then start guidance.");return;}
+        if(!locationAvailable(manager)){error("Enable device location, then start guidance.");return;}
         // The planned origin must match the driver's current location before guidance.
         Location fix=manager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
         if(fix==null||!fix.hasAccuracy()||fix.getAccuracy()>50||SystemClock.elapsedRealtimeNanos()-fix.getElapsedRealtimeNanos()>30_000_000_000L){
@@ -507,7 +507,7 @@ public final class MainActivity extends Activity {
         if(Store.graph.demo){error("GPS cannot be used with the fictional training map. Import real local coverage first.");return;}
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED){requestPermissions(new String[]{Manifest.permission.ACCESS_FINE_LOCATION,Manifest.permission.ACCESS_COARSE_LOCATION},101);return;}
         LocationManager locations=getSystemService(LocationManager.class);
-        if(!locations.isProviderEnabled(LocationManager.GPS_PROVIDER)){error("Enable device location, then tap Use GPS.");return;}
+        if(!locationAvailable(locations)){error("Enable device location, then tap Use GPS.");return;}
         status.setText(R.string.acquiring_gps);
         cancelGps();busy=true;gpsAcquiring=true;refresh();status.setText(R.string.acquiring_gps);
         boolean[] acquired={false};
@@ -558,6 +558,19 @@ public final class MainActivity extends Activity {
             }).setPositiveButton("Close",null).show();
         }catch(IOException e){error(e.getMessage());}
     }
+    /**
+     * Location is usable when the GPS provider is on, or when the system location switch is on and a
+     * provider is present. A test provider replaces the real GPS provider on some devices, and asking
+     * only about GPS_PROVIDER would then report location as disabled while fixes are arriving.
+     */
+    private static boolean locationAvailable(android.location.LocationManager manager){
+        try{
+            if(manager.isProviderEnabled(android.location.LocationManager.GPS_PROVIDER))return true;
+            if(android.os.Build.VERSION.SDK_INT>=28)return manager.isLocationEnabled();
+        }catch(RuntimeException ignored){}
+        return false;
+    }
+
     private void error(String message){
         if(isFinishing()||isDestroyed())return;
         AlertDialog.Builder builder=new AlertDialog.Builder(this).setTitle("EuroRig").setMessage(message)
