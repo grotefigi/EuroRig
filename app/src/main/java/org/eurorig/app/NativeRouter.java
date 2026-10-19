@@ -24,8 +24,11 @@ final class NativeRouter implements AutoCloseable {
     private volatile boolean relocationAtOrigin;
     private volatile double[] relocationFrom,relocationTo;
     private volatile double relocationMetres;
+    /** Correlation id for one calculation, so a diagnostic line belongs to a known run. */
+    private volatile String runId="none";
     /** Distance between the requested destination and the point the route actually ends at. */
     private volatile double arrivalOffsetMetres;
+    String runId(){return runId;}
     boolean relocatedAtOrigin(){return relocationAtOrigin;}
     double[] relocationFrom(){return relocationFrom;}
     double[] relocationTo(){return relocationTo;}
@@ -104,6 +107,7 @@ final class NativeRouter implements AutoCloseable {
     }
 
     private Plan planRouteUnchecked(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery,DisplayDatabase display,double[] seedExclusion)throws org.json.JSONException{
+        android.util.Log.i("RouteRun",runId+" planRouteUnchecked entered delivery="+delivery+" seed="+(seedExclusion!=null));
         Plan plan=new Plan();
         JSONObject query=request(lat,lon,endLat,endLon,truck,mode,delivery);
         JSONArray excluded=new JSONArray();JSONObject candidate=null;
@@ -199,6 +203,8 @@ final class NativeRouter implements AutoCloseable {
 
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck) {return route(lat,lon,endLat,endLon,truck,null,false);}
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery) {
+        runId=Long.toString(System.nanoTime()&0xFFFFFFF,36);
+        android.util.Log.i("RouteRun",runId+" plan requested from "+lat+","+lon+" to "+endLat+","+endLon+" delivery="+delivery);
         try {
             DisplayDatabase display=Store.display;
             double requestedEndLat=endLat,requestedEndLon=endLon;
@@ -299,6 +305,7 @@ final class NativeRouter implements AutoCloseable {
             return new Router.Route(graph,Arrays.asList(edges),instructions,seconds,restrictedMetres);
         }catch(JSONException e){throw new IllegalStateException("Invalid response from offline routing engine",e);}
         catch(Exception e){
+            android.util.Log.i("RouteRun",runId+" route failed "+e.getClass().getName()+": "+e.getMessage());
             if(e instanceof com.valhalla.valhalla.ValhallaException.Internal&&e.getMessage()!=null&&e.getMessage().contains("code=171,"))
                 throw new IllegalStateException("No usable truck road within 250 m of a selected point in the installed map. Choose a mapped road or the signed truck entrance, and check country coverage.",e);
             throw new IllegalStateException("Offline truck routing: "+e.getMessage(),e);
@@ -312,9 +319,19 @@ final class NativeRouter implements AutoCloseable {
      * recorded way geometry. Anything else fails closed: an unauditable route is never accepted.
      */
     private JSONArray traceEdges(JSONObject trace,List<Graph.Node> geometry,DisplayDatabase display)throws JSONException{
+        android.util.Log.i("RouteRun",runId+" trace attempt matcher=edge_walk points="+geometry.size());
         try{
-            return new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
-        }catch(RuntimeException exactFailure){
+            JSONArray edges=new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
+            android.util.Log.i("RouteRun",runId+" trace ok matcher=edge_walk edges="+edges.length());
+            return edges;
+        }catch(JSONException malformed){
+            throw malformed;
+        }catch(Exception exactFailure){
+            // The native binding throws a checked ValhallaException at runtime even though it is not
+            // declared, so RuntimeException was the wrong catch: measured as
+            // com.valhalla.valhalla.ValhallaException$Internal escaping to the outer handler.
+            android.util.Log.i("RouteRun",runId+" trace threw "+exactFailure.getClass().getName()
+                    +" : "+exactFailure.getMessage()+" at "+firstFrames(exactFailure));
             if(geometry.size()!=2||display==null){
                 android.util.Log.i("Audit",String.format(java.util.Locale.ROOT,
                         "matcher=edge_walk failed, fallback not applicable (points=%d, display=%s): %s",
@@ -332,12 +349,25 @@ final class NativeRouter implements AutoCloseable {
         }
     }
 
+    private static String firstFrames(Throwable failure){
+        StringBuilder text=new StringBuilder();
+        StackTraceElement[] frames=failure.getStackTrace();
+        for(int i=0;i<frames.length&&i<4;i++)text.append(i==0?"":" <- ").append(frames[i].getMethodName()).append(':').append(frames[i].getLineNumber());
+        return text.toString();
+    }
+
     /** One-segment fallback: accept only when the single matched edge is provably the routed road. */
     private JSONArray singleEdgeMatch(JSONObject trace,List<Graph.Node> geometry,DisplayDatabase display)throws JSONException{
+        android.util.Log.i("RouteRun",runId+" trace attempt matcher=map_snap");
         JSONObject relaxed=new JSONObject(trace.toString()).put("shape_match","map_snap").put("search_radius",10);
         JSONObject attributes;
         try{attributes=new JSONObject(engine.traceAttributesRaw(relaxed.toString()));}
-        catch(RuntimeException unmatched){return null;}
+        catch(JSONException malformed){throw malformed;}
+        catch(Exception unmatched){
+            android.util.Log.i("RouteRun",runId+" trace threw map_snap "+unmatched.getClass().getName()+": "+unmatched.getMessage());
+            return null;
+        }
+        android.util.Log.i("RouteRun",runId+" trace ok matcher=map_snap");
         JSONArray edges=attributes.optJSONArray("edges");
         if(edges==null||edges.length()!=1)return null;
         JSONObject edge=edges.getJSONObject(0);

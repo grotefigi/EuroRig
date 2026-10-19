@@ -64,13 +64,13 @@ public class EdgeMatchValidationTest {
         assertTrue(problem.contains("off the matched way"));
     }
 
-    @Test public void rejectsOppositeDirection(){
+    @Test public void acceptsReverseTraversalOfTheSameWay(){
+        // Two-way road driven against its node order: same asphalt, legitimate traversal. Which
+        // direction a restriction faces is resolved by the audit, not by the matcher check.
         List<Graph.Node> reversed=List.of(
                 new Graph.Node(45.0,25.0010,""),new Graph.Node(45.0,25.0000,""));
         double segment=Geo.distance(mid1.lat,mid1.lon,mid2.lat,mid2.lon);
-        String problem=EdgeMatchValidation.validate(mid1,mid2,2001,reversed,segment,0,1,2);
-        assertNotNull(problem);
-        assertTrue(problem.contains("deg away from the route"));
+        assertNull(EdgeMatchValidation.validate(mid1,mid2,2001,reversed,segment,0,1,2));
     }
 
     @Test public void rejectsAShortCoveredStretch(){

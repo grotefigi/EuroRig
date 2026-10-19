@@ -43,15 +43,16 @@ public final class EdgeMatchValidation {
         double tolerance=Math.max(5,segment*0.05);
         if(Math.abs(matchedMetres-segment)>tolerance&&Math.abs(matchedMetres-span)>tolerance)
             return String.format(java.util.Locale.ROOT,"matched length %.0f m disagrees with a %.0f m route",matchedMetres,segment);
-        // Direction is checked locally at both projections, so a bend between them does not look
-        // like a wrong-way match, and a reversed way still does.
+        // The way must run along the route, not across it. Reverse travel on a two-way road is a
+        // legitimate 180-degree difference, so this checks parallelism; which direction a record
+        // applies to is decided later by the audit against the way's node order.
         double heading=Geo.bearing(a,b);
         for(double fraction:new double[]{from[0],to[0]}){
             double wayHeading=bearingAt(way,fraction);
             if(Double.isNaN(wayHeading))return "matched way has no usable bearing";
             double delta=Math.abs(((wayHeading-heading+540)%360)-180);
-            if(delta>MAX_BEARING_DIFFERENCE)
-                return String.format(java.util.Locale.ROOT,"matched way runs %.0f deg away from the route",delta);
+            if(delta>MAX_BEARING_DIFFERENCE&&delta<180-MAX_BEARING_DIFFERENCE)
+                return String.format(java.util.Locale.ROOT,"matched way crosses the route at %.0f deg",delta);
         }
         return null;
     }
