@@ -26,6 +26,8 @@ public final class AccessPolicy {
 
     /** Delivery exceptions only apply this close to the destination (RR: 2 km). */
     public static final double DELIVERY_RADIUS_METRES=2000;
+    /** Per-trip private authorization applies only this close to the destination it was given for. */
+    public static final double PRIVATE_RADIUS_METRES=250;
     /** Tags that state a destination/delivery exception. */
     private static final java.util.Set<String> DESTINATION_GRANTS=java.util.Set.of("destination","delivery");
     /**
@@ -132,8 +134,10 @@ public final class AccessPolicy {
      */
     private static boolean permitted(String access,boolean deliveryPermitted,boolean privatePermitted,
                                      double metresToDestination){
+        // Private property is scoped to the property being delivered to, not to every private road
+        // inside the delivery window: authorization for one yard must not open another.
+        if(PRIVATE.contains(access))return privatePermitted&&metresToDestination<=PRIVATE_RADIUS_METRES;
         if(metresToDestination>DELIVERY_RADIUS_METRES)return false;
-        if(PRIVATE.contains(access))return privatePermitted;
         return DESTINATION_GRANTS.contains(access)&&deliveryPermitted;
     }
 

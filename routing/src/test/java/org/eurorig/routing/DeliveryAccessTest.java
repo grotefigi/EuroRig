@@ -96,6 +96,8 @@ public class DeliveryAccessTest {
 
         assertTrue("the delivery window still applies",
                 AccessPolicy.decide(privateRoad,truck,2500,false,true,true,RestrictionRule.DIR_UNKNOWN).blocked());
+        assertTrue("authorization for one property does not open another 400 m away",
+                AccessPolicy.decide(privateRoad,truck,400,false,true,true,RestrictionRule.DIR_UNKNOWN).blocked());
     }
 
     /** 6. No lawful approach must fail explicitly, never produce a misleading accepted route. */
