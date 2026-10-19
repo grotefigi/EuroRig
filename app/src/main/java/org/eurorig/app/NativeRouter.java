@@ -30,6 +30,8 @@ final class NativeRouter implements AutoCloseable {
     private volatile double arrivalOffsetMetres;
     /** What the driver is told when the route ends short of the requested destination. */
     private volatile String arrivalText="";
+    /** The audit's last refusal for the calculation in progress, kept across retry attempts. */
+    private volatile String lastRejection="";
     String runId(){return runId;}
     boolean relocatedAtOrigin(){return relocationAtOrigin;}
     double[] relocationFrom(){return relocationFrom;}
@@ -140,7 +142,8 @@ final class NativeRouter implements AutoCloseable {
                 if(candidate!=null){plan.response=candidate;break;}
                 // Report the audit's reason, not the engine's: the driver needs to know why their
                 // route was refused, and an engine "no path" after a rejection hides that.
-                if(plan!=null&&!plan.failure.isEmpty())throw new IllegalStateException(plan.failure
+                String refusal=plan!=null&&!plan.failure.isEmpty()?plan.failure:lastRejection;
+                if(!refusal.isEmpty())throw new IllegalStateException(refusal
                         +". The routing engine could not calculate another candidate.",engineFailure);
                 throw new IllegalStateException("Routing engine could not calculate another candidate: "+engineFailure.getMessage(),engineFailure);
             }
@@ -217,13 +220,13 @@ final class NativeRouter implements AutoCloseable {
                 if(reason!=null&&!decision.admitted()){
                     if(decision.blocked()&&rule!=null&&rule.hard(truck)){
                         // Reported so the endpoint can be moved. Never excluded, never accepted.
-                        failure=reason;plan.failedWay=way;
+                        failure=reason;plan.failedWay=way;lastRejection=reason;
                         if(toOrigin<=ENDPOINT_METRES)originHard=true;else if(toDestination<=ENDPOINT_METRES)destinationHard=true;
                         rejected=true;break;
                     }
                     // Uncertainty is surfaced, never routed as a prohibition (RR-04).
                     if(decision.unverified()){notes.add(reason);continue;}
-                    failure=reason;
+                    failure=reason;lastRejection=reason;
                     android.util.Log.i("Audit",String.format(java.util.Locale.ROOT,
                             "attempt %d rejected at way %d (%.0f m to destination): %s",
                             attempt+1,way,metresToDestination,reason));
@@ -254,6 +257,7 @@ final class NativeRouter implements AutoCloseable {
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck) {return route(lat,lon,endLat,endLon,truck,null,false);}
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery) {
         runId=Long.toString(System.nanoTime()&0xFFFFFFF,36);
+        lastRejection="";
         android.util.Log.i("RouteRun",runId+" plan requested from "+lat+","+lon+" to "+endLat+","+endLon+" delivery="+delivery);
         // A zero-length route cannot be audited and must never be presented as a calculation: an
         // empty geometry has no edge to match, so it fails downstream with a misleading matcher error.
