@@ -2,6 +2,7 @@ package org.eurorig.routing;
 
 import static org.junit.Assert.assertEquals;
 
+import java.util.List;
 import org.junit.Test;
 
 /**
@@ -32,6 +33,19 @@ public class RouteSectionAuditTest {
     @Test public void withoutAnAuditVerdictTheTagFallbackStillApplies() {
         assertEquals(RouteSection.AUTHORISED_ACCESS,
                 RouteSection.classify(edge(RestrictionRule.ACCESS, 0), TRUCK));
+    }
+
+    @Test public void theVerdictBelongsToTheTraversalNotTheWay() {
+        // The same way driven twice: ordinary outbound, admitted on the way back. A class keyed only
+        // by way id would paint both stretches the same; the verdict is per edge, in route order.
+        Graph.Edge out = edge(RestrictionRule.ACCESS, 0);
+        out.auditClass = RouteSection.PLAIN;
+        Graph.Edge back = edge(RestrictionRule.ACCESS, 0);
+        back.auditClass = RouteSection.AUTHORISED_ACCESS;
+        List<RouteSection> sections = RouteSection.of(List.of(out, back), TRUCK);
+        assertEquals(2, sections.size());
+        assertEquals(RouteSection.PLAIN, sections.get(0).cls);
+        assertEquals(RouteSection.AUTHORISED_ACCESS, sections.get(1).cls);
     }
 
     @Test public void anExceededHardLimitIsNeverPaintedAsOrdinary() {

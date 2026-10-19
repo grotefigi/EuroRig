@@ -137,6 +137,17 @@ class ClassificationTest(unittest.TestCase):
         self.assertTrue(has(kind, HARD))
         self.assertTrue(has(kind, BACKWARD))
 
+    def test_direction_scoped_access_keeps_its_kind_and_direction(self):
+        # The pack's access flag is a separate column (1) from the kind bit ACCESS (2); the compiler
+        # emits kind=ACCESS|BACKWARD for hgv:backward=no, which is what the audit reads.
+        kind, evidence = classify({"hgv:backward": "no"}, "residential")
+        self.assertTrue(has(kind, ACCESS))
+        self.assertTrue(has(kind, BACKWARD))
+        self.assertFalse(has(kind, FORWARD))
+        self.assertIn("hgv:backward=no", evidence)
+        self.assertEqual(2, ACCESS)
+        self.assertEqual(32, BACKWARD)
+
     def test_two_truck_scoped_oneways_that_disagree_are_uncertain(self):
         kind, _ = classify({"oneway:hgv": "yes", "oneway:motorcar": "-1"}, "residential")
         self.assertTrue(has(kind, UNCERTAIN))

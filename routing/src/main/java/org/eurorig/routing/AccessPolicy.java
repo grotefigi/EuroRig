@@ -131,6 +131,22 @@ public final class AccessPolicy {
 
     private AccessPolicy(){}
 
+    /**
+     * The access value for one travel direction. A direction-scoped tag such as hgv:backward=no
+     * outranks the plain value for that direction, which is the whole point of the suffix: without
+     * this the audit saw "yes" and reported a generic access restriction instead of the recorded
+     * prohibition.
+     */
+    public static String accessValue(Map<String,String> tags,int travel){
+        String suffix=travel==RestrictionRule.DIR_FORWARD?":forward"
+                :travel==RestrictionRule.DIR_BACKWARD?":backward":null;
+        if(suffix!=null){
+            for(String key:new String[]{"access","vehicle","motor_vehicle","motorcar","hgv"})
+                if(tags.containsKey(key+suffix))return tags.get(key+suffix);
+        }
+        return accessValue(tags);
+    }
+
     /** The access value that governs this vehicle, most specific key first. */
     public static String accessValue(Map<String,String> tags){
         String access="yes";
@@ -166,7 +182,9 @@ public final class AccessPolicy {
         if(hazardous!=null)return new Decision(BLOCKED,hazardous);
 
         if(rule.accessLimited()){
-            String access=accessValue(rule.tags);
+            // Direction-scoped values (hgv:backward=no) outrank the plain one for the direction actually
+            // travelled; otherwise the audit reads "yes" and reports a generic restriction.
+            String access=accessValue(rule.tags,travel);
             if("no".equals(access))return new Decision(BLOCKED,"Truck access prohibited");
             // A tag that grants nothing cannot be turned into permission by proximity or a preference.
             if(!GRANTS.contains(access)&&!"yes".equals(access))

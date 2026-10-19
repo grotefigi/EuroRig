@@ -63,6 +63,17 @@ public class RestrictionDirectionTest {
         assertEquals("Truck access prohibited", blocked.reason);
     }
 
+    @Test public void aDirectionScopedAccessTagIsReadForItsDirection() {
+        RestrictionRule backwardOnly = new RestrictionRule(0, 0, 0, 0, 0, Graph.BLOCKED,
+                Map.of("hgv:backward", "no"), RestrictionRule.ACCESS | RestrictionRule.BACKWARD,
+                "hgv:backward=no");
+        assertEquals(AccessPolicy.OK, decide(backwardOnly, RestrictionRule.DIR_FORWARD));
+        AccessPolicy.Decision blocked = AccessPolicy.decide(backwardOnly, TRUCK, 0, false, false, false,
+                RestrictionRule.DIR_BACKWARD);
+        assertTrue(blocked.blocked());
+        assertEquals("Truck access prohibited", blocked.reason);
+    }
+
     @Test public void directionScopedLimitsStayScoped() {
         // maxheight:backward must not restrict the forward direction.
         RestrictionRule backwardHeight = new RestrictionRule(3.5, 0, 0, 0, 0, Graph.BLOCKED,
