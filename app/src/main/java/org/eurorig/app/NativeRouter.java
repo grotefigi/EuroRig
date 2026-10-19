@@ -222,6 +222,10 @@ final class NativeRouter implements AutoCloseable {
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery) {
         runId=Long.toString(System.nanoTime()&0xFFFFFFF,36);
         android.util.Log.i("RouteRun",runId+" plan requested from "+lat+","+lon+" to "+endLat+","+endLon+" delivery="+delivery);
+        // A zero-length route cannot be audited and must never be presented as a calculation: an
+        // empty geometry has no edge to match, so it fails downstream with a misleading matcher error.
+        if(Geo.distance(lat,lon,endLat,endLon)<1.0)
+            throw new IllegalStateException("Start and destination are the same point. Choose two different places.");
         try {
             DisplayDatabase display=Store.display;
             double requestedEndLat=endLat,requestedEndLon=endLon;
