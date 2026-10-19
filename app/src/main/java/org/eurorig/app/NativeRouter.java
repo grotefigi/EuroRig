@@ -24,10 +24,13 @@ final class NativeRouter implements AutoCloseable {
     private volatile boolean relocationAtOrigin;
     private volatile double[] relocationFrom,relocationTo;
     private volatile double relocationMetres;
+    /** Distance between the requested destination and the point the route actually ends at. */
+    private volatile double arrivalOffsetMetres;
     boolean relocatedAtOrigin(){return relocationAtOrigin;}
     double[] relocationFrom(){return relocationFrom;}
     double[] relocationTo(){return relocationTo;}
     double relocationMetres(){return relocationMetres;}
+    double arrivalOffsetMetres(){return arrivalOffsetMetres;}
     String restrictionWarning(){return warning;}
     NativeRouter(Context context,File tiles) throws IOException {
         try{RegionPackages.validateTar(tiles);}
@@ -113,7 +116,7 @@ final class NativeRouter implements AutoCloseable {
                 // A relocated or excluded endpoint can strand the network. Keep the last route that
                 // passed the audit; it never carries a hard limit, because such a route is not a candidate.
                 if(candidate!=null){plan.response=candidate;break;}
-                throw engineFailure;
+                throw new IllegalStateException("Routing engine could not calculate another candidate: "+engineFailure.getMessage(),engineFailure);
             }
             if(display==null||!display.restrictionEvidence){plan.response=response;break;}
             JSONObject leg=response.getJSONObject("trip").getJSONArray("legs").getJSONObject(0);
@@ -189,7 +192,7 @@ final class NativeRouter implements AutoCloseable {
             if(!rejected){plan.response=response;plan.restrictedMetres=restricted;candidate=response;break;}
             plan.failure=failure;
             if(originHard||destinationHard){plan.originHard=originHard;plan.destinationHard=destinationHard;return plan;}
-            if(attempt==11)throw new IllegalStateException("No verified route for this profile: "+failure);
+            if(attempt==11)throw new IllegalStateException("No verified route found within the search limit: "+failure);
         }
         return plan;
     }
@@ -198,6 +201,8 @@ final class NativeRouter implements AutoCloseable {
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery) {
         try {
             DisplayDatabase display=Store.display;
+            double requestedEndLat=endLat,requestedEndLon=endLon;
+            arrivalOffsetMetres=0;
             if((delivery||truck.tunnelCode!=0||(truck.hazardousLoad&6)!=0)&&(display==null||!display.restrictionEvidence))
                 throw new IllegalStateException("Install the updated country map with restriction evidence before using delivery access or detailed ADR routing");
             double[] start={lat,lon},finish={endLat,endLon};
@@ -269,6 +274,13 @@ final class NativeRouter implements AutoCloseable {
             if(legs.length()!=1)throw new IllegalStateException("Unexpected route legs");
             JSONObject leg=legs.getJSONObject(0);
             List<Graph.Node> nodes=decode(leg.getString("shape"));
+            // The engine snaps endpoints to edges. Record how far the routed end really is from the
+            // requested destination so the driver is never told an unverified approach was reached.
+            Graph.Node routedStart=nodes.get(0),routedEnd=nodes.get(nodes.size()-1);
+            arrivalOffsetMetres=Geo.distance(requestedEndLat,requestedEndLon,routedEnd.lat,routedEnd.lon);
+            android.util.Log.i("Snap",String.format(java.util.Locale.ROOT,
+                    "requested end %.5f,%.5f routed end %.5f,%.5f offset %.0f m",
+                    requestedEndLat,requestedEndLon,routedEnd.lat,routedEnd.lon,arrivalOffsetMetres));
             JSONArray maneuvers=leg.getJSONArray("maneuvers");TreeMap<Integer,String> instructions=new TreeMap<>();
             for(int i=0;i<maneuvers.length();i++){
                 JSONObject m=maneuvers.getJSONObject(i);int index=m.getInt("begin_shape_index");

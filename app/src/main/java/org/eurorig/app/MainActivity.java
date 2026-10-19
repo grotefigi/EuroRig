@@ -182,7 +182,7 @@ public final class MainActivity extends Activity {
         if(Store.relocationFrom()!=null&&map!=null)map.showRelocation(Store.relocatedAtOrigin(),Store.relocationFrom(),Store.relocationTo(),Store.relocationMetres());
         else if(map!=null)map.clearRelocation();
         String caution=Store.restrictionWarning();
-        instruction.setText(Store.arrived?(g.demo?"Training route complete":"You have arrived"):r.edges.isEmpty()?"Start and destination are the same":caution.isEmpty()?"Route ready for your truck":caution);
+        instruction.setText(Store.arrived?(g.demo?"Training route complete":"You have arrived"):r.edges.isEmpty()?"Start and destination are the same":caution.isEmpty()?arrivalText(r):caution);
         List<RouteSection> sections=RouteSection.of(r.edges,Store.truck);
         double accessMetres=RouteSection.metresOf(sections,RouteSection.AUTHORISED_ACCESS);
         double unverifiedMetres=RouteSection.metresOf(sections,RouteSection.UNVERIFIED);
@@ -208,6 +208,17 @@ public final class MainActivity extends Activity {
     }
     private String label(int node){if(Store.graph==null)return "";Graph.Node n=Store.graph.nodes[node];return n.label.isEmpty()?String.format(Locale.ROOT,"%.5f, %.5f",n.lat,n.lon):n.label;}
     private String duration(double seconds){long minutes=Math.max(1,Math.round(seconds/60));return minutes<60?String.format(Locale.getDefault(),"%d min",minutes):String.format(Locale.getDefault(),"%d h %02d min",minutes/60,minutes%60);}
+    /**
+     * Never claim the requested destination was reached when the engine snapped the endpoint onto a
+     * road short of it. The gap is disclosed as a distance; it is not a claim of safe arrival.
+     */
+    private String arrivalText(Router.Route route){
+        double offset=Store.arrivalOffset();
+        if(offset>10)return String.format(Locale.getDefault(),
+                "Route ends %.0f m from the requested destination · final approach not verified",offset);
+        return "Route ready for your truck";
+    }
+
     /** Per-section explanations for the colours painted on the route. */
     private void routeSectionsDialog(List<RouteSection> sections){
         StringBuilder text=new StringBuilder();

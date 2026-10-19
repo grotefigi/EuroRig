@@ -25,6 +25,8 @@ final class Store {
     static double[] relocationFrom(){return nativeRouter==null?null:nativeRouter.relocationFrom();}
     static double[] relocationTo(){return nativeRouter==null?null:nativeRouter.relocationTo();}
     static double relocationMetres(){return nativeRouter==null?0:nativeRouter.relocationMetres();}
+    /** Metres between the requested destination and the point the accepted route ends at. */
+    static double arrivalOffset(){return nativeRouter==null?0:nativeRouter.arrivalOffsetMetres();}
     static volatile DisplayDatabase display;
     static volatile Router.Route route;
     static volatile Router.Route progressRoute;
