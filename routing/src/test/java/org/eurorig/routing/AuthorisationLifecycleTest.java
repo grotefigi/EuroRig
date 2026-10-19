@@ -20,25 +20,26 @@ public class AuthorisationLifecycleTest {
         Graph graph = new Graph("Test", "Fixture", "v1", true, nodes, new Graph.Edge[]{edge}, List.of());
         Router.Route built = new Router.Route(graph, Arrays.asList(edge), null, 60);
         built.authorisationRevision = revision;
+        built.requiresAuthorisation = true;
         return built;
     }
 
     @Test public void aRouteWithNoAuthorizationNeverGoesStale() {
-        assertFalse(route(0).authorisationStale(0));
-        assertFalse("a public route is unaffected by later declarations", route(0).authorisationStale(99));
+        assertFalse(route(0).authorisationStale(0, true));
+        assertFalse("a public route is unaffected by later declarations", route(0).authorisationStale(99, true));
     }
 
     @Test public void theSameDeclarationKeepsTheRouteValid() {
         DestinationAuthorisation declared = new DestinationAuthorisation(45, 25, 2011,
                 DestinationAuthorisation.PRIVATE, System.currentTimeMillis());
-        assertFalse(route(declared.revision()).authorisationStale(declared.revision()));
+        assertFalse(route(declared.revision()).authorisationStale(declared.revision(), true));
     }
 
     @Test public void revokingTheDeclarationMakesTheRouteStale() {
         DestinationAuthorisation declared = new DestinationAuthorisation(45, 25, 2011,
                 DestinationAuthorisation.PRIVATE, System.currentTimeMillis());
         long used = declared.revision();
-        assertTrue("revocation is represented by the declaration being gone", route(used).authorisationStale(0));
+        assertTrue("revocation is represented by the declaration being gone", route(used).authorisationStale(0, true));
     }
 
     @Test public void aReplacementDeclarationInvalidatesTheOldRoute() {
@@ -47,6 +48,6 @@ public class AuthorisationLifecycleTest {
         DestinationAuthorisation second = new DestinationAuthorisation(45, 25, 2011,
                 DestinationAuthorisation.PRIVATE, System.currentTimeMillis());
         assertTrue("a fresh declaration for the same way is still a different authorization",
-                route(first.revision()).authorisationStale(second.revision()));
+                route(first.revision()).authorisationStale(second.revision(), true));
     }
 }

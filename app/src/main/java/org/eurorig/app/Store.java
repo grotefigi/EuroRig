@@ -47,7 +47,7 @@ final class Store {
         if(installing||graph==null||graph.demo||route==null||route.edges.isEmpty())return false;
         // A route audited under an authorization that has since been revoked or replaced must not
         // start guiding: the driver withdrew the permission the audit relied on.
-        if(route.authorisationStale(authorisationRevision())){guidanceRefused="Authorization changed; recalculate the route";return false;}
+        if(route.authorisationStale(authorisationRevision(),privateAccessPermission)){guidanceRefused="Authorization changed; recalculate the route";return false;}
         travelled=0;progressRoute=route;remaining=route.metres;navigating=true;arrived=false;return true;
     }
     /**
@@ -76,7 +76,7 @@ final class Store {
      * already-painted route continue into property the driver has withdrawn permission for.
      */
     static synchronized void invalidateIfStale(){
-        if(route!=null&&route.authorisationStale(authorisationRevision())){
+        if(route!=null&&route.authorisationStale(authorisationRevision(),privateAccessPermission)){
             route=null;progressRoute=null;arrived=false;
             guidanceRefused="Authorization changed; recalculate the route";
             if(navigating){

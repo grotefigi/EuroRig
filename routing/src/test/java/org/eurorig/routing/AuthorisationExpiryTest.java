@@ -40,9 +40,9 @@ public class AuthorisationExpiryTest {
         DestinationAuthorisation declared = declared();
         Router.Route route = route(declared.revision());
         assertFalse("still guiding while the declaration is current",
-                route.authorisationStale(currentRevision(declared, GRANTED + VALIDITY - 1)));
+                route.authorisationStale(currentRevision(declared, GRANTED + VALIDITY - 1), true));
         assertTrue("expiry alone must stop the route, with no user action",
-                route.authorisationStale(currentRevision(declared, GRANTED + VALIDITY + 1)));
+                route.authorisationStale(currentRevision(declared, GRANTED + VALIDITY + 1), true));
     }
 
     @Test public void aClockThatWentBackwardsDoesNotExtendTheDeclaration() {
@@ -56,7 +56,7 @@ public class AuthorisationExpiryTest {
         DestinationAuthorisation again = new DestinationAuthorisation(45, 25, 2011,
                 DestinationAuthorisation.PRIVATE, GRANTED + 1000);
         assertTrue("a new declaration is a different authorization",
-                old.authorisationStale(currentRevision(again, GRANTED + 2000)));
+                old.authorisationStale(currentRevision(again, GRANTED + 2000), true));
         assertEquals("and the new revision really is different", false,
                 again.revision() == first.revision());
     }
@@ -68,6 +68,7 @@ public class AuthorisationExpiryTest {
         Graph graph = new Graph("Test", "Fixture", "v1", true, nodes, new Graph.Edge[]{edge}, List.of());
         Router.Route built = new Router.Route(graph, Arrays.asList(edge), null, 60);
         built.authorisationRevision = revision;
+        built.requiresAuthorisation = true;
         return built;
     }
 }

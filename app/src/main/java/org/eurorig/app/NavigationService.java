@@ -66,7 +66,7 @@ public final class NavigationService extends Service implements LocationListener
     private final Runnable authorisationCheck=new Runnable(){
         public void run(){
             if(!Store.navigating)return;
-            if(Store.route!=null&&Store.route.authorisationStale(Store.authorisationRevision()))stopForAuthorisation();
+            if(Store.route!=null&&Store.route.authorisationStale(Store.authorisationRevision(),Store.privateAccessPermission))stopForAuthorisation();
             else main.postDelayed(this,1000);
         }
     };
@@ -85,7 +85,7 @@ public final class NavigationService extends Service implements LocationListener
         if(!Store.navigating||progress==null)return;
         // Re-checked on every fix: an authorization revoked mid-drive must stop guidance, not merely
         // stop being displayed.
-        if(Store.route!=null&&Store.route.authorisationStale(Store.authorisationRevision())){
+        if(Store.route!=null&&Store.route.authorisationStale(Store.authorisationRevision(),Store.privateAccessPermission)){
             stopForAuthorisation();return;
         }
         long age=SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos();

@@ -112,6 +112,8 @@ final class NativeRouter implements AutoCloseable {
         int[] auditClasses;
         /** Revision of the declaration this plan was audited under, 0 when none was used. */
         long declaredRevision;
+        /** True when the accepted route needed restricted-access permission at all. */
+        boolean requiresAuthorisation;
     }
 
     /**
@@ -259,6 +261,7 @@ final class NativeRouter implements AutoCloseable {
                         :decision.unverified()?RouteSection.UNVERIFIED:RouteSection.PLAIN;
                 // Only travel the tag actually admits counts as restricted distance.
                 if(decision.admitted()){
+                    plan.requiresAuthorisation=true;
                     android.util.Log.i("Audit",String.format(java.util.Locale.ROOT,
                             "admitted way %d (%.0f m to destination): %s",way,metresToDestination,decision.reason));
                     if(restricted==0)plan.firstRestricted=new double[]{point.lat,point.lon};
@@ -400,6 +403,7 @@ final class NativeRouter implements AutoCloseable {
             Router.Route accepted=new Router.Route(graph,Arrays.asList(edges),instructions,seconds,restrictedMetres);
             // Remember which declaration this route relied on, so revoking it can stop guidance.
             accepted.authorisationRevision=plan.declaredRevision;
+            accepted.requiresAuthorisation=plan.requiresAuthorisation;
             return accepted;
         }catch(JSONException e){throw new IllegalStateException("Invalid response from offline routing engine",e);}
         catch(Exception e){

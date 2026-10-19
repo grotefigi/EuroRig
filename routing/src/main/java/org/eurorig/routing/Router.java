@@ -14,6 +14,12 @@ public final class Router {
          * guidance rather than let an already-painted route continue.
          */
         public long authorisationRevision;
+        /**
+         * True when this route was admitted through restricted access at all. A route that needed no
+         * permission must never be judged against one, and a route that did need it must not become
+         * "valid" merely because both its revision and the current revision are zero.
+         */
+        public boolean requiresAuthorisation;
         public final double[] cumulative;
         private final SortedMap<Integer,String> maneuvers;
         Route(Graph graph, List<Graph.Edge> edges) {
@@ -32,9 +38,18 @@ public final class Router {
             metres=cumulative[edges.size()]; seconds=duration>=0?duration:s;
         }
         public boolean nativeGeometry(){return maneuvers!=null;}
-        /** True when this route relies on an authorization that is no longer the current one. */
-        public boolean authorisationStale(long currentRevision){
-            return authorisationRevision!=0&&authorisationRevision!=currentRevision;
+        /**
+         * True when this route relies on an authorization that is no longer usable.
+         *
+         * @param currentRevision current declaration identity, 0 when none or expired
+         * @param permissionEnabled whether the trip-wide restricted-access permission is still on
+         */
+        public boolean authorisationStale(long currentRevision,boolean permissionEnabled){
+            if(!requiresAuthorisation)return false;
+            if(authorisationRevision!=0)return authorisationRevision!=currentRevision;
+            // Admitted without a named entrance (delivery access): it depends on the trip-wide
+            // permission, so switching that off invalidates it even though no revision changed.
+            return !permissionEnabled;
         }
         public String instruction(int edgeIndex) {
             if(edgeIndex>=edges.size()) return "You have arrived";
