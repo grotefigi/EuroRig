@@ -104,6 +104,7 @@ def main():
         print(__doc__)
         return 2
     flat, flon, tlat, tlon = sys.argv[1:5]
+    expected = sys.argv[5].upper() if len(sys.argv) > 5 else ""
     if (flat, flon) == (tlat, tlon):
         print('ABORT: identical endpoints requested')
         return 1
@@ -115,7 +116,13 @@ def main():
     if not set_endpoint('B', tlat, tlon):
         print('ABORT: destination not set'); return 1
     pairs = endpoints()
-    print('endpoints:', pairs)
+    # A scenario must assert the direction it intends to test, otherwise a run can silently repeat
+    # the opposite direction and still look like a pass.
+    heading = ('EAST' if float(tlon) > float(flon) else 'WEST') if flon != tlon else               ('NORTH' if float(tlat) > float(flat) else 'SOUTH')
+    print('endpoints:', pairs, 'direction:', heading, 'expected:', expected or '(unchecked)')
+    if expected and heading != expected:
+        print('ABORT: direction', heading, 'does not match the expected', expected)
+        return 1
     if pairs.get('A') == pairs.get('B'):
         print('ABORT: endpoints are identical'); return 1
     plan = locate(dump(), 'Plan route')
