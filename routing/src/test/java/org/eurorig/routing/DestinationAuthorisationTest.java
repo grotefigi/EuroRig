@@ -74,6 +74,13 @@ public class DestinationAuthorisationTest {
                 declared(2011, DestinationAuthorisation.PRIVATE)).verdict);
     }
 
+    @Test public void aTripWideToggleAloneNoLongerAdmitsPrivateProperty() {
+        // Same call, but with privatePermitted=true and no declaration: the toggle is not an entrance.
+        AccessPolicy.Decision decision = AccessPolicy.decideWithApproach(privateRoad(), TRUCK, 40,
+                false, false, true, RestrictionRule.DIR_UNKNOWN, null, 2011, true, LAT, LON, NOW);
+        assertTrue(decision.blocked());
+    }
+
     @Test public void aDeliveryEntranceDeclaredForDeliveryIsAdmitted() {
         assertTrue(decide(deliveryRoad(), 2008, true,
                 declared(2008, DestinationAuthorisation.DELIVERY)).admitted());

@@ -141,7 +141,11 @@ public final class AccessPolicy {
                                               DestinationAuthorisation authorisation,long way,
                                               boolean terminal,double destinationLat,double destinationLon,
                                               long nowMillis){
-        Decision decided=decide(rule,truck,metresToDestination,originEgress,deliveryPermitted,privatePermitted,travel);
+        // A trip-wide private toggle is not an entrance: private property is admitted only by the
+        // declaration that names this way for this destination, so the plain decision is taken as if
+        // no private permission had been given and the declaration supplies the rest.
+        boolean privateForDecision=privatePermitted&&(rule==null||!rule.privateAccess());
+        Decision decided=decide(rule,truck,metresToDestination,originEgress,deliveryPermitted,privateForDecision,travel);
         if(!decided.blocked()||rule==null||!terminal||authorisation==null)return decided;
         if(!authorisation.current(nowMillis))return decided;
         int kind=rule.privateAccess()?DestinationAuthorisation.PRIVATE

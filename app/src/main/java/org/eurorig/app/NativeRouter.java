@@ -138,6 +138,10 @@ final class NativeRouter implements AutoCloseable {
                 // A relocated or excluded endpoint can strand the network. Keep the last route that
                 // passed the audit; it never carries a hard limit, because such a route is not a candidate.
                 if(candidate!=null){plan.response=candidate;break;}
+                // Report the audit's reason, not the engine's: the driver needs to know why their
+                // route was refused, and an engine "no path" after a rejection hides that.
+                if(plan!=null&&!plan.failure.isEmpty())throw new IllegalStateException(plan.failure
+                        +". The routing engine could not calculate another candidate.",engineFailure);
                 throw new IllegalStateException("Routing engine could not calculate another candidate: "+engineFailure.getMessage(),engineFailure);
             }
             if(display==null||!display.restrictionEvidence){plan.response=response;break;}
@@ -198,8 +202,11 @@ final class NativeRouter implements AutoCloseable {
                     // authorization for, however close it passes to the destination.
                     decision=AccessPolicy.Decision.blocked("Private road is not the destination approach");
                 }else{
+                    // Egress is leaving the road you were standing on: only the route's first edge can
+                    // earn it. Using proximity to the origin instead let a long private road that
+                    // happens to pass near the start be admitted while driving away from it.
                     decision=AccessPolicy.decideWithApproach(rule,truck,metresToDestination,
-                            toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel,
+                            i==0&&toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel,
                             Store.destinationAuthorisation,way,privateTail[i],endLat,endLon,
                             System.currentTimeMillis());
                 }
@@ -229,6 +236,8 @@ final class NativeRouter implements AutoCloseable {
                         :decision.unverified()?RouteSection.UNVERIFIED:RouteSection.PLAIN;
                 // Only travel the tag actually admits counts as restricted distance.
                 if(decision.admitted()){
+                    android.util.Log.i("Audit",String.format(java.util.Locale.ROOT,
+                            "admitted way %d (%.0f m to destination): %s",way,metresToDestination,decision.reason));
                     if(restricted==0)plan.firstRestricted=new double[]{point.lat,point.lon};
                     restricted+=edge.getDouble("length")*1000;
                 }
