@@ -12,8 +12,8 @@ import org.junit.Test;
 
 public class AccessPointChoiceTest {
 
-    private static AccessPointChoice.Candidate candidate(long way, double metres, int level, boolean hard) {
-        return new AccessPointChoice.Candidate(way, metres, level, hard);
+    private static AccessPointChoice.Candidate candidate(long way, double metres, int level, boolean ineligible) {
+        return new AccessPointChoice.Candidate(way, metres, level, ineligible);
     }
 
     @Test public void nearestLawfulCandidateWins() {

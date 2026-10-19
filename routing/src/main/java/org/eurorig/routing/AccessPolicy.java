@@ -72,6 +72,43 @@ public final class AccessPolicy {
         return tail;
     }
 
+    /**
+     * Side-effect-free eligibility of a road as an endpoint access point for this truck.
+     *
+     * <p>This is the same access semantics the route audit applies, minus the parts that only make
+     * sense along a route: there is no "leaving the road" exemption here, because relocating an
+     * endpoint onto a road is not the same act as driving off it, and a relocation must never create
+     * permission. A delivery or private candidate is admitted only when the caller states that this
+     * endpoint is the destination and that the corresponding permission was actually given.
+     */
+    public static Decision candidateEligibility(RestrictionRule rule,Truck truck,
+                                                boolean destinationEndpoint,
+                                                boolean deliveryPermitted,boolean privatePermitted){
+        if(rule==null)return new Decision(OK,null);
+        String fatal=fatal(rule,truck);
+        if(fatal!=null)return new Decision(BLOCKED,fatal);
+        boolean uncertain=rule.uncertainOnly()||(rule.flags&Graph.UNCERTAIN)!=0;
+        if(uncertain&&rule.relevantUncertainty(truck))
+            return new Decision(UNVERIFIED,"Mapped conditional or unsupported restriction needs verification");
+        String hazardous=rule.hazardViolation(truck);
+        if(hazardous!=null)return new Decision(BLOCKED,hazardous);
+        if(rule.accessLimited()){
+            String access=accessValue(rule.tags);
+            if("no".equals(access))return new Decision(BLOCKED,"Truck access prohibited");
+            if(!GRANTS.contains(access)&&!"yes".equals(access))
+                return new Decision(BLOCKED,"Unsupported access exception");
+            if(PRIVATE.contains(access))
+                return privatePermitted&&destinationEndpoint
+                        ?new Decision(ADMITTED_ACCESS,"Private approach to the authorized destination")
+                        :new Decision(BLOCKED,"Private road: entry authorization not established");
+            if(DESTINATION_GRANTS.contains(access))
+                return destinationEndpoint&&permitted(access,deliveryPermitted,privatePermitted,0)
+                        ?new Decision(ADMITTED_ACCESS,"Delivery access to the requested destination")
+                        :new Decision(BLOCKED,"Delivery or destination access not authorized here");
+        }
+        return new Decision(OK,null);
+    }
+
     private AccessPolicy(){}
 
     /** The access value that governs this vehicle, most specific key first. */

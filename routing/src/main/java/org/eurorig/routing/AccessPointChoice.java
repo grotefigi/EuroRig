@@ -15,18 +15,19 @@ import java.util.List;
 public final class AccessPointChoice {
     private AccessPointChoice() {}
 
-    /** One candidate road: its way id, distance in metres, recorded level and hard verdict. */
+    /** One candidate road: way id, distance in metres, recorded road class, and whether it is
+     *  ineligible for this truck in this endpoint context (hard limit or access not permitted). */
     public static final class Candidate {
         public final long way;
         public final double metres;
         public final int level;
-        public final boolean hard;
+        public final boolean ineligible;
 
-        public Candidate(long way, double metres, int level, boolean hard) {
+        public Candidate(long way, double metres, int level, boolean ineligible) {
             this.way = way;
             this.metres = metres;
             this.level = level;
-            this.hard = hard;
+            this.ineligible = ineligible;
         }
     }
 
@@ -35,7 +36,7 @@ public final class AccessPointChoice {
         if (candidates == null) return null;
         Candidate best = null;
         for (Candidate candidate : new ArrayList<>(candidates)) {
-            if (candidate == null || candidate.hard) continue;
+            if (candidate == null || candidate.ineligible) continue;
             if (best == null || better(candidate, best)) best = candidate;
         }
         return best;

@@ -139,9 +139,11 @@ final class DisplayDatabase implements AutoCloseable {
      * the endpoint to a legal access point keeps graph connectivity, where excluding a circle around
      * the endpoint destroys it and produces a fabricated "no path".
      */
-    synchronized double[] legalAccessPoint(double lat,double lon,Truck truck,double radius,Set<Long> skip){
+    synchronized double[] legalAccessPoint(double lat,double lon,Truck truck,double radius,Set<Long> skip,
+                                           boolean destinationEndpoint,boolean deliveryPermitted,boolean privatePermitted){
         android.util.Log.i("AccessPoint",String.format(java.util.Locale.ROOT,
-                "request %.5f,%.5f evidence=%s skip=%s",lat,lon,restrictionEvidence,skip));
+                "request %.5f,%.5f endpoint=%s evidence=%s skip=%s",
+                lat,lon,destinationEndpoint?"destination":"origin",restrictionEvidence,skip));
         if(!restrictionEvidence)return null;
         double dLat=radius/111320.0,dLon=radius/(111320.0*Math.max(.2,Math.cos(Math.toRadians(lat))));
         String[] args={""+(lat-dLat),""+(lat+dLat),""+(lon-dLon),""+(lon+dLon)};
@@ -179,14 +181,19 @@ final class DisplayDatabase implements AutoCloseable {
             // The requested point itself is not an alternative access point.
             boolean same=candidate[0]<=1.0;
             RestrictionRule rule=rules.get(entry.getKey());
-            boolean hard=rule!=null&&rule.hard(truck);
+            // Access is decided by the same policy the route audit uses: a relocation never creates
+            // permission, so a delivery-only or private road is not eligible at the origin and is
+            // eligible at the destination only with the permission the driver actually gave.
+            AccessPolicy.Decision verdict=AccessPolicy.candidateEligibility(rule,truck,
+                    destinationEndpoint,deliveryPermitted,privatePermitted);
+            boolean ineligible=verdict.blocked()||verdict.unverified();
             candidates.add(new AccessPointChoice.Candidate(entry.getKey(),candidate[0],
-                    levels.get(entry.getKey()),hard||same||skipped));
+                    levels.get(entry.getKey()),ineligible||same||skipped));
             metres.put(entry.getKey(),candidate[0]);
             points.put(entry.getKey(),new double[]{candidate[1],candidate[2]});
-            detail.append(String.format(java.util.Locale.ROOT,"%s%d@%.0fm/l%d%s ",
+            detail.append(String.format(java.util.Locale.ROOT,"%s%d@%.0fm/l%d%s%s ",
                     skipped?"skipped:":"",entry.getKey(),candidate[0],levels.get(entry.getKey()),
-                    hard?"/HARD":""));
+                    ineligible?"/NO:":"",ineligible?verdict.reason:""));
         }
         AccessPointChoice.Candidate chosen=AccessPointChoice.choose(candidates);
         android.util.Log.i("AccessPoint",String.format(java.util.Locale.ROOT,

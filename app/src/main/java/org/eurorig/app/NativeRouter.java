@@ -78,8 +78,15 @@ final class NativeRouter implements AutoCloseable {
     }
 
     /** A road this truck may legally and physically use, within the endpoint radius. */
-    private double[] accessPoint(double lat,double lon,Truck truck,DisplayDatabase display,Set<Long> skip){
-        return display==null?null:display.legalAccessPoint(lat,lon,truck,ENDPOINT_METRES,skip);
+    /**
+     * Alternative access point for one endpoint. Origin relocation never carries permission: moving
+     * the start near a delivery-only or private road must not authorize entering it.
+     */
+    private double[] accessPoint(double lat,double lon,Truck truck,DisplayDatabase display,Set<Long> skip,
+                                 boolean destinationEndpoint,boolean deliveryPermitted){
+        return display==null?null:display.legalAccessPoint(lat,lon,truck,ENDPOINT_METRES,skip,
+                destinationEndpoint,destinationEndpoint&&deliveryPermitted,
+                destinationEndpoint&&Store.privateAccessPermission);
     }
 
     /** Result of one audited attempt sequence. */
@@ -227,7 +234,7 @@ final class NativeRouter implements AutoCloseable {
                 if(plan.failedWay>0)unusable.add(plan.failedWay);
                 boolean moved=false;
                 if(plan.originHard){
-                    double[] alternative=accessPoint(start[0],start[1],truck,display,unusable);
+                    double[] alternative=accessPoint(start[0],start[1],truck,display,unusable,false,false);
                     double metres=alternative==null?-1:Geo.distance(start[0],start[1],alternative[0],alternative[1]);
                     // A candidate at the requested point is not an alternative: it would loop.
                     if(alternative!=null&&metres>1.0&&!tried.add(String.format(java.util.Locale.ROOT,"%.5f,%.5f",alternative[0],alternative[1]))){
@@ -243,7 +250,7 @@ final class NativeRouter implements AutoCloseable {
                     }
                 }
                 if(!moved&&plan.destinationHard){
-                    double[] alternative=accessPoint(finish[0],finish[1],truck,display,unusable);
+                    double[] alternative=accessPoint(finish[0],finish[1],truck,display,unusable,true,delivery);
                     double metres=alternative==null?-1:Geo.distance(finish[0],finish[1],alternative[0],alternative[1]);
                     if(alternative!=null&&metres>1.0&&!tried.add(String.format(java.util.Locale.ROOT,"%.5f,%.5f",alternative[0],alternative[1]))){
                         android.util.Log.i("Relocation",String.format(java.util.Locale.ROOT,
