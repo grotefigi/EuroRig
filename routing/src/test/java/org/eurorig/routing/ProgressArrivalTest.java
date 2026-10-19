@@ -37,7 +37,7 @@ public class ProgressArrivalTest {
         Graph.Node[] nodes = {new Graph.Node(44, 26, "A")};
         Graph graph = new Graph("Test", "Fixture", "v1", true, nodes, new Graph.Edge[0], List.of());
         Router.Route empty = new Router.Route(graph, List.of(), null, 0);
-        // Documented behaviour of the existing guard: no edges means nothing to arrive at.
-        assertTrue(new Progress(empty).update(44, 26).arrived);
+        // No edges means nothing was driven, so it cannot be a completed journey.
+        assertFalse(new Progress(empty).update(44, 26).arrived);
     }
 }

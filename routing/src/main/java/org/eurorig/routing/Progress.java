@@ -16,7 +16,8 @@ public final class Progress {
         }
     }
     public Fix update(double lat,double lon) {
-        if(route.edges.isEmpty()) return new Fix(0,0,0,0,0,true);
+        // Nothing to arrive at: an empty route must never look like a completed journey.
+        if(route.edges.isEmpty()) return new Fix(0,0,0,0,0,false);
         double distance=Double.POSITIVE_INFINITY, position=travelled; int selected=current;
         int end=Math.min(route.edges.size(),current+8);
         // Native polylines may have many short points between GPS fixes.

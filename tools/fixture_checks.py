@@ -113,9 +113,15 @@ def main(config, database):
                      if a["way_id"] == 2002 and b["way_id"] == 2010]
         check("prohibited transition 2002 -[1003]-> 2010 is absent", not forbidden,
               forbidden or ways_of(edges))
-        check("the route reaches the gate side without the prohibited movement",
-              2010 in ways_of(edges) or 2008 in ways_of(edges) or 2009 in ways_of(edges),
-              ways_of(edges))
+        # The regression is only meaningful for a route that actually approaches the prohibited
+        # junction and then reaches the gate; a route that never touches it would pass vacuously.
+        ordered = ways_of(edges)
+        check("the tested route starts on the prohibited-turn approach (way 2002)",
+              ordered and ordered[0] == 2002, ordered)
+        check("the tested route reaches the gate side (ends on 2008, 2009 or 2010)",
+              ordered and ordered[-1] in (2008, 2009, 2010), ordered)
+        check("no ordered adjacent pair repeats the prohibited movement anywhere in the route",
+              all(not (a == 2002 and b == 2010) for a, b in consecutive(ordered)), ordered)
 
     # Both endpoints sit on the one-way way, so the engine may use it for endpoint access. This is
     # recorded as an observation, not an enforcement claim: a route that touches a one-way edge near
