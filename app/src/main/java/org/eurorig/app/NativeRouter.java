@@ -103,6 +103,8 @@ final class NativeRouter implements AutoCloseable {
         double[] firstRestricted;
         /** How the final edge of the accepted route was established, for arrival disclosure. */
         boolean lastAdmitted,lastUnverified;
+        /** Audit verdict per traced edge, in route order, so the paint follows the audit. */
+        int[] auditClasses;
     }
 
     /**
@@ -150,6 +152,8 @@ final class NativeRouter implements AutoCloseable {
             boolean[] privateTail=AccessPolicy.finalApproach(byEdge);
             boolean rejected=false,originHard=false,destinationHard=false;double restricted=0;
             Set<String> notes=new TreeSet<>();String failure=plan.failure;
+            int[] auditClasses=new int[traced.length()];
+            java.util.Arrays.fill(auditClasses,RouteSection.PLAIN);
             for(int i=0;i<traced.length();i++){
                 JSONObject edge=traced.getJSONObject(i);int begin=edge.getInt("begin_shape_index"),end=edge.getInt("end_shape_index");
                 long way=edge.getLong("way_id");
@@ -197,6 +201,8 @@ final class NativeRouter implements AutoCloseable {
                 }
                 plan.lastAdmitted=decision.admitted();
                 plan.lastUnverified=decision.unverified();
+                auditClasses[i]=decision.admitted()?RouteSection.AUTHORISED_ACCESS
+                        :decision.unverified()?RouteSection.UNVERIFIED:RouteSection.PLAIN;
                 // Only travel the tag actually admits counts as restricted distance.
                 if(decision.admitted()){
                     if(restricted==0)plan.firstRestricted=new double[]{point.lat,point.lon};
@@ -204,7 +210,7 @@ final class NativeRouter implements AutoCloseable {
                 }
             }
             plan.warnings.addAll(notes);
-            if(!rejected){plan.response=response;plan.restrictedMetres=restricted;candidate=response;break;}
+            if(!rejected){plan.response=response;plan.restrictedMetres=restricted;plan.auditClasses=auditClasses;candidate=response;break;}
             plan.failure=failure;
             if(originHard||destinationHard){plan.originHard=originHard;plan.destinationHard=destinationHard;return plan;}
             if(attempt==11)throw new IllegalStateException("No verified route found within the search limit: "+failure);
@@ -325,6 +331,7 @@ final class NativeRouter implements AutoCloseable {
                 long way=auditedWays==null?i:auditedWays[i];RestrictionRule rule=auditedRules.get(way);
                 edges[i]=rule==null?new Graph.Edge(i,i+1,way,"Route","road",0,0,0,0,0,0,50)
                         :new Graph.Edge(i,i+1,way,"Route","road",rule.height,rule.width,rule.length,rule.weight,rule.axle,rule.flags,50,rule.kind,rule.evidence);
+                if(plan.auditClasses!=null&&i<plan.auditClasses.length)edges[i].auditClass=plan.auditClasses[i];
             }
             Graph graph=new Graph("Valhalla truck route","© OpenStreetMap contributors · ODbL 1.0","Installed routing snapshot",false,
                 nodes.toArray(new Graph.Node[0]),edges,Collections.emptyList());

@@ -22,6 +22,13 @@ public final class Graph {
         public final int ruleKind;
         /** Recorded tag text behind ruleKind; empty when the pack carried no evidence. */
         public final String ruleEvidence;
+        /**
+         * Classification the audit actually reached for this edge in its travel direction, or -1
+         * when the edge did not come through the audit. The paint must follow this rather than
+         * re-deriving from the tags: a direction-scoped record that does not apply in this direction
+         * is an ordinary road here, however restricted it looks.
+         */
+        public int auditClass=-1;
         public double metres;
         public Edge(int from, int to, long way, String name, String kind, double height, double width,
                     double length, double weight, double axle, int flags, double speed) {

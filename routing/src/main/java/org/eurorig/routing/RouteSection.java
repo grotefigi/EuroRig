@@ -100,7 +100,13 @@ public final class RouteSection {
                 ||(edge.length>0&&truck.length>edge.length)
                 ||(edge.weight>0&&truck.weight>edge.weight)
                 ||(edge.axle>0&&truck.axleWeight>edge.axle);
+        // An exceeded hard limit outranks everything, including an audit verdict: it must never be
+        // painted as ordinary even if a caller marked the edge as having passed.
         if((kind&RestrictionRule.HARD)!=0&&exceeds)return PROHIBITED;
+        // Otherwise the audit's own verdict wins: it saw the direction of travel, which the tag-level
+        // fallback below cannot, and would paint a forward-legal edge as access-restricted merely
+        // because the record faces the other way.
+        if(edge.auditClass>=0)return edge.auditClass;
         if((kind&RestrictionRule.ACCESS)!=0)return AUTHORISED_ACCESS;
         if((kind&RestrictionRule.UNCERTAIN)!=0)return UNVERIFIED;
         return PLAIN;
