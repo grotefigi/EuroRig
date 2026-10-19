@@ -150,7 +150,9 @@ public final class AccessPolicy {
         if(!authorisation.current(nowMillis))return decided;
         int kind=rule.privateAccess()?DestinationAuthorisation.PRIVATE
                 :DESTINATION_GRANTS.contains(accessValue(rule.tags,travel))?DestinationAuthorisation.DELIVERY:0;
-        if(kind==0||!authorisation.covers(way,kind))return decided;
+        if(kind==0||!authorisation.covers(way,kind))
+            return new Decision(BLOCKED,decided.reason+" [declared entrance way "
+                    +authorisation.approachWayId+", this edge is way "+way+"]");
         if(!authorisation.forDestination(destinationLat,destinationLon))return decided;
         // A declaration never outranks a physical limit.
         if(fatal(rule,truck)!=null)return decided;

@@ -579,6 +579,9 @@ public final class MainActivity extends Activity {
                 Store.deliveryAccess?org.eurorig.routing.DestinationAuthorisation.DELIVERY
                         :org.eurorig.routing.DestinationAuthorisation.PRIVATE,
                 System.currentTimeMillis());
+        android.util.Log.i("Declare",String.format(java.util.Locale.ROOT,
+                "declared entrance way %d for destination %.5f,%.5f kind %s",approachWay,
+                destination.lat,destination.lon,Store.deliveryAccess?"delivery":"private"));
         Store.route=null;
         if(map!=null)map.clearRoute();
         calculate();

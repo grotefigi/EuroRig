@@ -128,6 +128,9 @@ final class NativeRouter implements AutoCloseable {
     private Plan planRouteUnchecked(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery,DisplayDatabase display,double[] seedExclusion)throws org.json.JSONException{
         android.util.Log.i("RouteRun",runId+" planRouteUnchecked entered delivery="+delivery+" seed="+(seedExclusion!=null));
         Plan plan=new Plan();
+        // The road the requested origin actually stands on: egress belongs to that road, not to
+        // whichever way snapping happened to put first in the route.
+        long originWay=display==null?-1:display.wayAt(lat,lon,15);
         JSONObject query=request(lat,lon,endLat,endLon,truck,mode,delivery);
         JSONArray excluded=new JSONArray();JSONObject candidate=null;
         if(seedExclusion!=null)excluded.put(new JSONObject().put("lat",seedExclusion[0]).put("lon",seedExclusion[1]));
@@ -136,7 +139,8 @@ final class NativeRouter implements AutoCloseable {
             JSONObject response;
             android.util.Log.i("RouteQuery",runId+" "+query.toString());
             try{response=new JSONObject(engine.routeRaw(query.toString()));}
-            catch(RuntimeException engineFailure){
+            catch(org.json.JSONException malformed){throw malformed;}
+            catch(Exception engineFailure){
                 // A relocated or excluded endpoint can strand the network. Keep the last route that
                 // passed the audit; it never carries a hard limit, because such a route is not a candidate.
                 if(candidate!=null){plan.response=candidate;break;}
@@ -209,7 +213,7 @@ final class NativeRouter implements AutoCloseable {
                     // earn it. Using proximity to the origin instead let a long private road that
                     // happens to pass near the start be admitted while driving away from it.
                     decision=AccessPolicy.decideWithApproach(rule,truck,metresToDestination,
-                            i==0&&toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel,
+                            i==0&&way==originWay&&toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel,
                             Store.destinationAuthorisation,way,privateTail[i],endLat,endLon,
                             System.currentTimeMillis());
                 }
