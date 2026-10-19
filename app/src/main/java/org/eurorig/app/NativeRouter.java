@@ -129,6 +129,7 @@ final class NativeRouter implements AutoCloseable {
         for(int attempt=0;attempt<12;attempt++){
             if(excluded.length()>0)query.put("exclude_locations",excluded);
             JSONObject response;
+            android.util.Log.i("RouteQuery",runId+" "+query.toString());
             try{response=new JSONObject(engine.routeRaw(query.toString()));}
             catch(RuntimeException engineFailure){
                 // A relocated or excluded endpoint can strand the network. Keep the last route that
@@ -139,6 +140,13 @@ final class NativeRouter implements AutoCloseable {
             if(display==null||!display.restrictionEvidence){plan.response=response;break;}
             JSONObject leg=response.getJSONObject("trip").getJSONArray("legs").getJSONObject(0);
             String shape=leg.getString("shape");List<Graph.Node> geometry=decode(shape);
+            // Reproduced directly against the same tiles: with low_class_penalty/low_class_factor set,
+            // Valhalla answers a request whose only legal path is a minor road with a zero-length trip
+            // instead of a no-route error. That is an engine answer about our own costing options, so
+            // it is reported as such rather than being handed to the matcher as a 443.
+            if(leg.getJSONObject("summary").getDouble("length")<0.001)
+                throw new IllegalStateException("No route for this truck: the routing engine returned an empty path. "
+                        +"Its low-class road penalties can exclude every legal road on a short approach.");
             // A zero-length candidate is an engine answer, not a matcher fault; log what it returned so
             // a bounded-replanning dead end can be told apart from an exclusion bug.
             if(geometry.size()<2||Geo.distance(geometry.get(0).lat,geometry.get(0).lon,
