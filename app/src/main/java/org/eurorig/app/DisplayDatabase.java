@@ -171,11 +171,10 @@ final class DisplayDatabase implements AutoCloseable {
         return chosen==null?null:new double[]{chosen[1],chosen[2]};
     }
     /**
-     * Bearing of the recorded way geometry nearest this point, in the OSM way's node order.
-     * compile_display writes way nodes in order, so a :forward record really faces this bearing.
-     * Returns NaN when the way is absent or degenerate: callers must then stay conservative.
+     * Geometry of one recorded way, in OSM node order (cached). Used to verify that a matched edge
+     * really is the road the route ran along, independently of the matcher that proposed it.
      */
-    synchronized double wayBearing(long way,double lat,double lon){
+    synchronized List<Graph.Node> wayShape(long way){
         List<Graph.Node> shape=wayShapes.get(way);
         if(shape==null){
             shape=Collections.emptyList();
@@ -187,6 +186,16 @@ final class DisplayDatabase implements AutoCloseable {
             if(wayShapes.size()>64)wayShapes.clear();
             wayShapes.put(way,shape);
         }
+        return shape;
+    }
+
+    /**
+     * Bearing of the recorded way geometry nearest this point, in the OSM way's node order.
+     * compile_display writes way nodes in order, so a :forward record really faces this bearing.
+     * Returns NaN when the way is absent or degenerate: callers must then stay conservative.
+     */
+    synchronized double wayBearing(long way,double lat,double lon){
+        List<Graph.Node> shape=wayShape(way);
         double best=Double.MAX_VALUE,bearing=Double.NaN;
         for(int i=0;i+1<shape.size();i++){
             Graph.Node a=shape.get(i),b=shape.get(i+1);

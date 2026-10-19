@@ -124,7 +124,7 @@ final class NativeRouter implements AutoCloseable {
             JSONObject trace=new JSONObject().put("encoded_polyline",shape).put("shape_match","edge_walk").put("costing","truck")
                 .put("costing_options",traceCosting(query))
                 .put("filters",new JSONObject().put("action","include").put("attributes",new JSONArray().put("edge.way_id").put("edge.begin_shape_index").put("edge.end_shape_index").put("edge.length")));
-            JSONArray traced=new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
+            JSONArray traced=traceEdges(trace,geometry,display);
             HashSet<Long> ways=new HashSet<>();for(int i=0;i<traced.length();i++)ways.add(traced.getJSONObject(i).getLong("way_id"));
             Map<Long,RestrictionRule> rules=display.rulesFor(ways);
             plan.ways=auditedWays(traced,geometry.size());plan.rules=rules;
@@ -304,6 +304,85 @@ final class NativeRouter implements AutoCloseable {
             throw new IllegalStateException("Offline truck routing: "+e.getMessage(),e);
         }
     }
+    /**
+     * Directed edges for the audited route. edge_walk is the exact matcher and stays the only path
+     * for every route it handles. A route of exactly one segment whose end lies inside an edge
+     * cannot be exact-matched (measured: Valhalla code 443), so that single shape may be matched
+     * with map_snap — but only when the one matched edge is independently verified against the
+     * recorded way geometry. Anything else fails closed: an unauditable route is never accepted.
+     */
+    private JSONArray traceEdges(JSONObject trace,List<Graph.Node> geometry,DisplayDatabase display)throws JSONException{
+        try{
+            return new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
+        }catch(RuntimeException exactFailure){
+            if(geometry.size()!=2||display==null)throw exactFailure;
+            JSONArray matched=singleEdgeMatch(trace,geometry,display);
+            if(matched==null){
+                android.util.Log.i("Audit","matcher=none single segment could not be verified: "+exactFailure.getMessage());
+                throw exactFailure;
+            }
+            android.util.Log.i("Audit",String.format(java.util.Locale.ROOT,
+                    "matcher=map_snap single edge way %d verified against recorded geometry",matched.getJSONObject(0).getLong("way_id")));
+            return matched;
+        }
+    }
+
+    /** One-segment fallback: accept only when the single matched edge is provably the routed road. */
+    private JSONArray singleEdgeMatch(JSONObject trace,List<Graph.Node> geometry,DisplayDatabase display)throws JSONException{
+        JSONObject relaxed=new JSONObject(trace.toString()).put("shape_match","map_snap").put("search_radius",10);
+        JSONObject attributes;
+        try{attributes=new JSONObject(engine.traceAttributesRaw(relaxed.toString()));}
+        catch(RuntimeException unmatched){return null;}
+        JSONArray edges=attributes.optJSONArray("edges");
+        if(edges==null||edges.length()!=1)return null;
+        JSONObject edge=edges.getJSONObject(0);
+        long way=edge.optLong("way_id",0);
+        if(way<=0)return null;
+        if(edge.optInt("begin_shape_index",-1)!=0||edge.optInt("end_shape_index",-1)!=geometry.size()-1)return null;
+        Graph.Node start=geometry.get(0),finish=geometry.get(1);
+        double segment=Geo.distance(start.lat,start.lon,finish.lat,finish.lon);
+        if(segment<=0)return null;
+        double matched=edge.optDouble("length",-1)*1000;
+        if(Math.abs(matched-segment)>Math.max(5,segment*0.05))return null;
+        JSONArray points=attributes.optJSONArray("matched_points");
+        if(points!=null)for(int i=0;i<points.length();i++){
+            JSONObject point=points.getJSONObject(i);
+            if(point.optInt("edge_index",-1)!=0)return null;
+            if(point.optDouble("distance_from_trace_point",99)>10)return null;
+        }
+        // Independent check against the recorded way: both route endpoints must lie on it, and the
+        // stretch between them must account for the routed distance.
+        List<Graph.Node> shape=display.wayShape(way);
+        if(shape.size()<2)return null;
+        double[] from=projectOnto(shape,start),to=projectOnto(shape,finish);
+        if(from==null||to==null)return null;
+        if(from[1]>10||to[1]>10)return null;
+        if(Math.abs(to[0]-from[0])*wayLength(shape)<segment*0.9)return null;
+        return new JSONArray().put(new JSONObject().put("way_id",way)
+                .put("begin_shape_index",0).put("end_shape_index",geometry.size()-1)
+                .put("length",matched/1000.0));
+    }
+
+    /** {fraction along the recorded way, cross-track metres} for the nearest segment. */
+    private static double[] projectOnto(List<Graph.Node> shape,Graph.Node point){
+        double best=Double.MAX_VALUE;double[] result=null;
+        for(int i=0;i+1<shape.size();i++){
+            Graph.Node a=shape.get(i),b=shape.get(i+1);
+            double[] projection=Geo.project(point.lat,point.lon,a,b);
+            if(projection[1]<best){
+                best=projection[1];
+                result=new double[]{(i+projection[0])/(shape.size()-1),projection[1]};
+            }
+        }
+        return result;
+    }
+
+    private static double wayLength(List<Graph.Node> shape){
+        double total=0;
+        for(int i=0;i+1<shape.size();i++)total+=Geo.distance(shape.get(i).lat,shape.get(i).lon,shape.get(i+1).lat,shape.get(i+1).lon);
+        return total;
+    }
+
     static JSONObject traceCosting(JSONObject query)throws JSONException{
         JSONObject costing=new JSONObject(query.getJSONObject("costing_options").toString());
         // Mobile 0.6.3's edge-walk matcher crashes with this route-search option.
