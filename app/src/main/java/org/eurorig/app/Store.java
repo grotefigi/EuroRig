@@ -86,9 +86,19 @@ final class Store {
             }
         }
     }
-    /** Revokes the driver's declaration and everything that relied on it. */
+    /**
+     * Revokes the driver's declaration and everything that relied on it. Guidance is stopped here
+     * unconditionally: the declaration is gone, so any admitted route is invalid regardless of what
+     * the current route field happens to hold - a caller may already have cleared it.
+     */
     static synchronized void revokeAuthorisation(){
         destinationAuthorisation=null;invalidateIfStale();
+        if(navigating){
+            navigating=false;
+            guidanceRefused="Authorization withdrawn; recalculate the route";
+            Runnable stopper=guidanceStopper;
+            if(stopper!=null)stopper.run();
+        }
     }
     static volatile boolean arrived;
     /** Driver-declared entrance for the current destination; null until they declare one. */

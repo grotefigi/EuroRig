@@ -330,8 +330,10 @@ public final class MainActivity extends Activity {
         box.addView(text("Delivery access is limited to 2 km from the destination. It uses shortest routing and preserves height, width, length, gross/axle weight, ADR and turn restrictions. Destination and delivery tags are admitted on their own conditions; private property needs the per-trip permission above, because map data cannot prove it. Unknown limits, barriers and bridges on restricted access are excluded. Permission applies to this trip on this device.",12,MUTED));
         ScrollView scroll=new ScrollView(this);scroll.addView(box);
         new AlertDialog.Builder(this).setTitle("Route preferences").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{
-            Store.mode=RoutingMode.values()[choices.indexOfChild(choices.findViewById(choices.getCheckedRadioButtonId()))];Store.deliveryAccess=access.isChecked();Store.route=null;
+            Store.mode=RoutingMode.values()[choices.indexOfChild(choices.findViewById(choices.getCheckedRadioButtonId()))];Store.deliveryAccess=access.isChecked();
+            // Revoke before dropping the route, so the revocation can still see what it invalidates.
             if(Store.privateAccessPermission&&!privateAccess.isChecked())Store.revokeAuthorisation();
+            Store.route=null;
             Store.privateAccessPermission=privateAccess.isChecked();
             Store.showAllRestrictions=everyRestriction.isChecked();
             Store.routeOnlyRestrictions=routeOnly.isChecked();
