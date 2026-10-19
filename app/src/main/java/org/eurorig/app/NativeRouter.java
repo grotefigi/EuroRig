@@ -350,37 +350,17 @@ final class NativeRouter implements AutoCloseable {
             if(point.optInt("edge_index",-1)!=0)return null;
             if(point.optDouble("distance_from_trace_point",99)>10)return null;
         }
-        // Independent check against the recorded way: both route endpoints must lie on it, and the
-        // stretch between them must account for the routed distance.
-        List<Graph.Node> shape=display.wayShape(way);
-        if(shape.size()<2)return null;
-        double[] from=projectOnto(shape,start),to=projectOnto(shape,finish);
-        if(from==null||to==null)return null;
-        if(from[1]>10||to[1]>10)return null;
-        if(Math.abs(to[0]-from[0])*wayLength(shape)<segment*0.9)return null;
+        // Independent correspondence check against the recorded way; the matcher's opinion is not
+        // evidence on its own. Any failure leaves the route unauditable and therefore rejected.
+        String problem=EdgeMatchValidation.validate(start,finish,way,display.wayShape(way),matched,
+                edge.optInt("begin_shape_index",-1),edge.optInt("end_shape_index",-1),geometry.size());
+        if(problem!=null){
+            android.util.Log.i("Audit","matcher=map_snap rejected: "+problem);
+            return null;
+        }
         return new JSONArray().put(new JSONObject().put("way_id",way)
                 .put("begin_shape_index",0).put("end_shape_index",geometry.size()-1)
                 .put("length",matched/1000.0));
-    }
-
-    /** {fraction along the recorded way, cross-track metres} for the nearest segment. */
-    private static double[] projectOnto(List<Graph.Node> shape,Graph.Node point){
-        double best=Double.MAX_VALUE;double[] result=null;
-        for(int i=0;i+1<shape.size();i++){
-            Graph.Node a=shape.get(i),b=shape.get(i+1);
-            double[] projection=Geo.project(point.lat,point.lon,a,b);
-            if(projection[1]<best){
-                best=projection[1];
-                result=new double[]{(i+projection[0])/(shape.size()-1),projection[1]};
-            }
-        }
-        return result;
-    }
-
-    private static double wayLength(List<Graph.Node> shape){
-        double total=0;
-        for(int i=0;i+1<shape.size();i++)total+=Geo.distance(shape.get(i).lat,shape.get(i).lon,shape.get(i+1).lat,shape.get(i+1).lon);
-        return total;
     }
 
     static JSONObject traceCosting(JSONObject query)throws JSONException{
