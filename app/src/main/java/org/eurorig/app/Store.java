@@ -45,6 +45,8 @@ final class Store {
     static synchronized boolean beginInstall(){if(navigating||installing)return false;installing=true;return true;}
     static synchronized boolean beginGuidance(){if(installing||graph==null||graph.demo||route==null||route.edges.isEmpty())return false;travelled=0;progressRoute=route;remaining=route.metres;navigating=true;arrived=false;return true;}
     static volatile boolean arrived;
+    /** Driver-declared entrance for the current destination; null until they declare one. */
+    static volatile org.eurorig.routing.DestinationAuthorisation destinationAuthorisation;
     static volatile double lat=Double.NaN, lon=Double.NaN;
     static volatile String guidance="Choose your destination";
     static volatile double remaining, speed, bearing=Double.NaN;

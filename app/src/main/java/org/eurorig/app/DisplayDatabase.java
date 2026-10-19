@@ -139,6 +139,25 @@ final class DisplayDatabase implements AutoCloseable {
      * the endpoint to a legal access point keeps graph connectivity, where excluding a circle around
      * the endpoint destroys it and produces a fabricated "no path".
      */
+    /**
+     * Nearest recorded way to a point, regardless of access. This is identity, not permission: it lets
+     * a declaration name the road the driver means without asking them for an OSM way id.
+     */
+    synchronized long wayAt(double lat,double lon,double radius){
+        double dLat=radius/111320.0,dLon=radius/(111320.0*Math.max(.2,Math.cos(Math.toRadians(lat))));
+        String[] args={""+(lat-dLat),""+(lat+dLat),""+(lon-dLon),""+(lon+dLon)};
+        long best=-1;double bestDistance=radius;
+        try(Cursor rows=database.rawQuery("SELECT id,shape FROM roads WHERE north>=? AND south<=? AND east>=? AND west<=? LIMIT 400",args)){
+            while(rows.moveToNext()){
+                for(Graph.Node point:NativeRouter.decode(rows.getString(1))){
+                    double distance=Geo.distance(point.lat,point.lon,lat,lon);
+                    if(distance<bestDistance){bestDistance=distance;best=rows.getLong(0);}
+                }
+            }
+        }
+        return best;
+    }
+
     synchronized double[] legalAccessPoint(double lat,double lon,Truck truck,double radius,Set<Long> skip,
                                            boolean destinationEndpoint,boolean deliveryPermitted,boolean privatePermitted){
         android.util.Log.i("AccessPoint",String.format(java.util.Locale.ROOT,

@@ -199,7 +199,9 @@ public final class MainActivity extends Activity {
         stats.setContentDescription(explained?"Route with restricted sections. Tap for details.":null);
         stats.setOnClickListener(explained?v->routeSectionsDialog(sections):null);
         stats.setClickable(explained);}
-        else{instruction.setText(R.string.select_destination);stats.setText(R.string.choose_destination);map.clearRoute();}
+        else{instruction.setText(R.string.select_destination);stats.setText(R.string.choose_destination);map.clearRoute();
+            // A declaration names one destination's entrance; changing the destination voids it.
+            Store.destinationAuthorisation=null;}
         map.updateGraph(Store.graph);
         if(active&&!guidanceWasActive&&fresh){map.locate(Store.lat,Store.lon);guidanceWasActive=true;}
         if(active&&fresh)map.updatePosition();else map.invalidate();
@@ -552,5 +554,33 @@ public final class MainActivity extends Activity {
             }).setPositiveButton("Close",null).show();
         }catch(IOException e){error(e.getMessage());}
     }
-    private void error(String message){if(!isFinishing()&&!isDestroyed())new AlertDialog.Builder(this).setTitle("EuroRig").setMessage(message).setPositiveButton("OK",null).show();}
+    private void error(String message){
+        if(isFinishing()||isDestroyed())return;
+        AlertDialog.Builder builder=new AlertDialog.Builder(this).setTitle("EuroRig").setMessage(message)
+                .setPositiveButton("OK",null);
+        // An access refusal at the destination is the one case where the driver can name the entrance
+        // they mean. The declaration is theirs; it is not evidence about the property.
+        boolean accessRefusal=message!=null&&(message.contains("Access restricted")
+                ||message.contains("Private road")||message.contains("access point"));
+        Graph.Node destination=Store.graph!=null?Store.graph.nodes[Store.end]:null;
+        if(accessRefusal&&Store.display!=null&&Store.destinationChosen&&destination!=null){
+            long approach=Store.display.wayAt(destination.lat,destination.lon,40);
+            if(approach>0)builder.setNeutralButton("Declare this entrance",
+                    (dialog,which)->declareEntrance(approach));
+        }
+        builder.show();
+    }
+
+    /** Records the driver's declaration for the destination's own approach and recalculates. */
+    private void declareEntrance(long approachWay){
+        Graph.Node destination=Store.graph.nodes[Store.end];
+        Store.destinationAuthorisation=new org.eurorig.routing.DestinationAuthorisation(
+                destination.lat,destination.lon,approachWay,
+                Store.deliveryAccess?org.eurorig.routing.DestinationAuthorisation.DELIVERY
+                        :org.eurorig.routing.DestinationAuthorisation.PRIVATE,
+                System.currentTimeMillis());
+        Store.route=null;
+        if(map!=null)map.clearRoute();
+        calculate();
+    }
 }

@@ -198,7 +198,10 @@ final class NativeRouter implements AutoCloseable {
                     // authorization for, however close it passes to the destination.
                     decision=AccessPolicy.Decision.blocked("Private road is not the destination approach");
                 }else{
-                    decision=AccessPolicy.decide(rule,truck,metresToDestination,toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel);
+                    decision=AccessPolicy.decideWithApproach(rule,truck,metresToDestination,
+                            toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel,
+                            Store.destinationAuthorisation,way,privateTail[i],endLat,endLon,
+                            System.currentTimeMillis());
                 }
                 String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null)
                         :(decision.reason.isEmpty()?null:decision.reason);

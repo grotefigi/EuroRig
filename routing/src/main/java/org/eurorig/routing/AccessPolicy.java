@@ -129,6 +129,31 @@ public final class AccessPolicy {
         return new Decision(OK,null);
     }
 
+    /**
+     * The route audit's decision, plus the one case where a driver's declaration can admit a
+     * restricted terminal edge: the edge is the last restricted way of the route's own tail, the
+     * declaration names that exact way for this destination, it is current, and nothing hard is
+     * recorded against it. Everything else falls back to {@link #decide}.
+     */
+    public static Decision decideWithApproach(RestrictionRule rule,Truck truck,double metresToDestination,
+                                              boolean originEgress,boolean deliveryPermitted,
+                                              boolean privatePermitted,int travel,
+                                              DestinationAuthorisation authorisation,long way,
+                                              boolean terminal,double destinationLat,double destinationLon,
+                                              long nowMillis){
+        Decision decided=decide(rule,truck,metresToDestination,originEgress,deliveryPermitted,privatePermitted,travel);
+        if(!decided.blocked()||rule==null||!terminal||authorisation==null)return decided;
+        if(!authorisation.current(nowMillis))return decided;
+        int kind=rule.privateAccess()?DestinationAuthorisation.PRIVATE
+                :DESTINATION_GRANTS.contains(accessValue(rule.tags,travel))?DestinationAuthorisation.DELIVERY:0;
+        if(kind==0||!authorisation.covers(way,kind))return decided;
+        if(!authorisation.forDestination(destinationLat,destinationLon))return decided;
+        // A declaration never outranks a physical limit.
+        if(fatal(rule,truck)!=null)return decided;
+        return new Decision(ADMITTED_ACCESS,"Declared entrance for this destination (driver-declared, "
+                +"not confirmed against property records)");
+    }
+
     private AccessPolicy(){}
 
     /**
