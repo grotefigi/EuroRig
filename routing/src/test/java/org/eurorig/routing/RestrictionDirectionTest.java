@@ -74,6 +74,38 @@ public class RestrictionDirectionTest {
         assertEquals("Truck access prohibited", blocked.reason);
     }
 
+    @Test public void aPlainGrantWithABackwardProhibitionAppliesToItsDirectionOnly() {
+        RestrictionRule rule = new RestrictionRule(0, 0, 0, 0, 0, Graph.BLOCKED,
+                Map.of("hgv", "yes", "hgv:backward", "no"), RestrictionRule.ACCESS | RestrictionRule.BACKWARD,
+                "hgv=yes,hgv:backward=no");
+        assertEquals(AccessPolicy.OK, decide(rule, RestrictionRule.DIR_FORWARD));
+        assertTrue(AccessPolicy.decide(rule, TRUCK, 0, false, false, false, RestrictionRule.DIR_BACKWARD).blocked());
+    }
+
+    @Test public void aPlainProhibitionWithAForwardGrantAllowsOnlyTheGrantedDirection() {
+        RestrictionRule rule = new RestrictionRule(0, 0, 0, 0, 0, Graph.BLOCKED,
+                Map.of("hgv", "no", "hgv:forward", "yes"), RestrictionRule.ACCESS,
+                "hgv=no,hgv:forward=yes");
+        assertEquals(AccessPolicy.OK, decide(rule, RestrictionRule.DIR_FORWARD));
+        assertTrue(AccessPolicy.decide(rule, TRUCK, 0, false, false, false, RestrictionRule.DIR_BACKWARD).blocked());
+    }
+
+    @Test public void oppositeTruckValuesPerDirectionAreReadPerDirection() {
+        RestrictionRule rule = new RestrictionRule(0, 0, 0, 0, 0, Graph.BLOCKED,
+                Map.of("hgv:forward", "no", "hgv:backward", "yes"), RestrictionRule.ACCESS,
+                "hgv:forward=no,hgv:backward=yes");
+        assertTrue(AccessPolicy.decide(rule, TRUCK, 0, false, false, false, RestrictionRule.DIR_FORWARD).blocked());
+        assertEquals(AccessPolicy.OK, decide(rule, RestrictionRule.DIR_BACKWARD));
+    }
+
+    @Test public void aConditionalDirectionalAccessValueIsUnverifiedNotGranted() {
+        RestrictionRule rule = new RestrictionRule(0, 0, 0, 0, 0, Graph.BLOCKED,
+                Map.of("hgv:backward", "conditional"), RestrictionRule.ACCESS | RestrictionRule.BACKWARD,
+                "hgv:backward=conditional");
+        assertEquals(AccessPolicy.UNVERIFIED,
+                AccessPolicy.decide(rule, TRUCK, 0, false, false, false, RestrictionRule.DIR_BACKWARD).verdict);
+    }
+
     @Test public void directionScopedLimitsStayScoped() {
         // maxheight:backward must not restrict the forward direction.
         RestrictionRule backwardHeight = new RestrictionRule(3.5, 0, 0, 0, 0, Graph.BLOCKED,

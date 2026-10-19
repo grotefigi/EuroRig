@@ -410,26 +410,55 @@ final class NativeRouter implements AutoCloseable {
         }
         android.util.Log.i("RouteRun",runId+" trace ok matcher=map_snap");
         JSONArray edges=attributes.optJSONArray("edges");
-        if(edges==null||edges.length()!=1)return null;
+        android.util.Log.i("SnapCandidate",String.format(java.util.Locale.ROOT,
+                "%s entry geometry=%d edges=%d first=%.6f,%.6f last=%.6f,%.6f",runId,geometry.size(),
+                edges==null?0:edges.length(),geometry.get(0).lat,geometry.get(0).lon,
+                geometry.get(geometry.size()-1).lat,geometry.get(geometry.size()-1).lon));
+        // Every early refusal is named: a silent null here is what made an earlier device run look
+        // like a routing failure with no candidate to inspect.
+        if(edges==null||edges.length()!=1){
+            android.util.Log.i("SnapCandidate",runId+" map_snap returned "+(edges==null?0:edges.length())+" edges");
+            return null;
+        }
         JSONObject edge=edges.getJSONObject(0);
         long way=edge.optLong("way_id",0);
-        if(way<=0)return null;
-        if(edge.optInt("begin_shape_index",-1)!=0||edge.optInt("end_shape_index",-1)!=geometry.size()-1)return null;
+        if(way<=0){android.util.Log.i("SnapCandidate",runId+" map_snap edge has no way id");return null;}
+        int begin=edge.optInt("begin_shape_index",-1),end=edge.optInt("end_shape_index",-1);
+        if(begin!=0||end!=geometry.size()-1){
+            android.util.Log.i("SnapCandidate",String.format(java.util.Locale.ROOT,
+                    "way %d indices %d..%d do not cover %d route points",way,begin,end,geometry.size()));
+            return null;
+        }
         Graph.Node start=geometry.get(0),finish=geometry.get(1);
         double segment=Geo.distance(start.lat,start.lon,finish.lat,finish.lon);
-        if(segment<=0)return null;
+        if(segment<=0){
+            android.util.Log.i("SnapCandidate",String.format(java.util.Locale.ROOT,
+                    "way %d refused: the route geometry is degenerate (both points %.6f,%.6f)",way,start.lat,start.lon));
+            return null;
+        }
         double matched=edge.optDouble("length",-1)*1000;
-        if(Math.abs(matched-segment)>Math.max(5,segment*0.05))return null;
+        if(Math.abs(matched-segment)>Math.max(5,segment*0.05)){
+            android.util.Log.i("SnapCandidate",String.format(java.util.Locale.ROOT,
+                    "way %d matched %.0f m does not match the %.0f m route",way,matched,segment));
+            return null;
+        }
         JSONArray points=attributes.optJSONArray("matched_points");
         if(points!=null)for(int i=0;i<points.length();i++){
             JSONObject point=points.getJSONObject(i);
-            if(point.optInt("edge_index",-1)!=0)return null;
-            if(point.optDouble("distance_from_trace_point",99)>10)return null;
+            int edgeIndex=point.optInt("edge_index",-1);
+            double offset=point.optDouble("distance_from_trace_point",99);
+            if(edgeIndex!=0||offset>10){
+                android.util.Log.i("SnapCandidate",String.format(java.util.Locale.ROOT,
+                        "way %d point %d on edge %d is %.1f m from the trace",way,i,edgeIndex,offset));
+                return null;
+            }
         }
         // Independent correspondence check against the recorded way; the matcher's opinion is not
         // evidence on its own. Any failure leaves the route unauditable and therefore rejected.
-        String problem=EdgeMatchValidation.validate(start,finish,way,display.wayShape(way),matched,
-                edge.optInt("begin_shape_index",-1),edge.optInt("end_shape_index",-1),geometry.size());
+        List<Graph.Node> shape=display.wayShape(way);
+        String problem=EdgeMatchValidation.validate(start,finish,way,shape,matched,begin,end,geometry.size());
+        android.util.Log.i("SnapCandidate",runId+" "+EdgeMatchValidation.describe(start,finish,way,shape,
+                matched,begin,end,geometry.size())+(problem==null?" ACCEPTED":" REJECTED: "+problem));
         if(problem!=null){
             android.util.Log.i("Audit","matcher=map_snap rejected: "+problem);
             return null;

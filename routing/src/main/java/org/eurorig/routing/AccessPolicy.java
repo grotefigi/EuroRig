@@ -185,10 +185,18 @@ public final class AccessPolicy {
             // Direction-scoped values (hgv:backward=no) outrank the plain one for the direction actually
             // travelled; otherwise the audit reads "yes" and reports a generic restriction.
             String access=accessValue(rule.tags,travel);
+            boolean directionalValue=!access.equals(accessValue(rule.tags));
+            // A conditional or unrecognised value attached to one direction is not permission and not
+            // a proven prohibition; it is something the app cannot evaluate.
+            if(directionalValue&&!"no".equals(access)&&!"yes".equals(access)&&!GRANTS.contains(access))
+                return new Decision(UNVERIFIED,"Directional access condition not evaluated: "+access);
             if("no".equals(access))return new Decision(BLOCKED,"Truck access prohibited");
             // A tag that grants nothing cannot be turned into permission by proximity or a preference.
             if(!GRANTS.contains(access)&&!"yes".equals(access))
                 return new Decision(BLOCKED,"Unsupported access exception");
+            // "yes" for this direction means no access restriction applies here, even when the road
+            // carries a prohibition for the other direction.
+            if("yes".equals(access))return new Decision(OK,null);
             // Leaving a road the vehicle is already standing on is not an access exception.
             boolean leaving=originEgress&&GRANTS.contains(access);
             if(!leaving){

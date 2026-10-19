@@ -57,8 +57,31 @@ public final class EdgeMatchValidation {
         return null;
     }
 
+    /**
+     * Diagnostic description of one candidate, in the terms a reviewer needs to decide whether the
+     * matcher or the validator is at fault: what was returned, how far it is from the route, and how
+     * long each of them is.
+     */
+    public static String describe(Graph.Node start,Graph.Node finish,long way,java.util.List<Graph.Node> shape,
+                                  double matchedMetres,int begin,int end,int routePoints){
+        if(shape==null||shape.size()<2)
+            return String.format(java.util.Locale.ROOT,
+                    "way %d matched %.0f m indices %d..%d route points %d (no recorded geometry)",
+                    way,matchedMetres,begin,end,routePoints);
+        double[] from=projectOnto(shape,start),to=projectOnto(shape,finish);
+        double routed=Geo.distance(start.lat,start.lon,finish.lat,finish.lon);
+        double span=Math.abs(to[0]-from[0])*wayLength(shape);
+        double heading=Geo.bearing(start,finish);
+        double wayHeading=bearingAt(shape,(from[0]+to[0])/2);
+        double delta=Math.abs(((wayHeading-heading+540)%360)-180);
+        return String.format(java.util.Locale.ROOT,
+                "way %d matched %.0f m indices %d..%d route points %d routed %.0f m span %.0f m "
+                        +"cross-track start %.1f m finish %.1f m bearings route %.0f way %.0f delta %.0f",
+                way,matchedMetres,begin,end,routePoints,routed,span,from[1],to[1],heading,wayHeading,delta);
+    }
+
     /** {fraction of the way's length, cross-track metres} for the nearest segment. */
-    static double[] projectOnto(List<Graph.Node> shape,Graph.Node point){
+    public static double[] projectOnto(List<Graph.Node> shape,Graph.Node point){
         double total=wayLength(shape);
         if(total<=0)return null;
         double best=Double.MAX_VALUE;double[] result=null;
@@ -77,7 +100,7 @@ public final class EdgeMatchValidation {
     }
 
     /** Segment bearing at a fraction of the way's length, so unequal legs are handled correctly. */
-    static double bearingAt(List<Graph.Node> shape,double fraction){
+    public static double bearingAt(List<Graph.Node> shape,double fraction){
         double total=wayLength(shape);
         if(total<=0)return Double.NaN;
         double target=Math.max(0,Math.min(1,fraction))*total;
@@ -91,7 +114,7 @@ public final class EdgeMatchValidation {
         return Double.NaN;
     }
 
-    static double wayLength(List<Graph.Node> shape){
+    public static double wayLength(List<Graph.Node> shape){
         double total=0;
         for(int i=0;i+1<shape.size();i++)
             total+=Geo.distance(shape.get(i).lat,shape.get(i).lon,shape.get(i+1).lat,shape.get(i+1).lon);
