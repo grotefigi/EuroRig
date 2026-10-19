@@ -21,6 +21,8 @@ import sys
 
 import valhalla
 
+OSM = str(__file__).rsplit("tools", 1)[0] + "tools/fixtures/warehouse/warehouse.osm"
+
 TRUCK = {"height": 3.89, "width": 2.55, "length": 16.5, "weight": 41.0, "axle_load": 8.0}
 
 
@@ -49,12 +51,26 @@ def trace(actor, origin, destination):
         if "error" in attributes:
             last_error = "%s: %s" % (matcher, attributes["error"][:120])
             continue
-        return [(edge.get("way_id"), edge.get("begin_heading")) for edge in attributes.get("edges", [])], matcher
+        return [{"way_id": edge.get("way_id"), "end_node": edge.get("end_node"),
+                 "begin_heading": edge.get("begin_heading")} for edge in attributes.get("edges", [])], matcher
     return None, last_error if "last_error" in locals() else "no matcher produced edges"
 
 
+def shared_nodes(osm_path, first, second):
+    """Node ids belonging to both ways, read from the authored OSM."""
+    import xml.etree.ElementTree as ElementTree
+    root = ElementTree.parse(osm_path).getroot()
+    nodes = {int(way.find("nd").get("ref")): set()
+             for way in root.findall("way")}
+    for way in root.findall("way"):
+        identifier = int(way.get("id"))
+        if identifier in (first, second):
+            nodes[identifier] = {int(nd.get("ref")) for nd in way.findall("nd")}
+    return nodes[first] & nodes[second]
+
+
 def ways_of(edges):
-    return [way for way, _ in edges]
+    return [edge["way_id"] for edge in edges]
 
 
 def consecutive(ways):
@@ -89,8 +105,17 @@ def main(config, database):
     edges, why = trace(actor, (45.0, 25.0015), (45.0008, 25.0018))
     check("route towards warehouse A gate is matched", edges is not None, why)
     if edges:
-        check("prohibited turn 2002 -> 2010 is absent",
-              (2002, 2010) not in consecutive(ways_of(edges)), ways_of(edges))
+        # Relation 3001 forbids 2002 -> via node 1003 -> 2010. trace_attributes reports each edge end
+        # as an intersection summary without way ids or OSM node ids, so the via node cannot be read
+        # from the trace. It is established from the authored topology instead: the two ways share
+        # exactly one node, so a consecutive 2002 -> 2010 pair can only be that movement.
+        forbidden = [(a["way_id"], b["way_id"]) for a, b in zip(edges, edges[1:])
+                     if a["way_id"] == 2002 and b["way_id"] == 2010]
+        check("prohibited transition 2002 -[1003]-> 2010 is absent", not forbidden,
+              forbidden or ways_of(edges))
+        check("the route reaches the gate side without the prohibited movement",
+              2010 in ways_of(edges) or 2008 in ways_of(edges) or 2009 in ways_of(edges),
+              ways_of(edges))
 
     # Both endpoints sit on the one-way way, so the engine may use it for endpoint access. This is
     # recorded as an observation, not an enforcement claim: a route that touches a one-way edge near
@@ -99,6 +124,9 @@ def main(config, database):
     edges, why = trace(actor, (45.0020, 25.0018), (45.0020, 25.0012))
     observed = ways_of(edges) if edges else []
     print("NOTE  reverse trip with both endpoints on 2006 used edges:", observed or why)
+
+    shared = shared_nodes(OSM, 2002, 2010)
+    check("ways 2002 and 2010 meet at exactly the prohibited via node 1003", shared == {1003}, shared)
 
     print("== pack evidence (what the audit can enforce) ==")
     check("way 2002 carries maxheight 3.5", "maxheight=3.5" in rules.get(2002, (0, 0, ""))[2], rules.get(2002))

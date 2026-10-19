@@ -39,6 +39,16 @@ public class ArrivalTest {
                 status.text.contains("not confirmed against property records"));
     }
 
+    @Test public void reachingTheCoordinatesNeverUpgradesAnUnverifiedApproach() {
+        // The vehicle ends exactly on the requested point, but the approach could not be evaluated:
+        // geographic arrival must not promote the certainty.
+        Arrival.Status status = Arrival.describe(LAT, LON, LAT, LON, Arrival.Certainty.UNVERIFIED);
+        assertTrue(status.reached);
+        assertEquals(Arrival.Certainty.UNVERIFIED, status.certainty);
+        assertTrue(status.text.contains("could not be verified"));
+        assertFalse(status.text.equals("Route ends at the requested destination."));
+    }
+
     @Test public void anUnevaluatedApproachSaysSo() {
         Arrival.Status status = Arrival.describe(LAT, LON, LAT, LON, Arrival.Certainty.UNVERIFIED);
         assertTrue(status.text.contains("could not be verified"));
