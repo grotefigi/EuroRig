@@ -43,7 +43,35 @@ final class Store {
     static volatile boolean navigating;
     static volatile boolean installing;
     static synchronized boolean beginInstall(){if(navigating||installing)return false;installing=true;return true;}
-    static synchronized boolean beginGuidance(){if(installing||graph==null||graph.demo||route==null||route.edges.isEmpty())return false;travelled=0;progressRoute=route;remaining=route.metres;navigating=true;arrived=false;return true;}
+    static synchronized boolean beginGuidance(){
+        if(installing||graph==null||graph.demo||route==null||route.edges.isEmpty())return false;
+        // A route audited under an authorization that has since been revoked or replaced must not
+        // start guiding: the driver withdrew the permission the audit relied on.
+        if(route.authorisationStale(authorisationRevision())){guidanceRefused="Authorization changed; recalculate the route";return false;}
+        travelled=0;progressRoute=route;remaining=route.metres;navigating=true;arrived=false;return true;
+    }
+    /** Current declaration identity, 0 when the driver has none. */
+    static long authorisationRevision(){
+        org.eurorig.routing.DestinationAuthorisation declared=destinationAuthorisation;
+        return declared==null?0:declared.revision();
+    }
+    /** Why guidance refused to start, for the driver. */
+    static volatile String guidanceRefused="";
+    /**
+     * Drops any accepted route that depended on an authorization which is no longer current. Called
+     * wherever the declaration can change, so revocation stops guidance instead of letting an
+     * already-painted route continue into property the driver has withdrawn permission for.
+     */
+    static synchronized void invalidateIfStale(){
+        if(route!=null&&route.authorisationStale(authorisationRevision())){
+            route=null;progressRoute=null;navigating=false;arrived=false;
+            guidanceRefused="Authorization changed; recalculate the route";
+        }
+    }
+    /** Revokes the driver's declaration and everything that relied on it. */
+    static synchronized void revokeAuthorisation(){
+        destinationAuthorisation=null;invalidateIfStale();
+    }
     static volatile boolean arrived;
     /** Driver-declared entrance for the current destination; null until they declare one. */
     static volatile org.eurorig.routing.DestinationAuthorisation destinationAuthorisation;

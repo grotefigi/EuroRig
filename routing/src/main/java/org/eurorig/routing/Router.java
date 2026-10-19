@@ -8,6 +8,12 @@ public final class Router {
         public final Graph graph;
         public final List<Graph.Edge> edges;
         public final double metres, seconds, restrictedMetres;
+        /**
+         * Identity of the authorization this route was audited under, or 0 for none. A route may only
+         * guide while that authorization is still the current one: revoking or expiring it must stop
+         * guidance rather than let an already-painted route continue.
+         */
+        public long authorisationRevision;
         public final double[] cumulative;
         private final SortedMap<Integer,String> maneuvers;
         Route(Graph graph, List<Graph.Edge> edges) {
@@ -26,6 +32,10 @@ public final class Router {
             metres=cumulative[edges.size()]; seconds=duration>=0?duration:s;
         }
         public boolean nativeGeometry(){return maneuvers!=null;}
+        /** True when this route relies on an authorization that is no longer the current one. */
+        public boolean authorisationStale(long currentRevision){
+            return authorisationRevision!=0&&authorisationRevision!=currentRevision;
+        }
         public String instruction(int edgeIndex) {
             if(edgeIndex>=edges.size()) return "You have arrived";
             if(maneuvers!=null)return maneuvers.getOrDefault(edgeIndex,"Continue on the route");

@@ -110,6 +110,8 @@ final class NativeRouter implements AutoCloseable {
         boolean lastAdmitted,lastUnverified;
         /** Audit verdict per traced edge, in route order, so the paint follows the audit. */
         int[] auditClasses;
+        /** Revision of the declaration this plan was audited under, 0 when none was used. */
+        long declaredRevision;
     }
 
     /**
@@ -134,6 +136,7 @@ final class NativeRouter implements AutoCloseable {
         // One snapshot for the whole calculation: every candidate audit sees the same declaration,
         // so a retry cannot use a different authorization state than the one the driver gave.
         org.eurorig.routing.DestinationAuthorisation declared=Store.destinationAuthorisation;
+        plan.declaredRevision=declared==null?0:declared.revision();
         android.util.Log.i("Declare",String.format(java.util.Locale.ROOT,
                 "%s snapshot %s originWay=%d origin=%.5f,%.5f destination=%.5f,%.5f",runId,
                 declared==null?"none":"way "+declared.approachWayId+" kind "+declared.kind
@@ -394,7 +397,10 @@ final class NativeRouter implements AutoCloseable {
             Graph graph=new Graph("Valhalla truck route","© OpenStreetMap contributors · ODbL 1.0","Installed routing snapshot",false,
                 nodes.toArray(new Graph.Node[0]),edges,Collections.emptyList());
             double seconds=leg.getJSONObject("summary").getDouble("time");
-            return new Router.Route(graph,Arrays.asList(edges),instructions,seconds,restrictedMetres);
+            Router.Route accepted=new Router.Route(graph,Arrays.asList(edges),instructions,seconds,restrictedMetres);
+            // Remember which declaration this route relied on, so revoking it can stop guidance.
+            accepted.authorisationRevision=plan.declaredRevision;
+            return accepted;
         }catch(JSONException e){throw new IllegalStateException("Invalid response from offline routing engine",e);}
         catch(Exception e){
             android.util.Log.i("RouteRun",runId+" route failed "+e.getClass().getName()+": "+e.getMessage());

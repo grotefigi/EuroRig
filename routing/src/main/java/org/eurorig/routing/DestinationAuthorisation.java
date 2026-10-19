@@ -16,6 +16,12 @@ public final class DestinationAuthorisation {
     public final long approachWayId;
     public final int kind;
     public final long grantedAtMillis;
+    /**
+     * Identity of this declaration. Each new declaration gets a fresh value, so a route audited under
+     * an earlier one can be recognised as stale even when both name the same way.
+     */
+    private static final java.util.concurrent.atomic.AtomicLong REVISIONS=new java.util.concurrent.atomic.AtomicLong();
+    private final long revision=REVISIONS.incrementAndGet();
 
     public static final int PRIVATE = 1, DELIVERY = 2;
 
@@ -30,6 +36,9 @@ public final class DestinationAuthorisation {
 
     /** Metres within which the declaration is still considered to be for the same destination. */
     public static final double SAME_DESTINATION_METRES = 25;
+
+    /** Monotonic identity of this declaration; never 0. */
+    public long revision(){return revision;}
 
     public boolean forDestination(double lat, double lon) {
         return Geo.distance(lat, lon, destinationLat, destinationLon) <= SAME_DESTINATION_METRES;

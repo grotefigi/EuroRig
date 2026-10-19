@@ -68,6 +68,11 @@ public final class NavigationService extends Service implements LocationListener
     }
     public void onLocationChanged(Location l){
         if(!Store.navigating||progress==null)return;
+        // Re-checked on every fix: an authorization revoked mid-drive must stop guidance, not merely
+        // stop being displayed.
+        if(Store.route!=null&&Store.route.authorisationStale(Store.authorisationRevision())){
+            Store.navigating=false;Store.guidance="Authorization withdrawn. Recalculate the route.";speak(Store.guidance);stopSelf();return;
+        }
         long age=SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos();
         if(!l.hasAccuracy()||l.getAccuracy()>50||age<0||age>10_000_000_000L){
             Store.guidance="GPS accuracy too low for guidance";return;

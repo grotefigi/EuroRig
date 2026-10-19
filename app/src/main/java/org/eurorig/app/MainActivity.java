@@ -148,7 +148,7 @@ public final class MainActivity extends Activity {
         if(node<0){error("That point is outside the installed map. Choose a point within "+Store.graph.name+".");return;}
         if(starting){cancelGps();Store.start=node;Store.originChosen=true;}else{
             // A declaration names one destination's entrance: picking a different destination voids it.
-            if(Store.end!=node)Store.destinationAuthorisation=null;
+            if(Store.end!=node)Store.revokeAuthorisation();
             Store.end=node;Store.destinationChosen=true;}Store.route=null;saveEndpoints();
         Graph.Node point=Store.graph.nodes[node];map.showPoint(point.lat,point.lon);refresh();
     }
@@ -331,6 +331,7 @@ public final class MainActivity extends Activity {
         ScrollView scroll=new ScrollView(this);scroll.addView(box);
         new AlertDialog.Builder(this).setTitle("Route preferences").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{
             Store.mode=RoutingMode.values()[choices.indexOfChild(choices.findViewById(choices.getCheckedRadioButtonId()))];Store.deliveryAccess=access.isChecked();Store.route=null;
+            if(Store.privateAccessPermission&&!privateAccess.isChecked())Store.revokeAuthorisation();
             Store.privateAccessPermission=privateAccess.isChecked();
             Store.showAllRestrictions=everyRestriction.isChecked();
             Store.routeOnlyRestrictions=routeOnly.isChecked();
