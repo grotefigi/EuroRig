@@ -131,6 +131,14 @@ final class NativeRouter implements AutoCloseable {
         // The road the requested origin actually stands on: egress belongs to that road, not to
         // whichever way snapping happened to put first in the route.
         long originWay=display==null?-1:display.wayAt(lat,lon,15);
+        // One snapshot for the whole calculation: every candidate audit sees the same declaration,
+        // so a retry cannot use a different authorization state than the one the driver gave.
+        org.eurorig.routing.DestinationAuthorisation declared=Store.destinationAuthorisation;
+        android.util.Log.i("Declare",String.format(java.util.Locale.ROOT,
+                "%s snapshot %s originWay=%d origin=%.5f,%.5f destination=%.5f,%.5f",runId,
+                declared==null?"none":"way "+declared.approachWayId+" kind "+declared.kind
+                        +" dest "+declared.destinationLat+","+declared.destinationLon,
+                originWay,lat,lon,endLat,endLon));
         JSONObject query=request(lat,lon,endLat,endLon,truck,mode,delivery);
         JSONArray excluded=new JSONArray();JSONObject candidate=null;
         if(seedExclusion!=null)excluded.put(new JSONObject().put("lat",seedExclusion[0]).put("lon",seedExclusion[1]));
@@ -214,9 +222,14 @@ final class NativeRouter implements AutoCloseable {
                     // happens to pass near the start be admitted while driving away from it.
                     decision=AccessPolicy.decideWithApproach(rule,truck,metresToDestination,
                             i==0&&way==originWay&&toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel,
-                            Store.destinationAuthorisation,way,privateTail[i],endLat,endLon,
+                            declared,way,privateTail[i],endLat,endLon,
                             System.currentTimeMillis());
                 }
+                if(rule!=null&&(rule.privateAccess()||rule.accessLimited()))
+                    android.util.Log.i("Declare",String.format(java.util.Locale.ROOT,
+                            "%s edge %d way %d tail=%s egress=%s rule=%s decision=%d %s",
+                            runId,i,way,privateTail[i],i==0&&way==originWay,
+                            rule.privateAccess()?"private":"access",decision.verdict,decision.reason));
                 String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null)
                         :(decision.reason.isEmpty()?null:decision.reason);
                 // An admitted edge carries an explanatory reason, but it is not a refusal: treating it as

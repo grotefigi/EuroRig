@@ -146,7 +146,10 @@ public final class MainActivity extends Activity {
     private void saveEndpoints(){Store.saveEndpoints(this);}
     private void selectedPoint(int node,boolean starting){
         if(node<0){error("That point is outside the installed map. Choose a point within "+Store.graph.name+".");return;}
-        if(starting){cancelGps();Store.start=node;Store.originChosen=true;}else{Store.end=node;Store.destinationChosen=true;}Store.route=null;saveEndpoints();
+        if(starting){cancelGps();Store.start=node;Store.originChosen=true;}else{
+            // A declaration names one destination's entrance: picking a different destination voids it.
+            if(Store.end!=node)Store.destinationAuthorisation=null;
+            Store.end=node;Store.destinationChosen=true;}Store.route=null;saveEndpoints();
         Graph.Node point=Store.graph.nodes[node];map.showPoint(point.lat,point.lon);refresh();
     }
     private void refresh(){
@@ -199,9 +202,7 @@ public final class MainActivity extends Activity {
         stats.setContentDescription(explained?"Route with restricted sections. Tap for details.":null);
         stats.setOnClickListener(explained?v->routeSectionsDialog(sections):null);
         stats.setClickable(explained);}
-        else{instruction.setText(R.string.select_destination);stats.setText(R.string.choose_destination);map.clearRoute();
-            // A declaration names one destination's entrance; changing the destination voids it.
-            Store.destinationAuthorisation=null;}
+        else{instruction.setText(R.string.select_destination);stats.setText(R.string.choose_destination);map.clearRoute();}
         map.updateGraph(Store.graph);
         if(active&&!guidanceWasActive&&fresh){map.locate(Store.lat,Store.lon);guidanceWasActive=true;}
         if(active&&fresh)map.updatePosition();else map.invalidate();
