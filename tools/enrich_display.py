@@ -9,7 +9,7 @@ import math
 import sqlite3
 from pathlib import Path
 from compile_map import restrictions, ROADS, ALLOW, BLOCKED, UNCERTAIN
-from restriction_kind import classify
+from restriction_kind import one_way, classify
 
 
 def summary(tags, kind=None):
@@ -44,7 +44,7 @@ def enrich(sources,destination):
                 tags=dict(way.tags);kind=tags.get('highway')
                 if not kind:return
                 values=summary(tags,kind)
-                if any(values[:5]) or values[5]&(BLOCKED|UNCERTAIN|2) or kind in ('track','footway','path','pedestrian','cycleway'):
+                if any(values[:5]) or values[5]&(BLOCKED|UNCERTAIN|2) or one_way(tags) or kind in ('track','footway','path','pedestrian','cycleway'):
                     rule,evidence=classify(tags,tags.get('highway'))
                     db.execute('INSERT OR IGNORE INTO road_rules VALUES(?,?,?,?,?,?,?,?,?,?)',(way.id,*values,rule,evidence))
             def node(self,node):

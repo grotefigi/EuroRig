@@ -31,8 +31,14 @@ public class AccessPolicyEligibilityTest {
     }
 
     @Test public void deliveryOnlyIsAdmittedAtTheDestinationWithPermission() {
-        AccessPolicy.Decision decision = AccessPolicy.candidateEligibility(access("delivery"), TRUCK, true, true, false);
+        AccessPolicy.Decision decision = AccessPolicy.candidateEligibility(access("delivery"), TRUCK, true, true, false, true);
         assertTrue(decision.admitted());
+    }
+
+    @Test public void aDeliveryGrantWithoutAnEstablishedApproachIsUnverified() {
+        // The permission says nothing about which yard this road serves.
+        assertEquals(AccessPolicy.UNVERIFIED,
+                AccessPolicy.candidateEligibility(access("delivery"), TRUCK, true, true, false, false).verdict);
     }
 
     @Test public void privateIsIneligibleWithoutAffirmation() {
@@ -45,7 +51,13 @@ public class AccessPolicyEligibilityTest {
     }
 
     @Test public void privateIsAdmittedAtTheDestinationWithAffirmation() {
-        assertTrue(AccessPolicy.candidateEligibility(access("private"), TRUCK, true, false, true).admitted());
+        assertTrue(AccessPolicy.candidateEligibility(access("private"), TRUCK, true, false, true, true).admitted());
+    }
+
+    @Test public void anUnrelatedPrivateRoadStaysUnverifiedEvenWithAffirmation() {
+        // Affirmation for a destination does not identify which private road serves it.
+        assertEquals(AccessPolicy.UNVERIFIED,
+                AccessPolicy.candidateEligibility(access("private"), TRUCK, true, false, true, false).verdict);
     }
 
     @Test public void affirmationCannotOverrideAHardHeightLimit() {

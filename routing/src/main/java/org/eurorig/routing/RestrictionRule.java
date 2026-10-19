@@ -57,6 +57,16 @@ public final class RestrictionRule {
     public boolean accessLimited(){return (flags&Graph.BLOCKED)!=0;}
     /** The governing access value says private property, not a public or destination road. */
     public boolean privateAccess(){return "private".equals(AccessPolicy.accessValue(tags));}
+    /**
+     * A recorded one-way. The pack stores the permitted travel direction as the direction bit, so a
+     * rule carrying one bit applies only to travel against it - see {@link #applies(int)}. Direction
+     * unknown therefore still applies, because an unverified direction must not be assumed lawful.
+     */
+    public boolean oneWay(){
+        if(tags==null)return false;
+        for(String key:tags.keySet())if(key.equals("oneway")||key.startsWith("oneway:"))return true;
+        return false;
+    }
     public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination){
         return violation(truck,permittedDelivery,metresFromDestination,false);
     }

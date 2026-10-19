@@ -17,6 +17,12 @@ HARD, ACCESS, UNCERTAIN, PREFERENCE = 1, 2, 4, 8
 # cannot disagree about which way a limit faces.
 FORWARD, BACKWARD = 16, 32
 DIRECTION_SUFFIXES = ((":forward", FORWARD), (":backward", BACKWARD), (":both_ways", 0))
+# One-way: the value names the permitted travel direction, so the prohibition faces the other.
+# "yes"/"1" means traffic runs with node order, hence the record blocks backward travel.
+ONEWAY_ALLOWED = {
+    "yes": BACKWARD, "true": BACKWARD, "1": BACKWARD,
+    "-1": FORWARD, "reverse": FORWARD,
+}
 
 NUMERIC = ("maxheight", "maxwidth", "maxlength", "maxweight", "maxaxleload", "maxbogie")
 ACCESS_KEYS = ("access", "hgv", "vehicle", "motor_vehicle", "motorcar")
@@ -64,6 +70,15 @@ def split_direction(key):
     return key, 0
 
 
+def one_way(tags):
+    """True when the tags state a one-way restriction the audit can enforce."""
+    for key, value in tags.items():
+        if key == "oneway" or key.startswith("oneway:"):
+            if str(value).strip().lower() in ONEWAY_ALLOWED:
+                return True
+    return False
+
+
 def classify(tags, highway=None):
     """Return (kind bitmask, evidence) for one element's tags."""
     kind = 0
@@ -85,6 +100,16 @@ def classify(tags, highway=None):
             # Present in the data, but not enforced: reported, never silently trusted.
             kind |= UNCERTAIN
             evidence.append(f"{key}={value}")
+        elif key == "oneway" or key.startswith("oneway:"):
+            # The recorded value states which direction traffic may run; the prohibition therefore
+            # faces the other one. BACKWARD bit = the way is one-way in node order.
+            stated = str(value).strip().lower()
+            if stated in ONEWAY_ALLOWED:
+                kind |= HARD | ONEWAY_ALLOWED[stated]
+                evidence.append(f"{key}={value}")
+            elif stated not in ("no", "false", "0"):
+                kind |= UNCERTAIN
+                evidence.append(f"{key}={value}")
         elif base in ACCESS_KEYS and str(value).lower() in ACCESS_DENY:
             kind |= ACCESS
             evidence.append(f"{key}={value}")

@@ -84,6 +84,20 @@ public final class AccessPolicy {
     public static Decision candidateEligibility(RestrictionRule rule,Truck truck,
                                                 boolean destinationEndpoint,
                                                 boolean deliveryPermitted,boolean privatePermitted){
+        return candidateEligibility(rule,truck,destinationEndpoint,deliveryPermitted,privatePermitted,false);
+    }
+
+    /**
+     * @param approachEstablished whether the caller can show that this candidate is part of the
+     *        terminal approach actually serving the requested destination. Permission flags alone
+     *        do not identify a destination, so without that evidence a private or delivery candidate
+     *        is UNVERIFIED rather than eligible: an unrelated yard next door must not become an
+     *        authorized approach.
+     */
+    public static Decision candidateEligibility(RestrictionRule rule,Truck truck,
+                                                boolean destinationEndpoint,
+                                                boolean deliveryPermitted,boolean privatePermitted,
+                                                boolean approachEstablished){
         if(rule==null)return new Decision(OK,null);
         String fatal=fatal(rule,truck);
         if(fatal!=null)return new Decision(BLOCKED,fatal);
@@ -97,14 +111,20 @@ public final class AccessPolicy {
             if("no".equals(access))return new Decision(BLOCKED,"Truck access prohibited");
             if(!GRANTS.contains(access)&&!"yes".equals(access))
                 return new Decision(BLOCKED,"Unsupported access exception");
-            if(PRIVATE.contains(access))
-                return privatePermitted&&destinationEndpoint
+            if(PRIVATE.contains(access)){
+                if(!(privatePermitted&&destinationEndpoint))
+                    return new Decision(BLOCKED,"Private road: entry authorization not established");
+                return approachEstablished
                         ?new Decision(ADMITTED_ACCESS,"Private approach to the authorized destination")
-                        :new Decision(BLOCKED,"Private road: entry authorization not established");
-            if(DESTINATION_GRANTS.contains(access))
-                return destinationEndpoint&&permitted(access,deliveryPermitted,privatePermitted,0)
+                        :new Decision(UNVERIFIED,"Approach to the requested destination not established");
+            }
+            if(DESTINATION_GRANTS.contains(access)){
+                if(!(destinationEndpoint&&permitted(access,deliveryPermitted,privatePermitted,0)))
+                    return new Decision(BLOCKED,"Delivery or destination access not authorized here");
+                return approachEstablished
                         ?new Decision(ADMITTED_ACCESS,"Delivery access to the requested destination")
-                        :new Decision(BLOCKED,"Delivery or destination access not authorized here");
+                        :new Decision(UNVERIFIED,"Approach to the requested destination not established");
+            }
         }
         return new Decision(OK,null);
     }
@@ -129,6 +149,9 @@ public final class AccessPolicy {
                                   boolean originEgress,boolean deliveryPermitted,boolean privatePermitted,int travel){
         if(rule==null)return new Decision(OK,null);
         if(!rule.applies(travel))return new Decision(OK,null);
+        // A one-way record applies exactly to travel against its recorded direction, and blocks all
+        // traffic, not just trucks: it is a road-direction prohibition, not an access exception.
+        if(rule.oneWay())return new Decision(BLOCKED,"One-way road: travel against the recorded direction");
 
         String fatal=fatal(rule,truck);
         if(fatal!=null)return new Decision(BLOCKED,fatal);

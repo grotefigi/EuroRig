@@ -1,7 +1,7 @@
 import unittest
 
 from restriction_kind import (ACCESS, BACKWARD, FORWARD, HARD, PREFERENCE, UNCERTAIN, classify, has,
-                              parse_measure, split_direction)
+                              one_way, parse_measure, split_direction)
 
 
 class ClassificationTest(unittest.TestCase):
@@ -90,6 +90,35 @@ class ClassificationTest(unittest.TestCase):
         self.assertAlmostEqual(3.5, parse_measure("3500 kg", {"kg": 0.001}))
         self.assertAlmostEqual(4.2, parse_measure("4.2m", {"m": 1.0}))
         self.assertIsNone(parse_measure("until 2027", {"t": 1.0}))
+
+    def test_oneway_yes_blocks_backward_travel(self):
+        kind, evidence = classify({"oneway": "yes"}, "residential")
+        self.assertTrue(has(kind, HARD))
+        self.assertTrue(has(kind, BACKWARD))
+        self.assertFalse(has(kind, FORWARD))
+        self.assertIn("oneway=yes", evidence)
+
+    def test_oneway_minus_one_blocks_forward_travel(self):
+        kind, _ = classify({"oneway": "-1"}, "residential")
+        self.assertTrue(has(kind, HARD))
+        self.assertTrue(has(kind, FORWARD))
+        self.assertFalse(has(kind, BACKWARD))
+
+    def test_oneway_no_is_not_a_prohibition(self):
+        kind, _ = classify({"oneway": "no"}, "residential")
+        self.assertFalse(has(kind, HARD))
+        self.assertFalse(has(kind, FORWARD) or has(kind, BACKWARD))
+
+    def test_one_way_helper_matches_the_enforced_values(self):
+        self.assertTrue(one_way({"oneway": "yes"}))
+        self.assertTrue(one_way({"oneway": "-1"}))
+        self.assertFalse(one_way({"oneway": "no"}))
+        self.assertFalse(one_way({"highway": "residential"}))
+
+    def test_unknown_oneway_value_is_uncertain_not_enforced(self):
+        kind, _ = classify({"oneway": "alternating"}, "residential")
+        self.assertTrue(has(kind, UNCERTAIN))
+        self.assertFalse(has(kind, HARD))
 
 
 if __name__ == "__main__":
