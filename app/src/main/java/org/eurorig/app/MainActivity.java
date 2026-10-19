@@ -67,7 +67,7 @@ public final class MainActivity extends Activity {
             }
         });
     }
-    protected void onResume(){super.onResume();resumed=true;main.removeCallbacks(ticker);main.post(ticker);}
+    protected void onResume(){super.onResume();resumed=true;main.removeCallbacks(ticker);main.post(ticker);resumeTracking();}
     protected void onPause(){resumed=false;main.removeCallbacks(ticker);cancelGps();super.onPause();}
     protected void onDestroy(){requestGeneration++;main.removeCallbacksAndMessages(null);if(simulating){Store.lat=Double.NaN;Store.lon=Double.NaN;}super.onDestroy();}
     public void onConfigurationChanged(android.content.res.Configuration configuration){
@@ -530,6 +530,37 @@ public final class MainActivity extends Activity {
         try{locations.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,listener,Looper.getMainLooper());main.postDelayed(()->{if(pendingGps==listener&&!acquired[0]){cancelGps();if(!isDestroyed()){refresh();error("No accurate GPS fix yet. Try again outside.");}}},20000);}
         catch(SecurityException|IllegalArgumentException e){cancelGps();error("GPS unavailable");refresh();}
     }
+    /**
+     * Keeps the position current without touching the origin or the route.
+     *
+     * <p>Leaving the app for the destination search cancels location updates, and re-acquiring with
+     * "Use GPS" clears the route. Without this a driver who searched a destination could never start
+     * guidance: the fix would be stale and the only way to refresh it would discard the route. This
+     * listener only refreshes the position; the freshness requirement at guidance start is unchanged.
+     */
+    private void resumeTracking(){
+        if(Store.graph==null||Store.graph.demo||Store.route==null||!Store.originChosen)return;
+        if(pendingGps!=null)return;
+        if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED)return;
+        LocationManager locations=getSystemService(LocationManager.class);
+        if(!locationAvailable(locations))return;
+        LocationListener listener=new LocationListener(){
+            public void onLocationChanged(Location l){
+                if(isDestroyed()||pendingGps!=this)return;
+                long age=SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos();
+                if(!l.hasAccuracy()||l.getAccuracy()>50||age<0||age>10_000_000_000L)return;
+                Store.lat=l.getLatitude();Store.lon=l.getLongitude();
+                Store.fixTime=SystemClock.elapsedRealtime()-age/1_000_000;
+                if(l.hasBearing()&&l.hasSpeed()&&l.getSpeed()>=1)Store.bearing=l.getBearing();
+                map.updatePosition();
+            }
+            public void onProviderEnabled(String p){}public void onProviderDisabled(String p){}public void onStatusChanged(String p,int s,Bundle b){}
+        };
+        pendingGps=listener;
+        try{locations.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,listener,Looper.getMainLooper());}
+        catch(SecurityException|IllegalArgumentException e){pendingGps=null;}
+    }
+
     private void cancelGps(){if(pendingGps!=null){getSystemService(LocationManager.class).removeUpdates(pendingGps);pendingGps=null;}if(gpsAcquiring)busy=false;gpsAcquiring=false;}
     private void saveFavourite(int n){
         Graph.Node p=Store.graph.nodes[n];String value=p.lat+","+p.lon+"|"+label(n);

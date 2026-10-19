@@ -12,9 +12,12 @@ import org.junit.Test;
 
 /**
  * A region is a driver's offline map. Retention must never treat "not selected right now" as
- * "safe to delete" - doing so destroyed a 1.3 GB installed map when a test switched region.
+ * "safe to delete" - doing so destroyed a 1.3 GB installed map when a test switched region - and must
+ * never erase partial data that could still be recovered.
  */
 public class RegionRetentionTest {
+    private static final String ACTIVE = "d6656562-aceb-456c-9769-9f38dce3d23e";
+
     private static File folder(File root, String name) throws IOException {
         File dir = new File(root, name);
         assertTrue(dir.mkdirs());
@@ -38,13 +41,6 @@ public class RegionRetentionTest {
         assertTrue(RegionRetention.complete(completeRegion(root, "11111111-2222-3333-4444-555555555555")));
     }
 
-    @Test public void anInterruptedInstallationIsNotComplete() throws IOException {
-        File root = Files.createTempDirectory("regions").toFile();
-        File dir = folder(root, "22222222-2222-3333-4444-555555555555");
-        write(dir, "routing.tar", 64); // no manifest, no display map yet
-        assertFalse(RegionRetention.complete(dir));
-    }
-
     @Test public void anEmptyFileDoesNotCountAsInstalled() throws IOException {
         File root = Files.createTempDirectory("regions").toFile();
         File dir = folder(root, "33333333-2222-3333-4444-555555555555");
@@ -54,30 +50,70 @@ public class RegionRetentionTest {
         assertFalse("a zero-length manifest is a failed download", RegionRetention.complete(dir));
     }
 
-    @Test public void onlyInterruptedInstallationsAreStale() throws IOException {
+    @Test public void completeRegionsAreNeverInThePlan() throws IOException {
         File root = Files.createTempDirectory("regions").toFile();
-        File kept = completeRegion(root, "d6656562-aceb-456c-9769-9f38dce3d23e");
-        File other = completeRegion(root, "11111111-2222-3333-4444-555555555555");
-        File broken = folder(root, "44444444-2222-3333-4444-555555555555");
-        write(broken, "manifest.json", 32);
+        completeRegion(root, ACTIVE);
+        completeRegion(root, "11111111-2222-3333-4444-555555555555");
 
-        List<File> stale = RegionRetention.incomplete(root);
+        RegionRetention.Plan plan = RegionRetention.plan(root, ACTIVE);
 
-        assertEquals(1, stale.size());
-        assertEquals(broken.getName(), stale.get(0).getName());
-        assertFalse("a complete unselected region is not stale", stale.contains(kept));
-        assertFalse("nor is a complete selected one", stale.contains(other));
+        assertTrue("neither the active nor an inactive complete region is touched", plan.isEmpty());
+    }
+
+    @Test public void theActiveRegionIsNeverTouchedEvenWhenIncomplete() throws IOException {
+        File root = Files.createTempDirectory("regions").toFile();
+        File active = folder(root, ACTIVE);
+        write(active, "manifest.json", 32); // mid-import
+
+        assertTrue("an import in progress is not cleanup's business", RegionRetention.plan(root, ACTIVE).isEmpty());
+    }
+
+    @Test public void aPartialRegionIsQuarantinedNotDeleted() throws IOException {
+        File root = Files.createTempDirectory("regions").toFile();
+        File partial = folder(root, "44444444-2222-3333-4444-555555555555");
+        write(partial, "routing.tar", 4096); // 4 KB of a download that stopped
+
+        RegionRetention.Plan plan = RegionRetention.plan(root, ACTIVE);
+
+        assertTrue("recoverable bytes are not erased", plan.delete.isEmpty());
+        assertEquals(1, plan.quarantine.size());
+        assertEquals(partial.getName(), plan.quarantine.get(0).getName());
+    }
+
+    @Test public void onlyAFolderWithNoDataAtAllIsDeleted() throws IOException {
+        File root = Files.createTempDirectory("regions").toFile();
+        File abandoned = folder(root, "55555555-2222-3333-4444-555555555555");
+
+        RegionRetention.Plan plan = RegionRetention.plan(root, ACTIVE);
+
+        assertEquals(1, plan.delete.size());
+        assertEquals(abandoned.getName(), plan.delete.get(0).getName());
+        assertTrue(plan.quarantine.isEmpty());
+    }
+
+    @Test public void quarantinedFoldersAreNoLongerRegionIds() throws IOException {
+        File root = Files.createTempDirectory("regions").toFile();
+        File partial = folder(root, "66666666-2222-3333-4444-555555555555");
+        write(partial, "routing.tar", 16);
+
+        File target = RegionRetention.quarantineName(partial);
+
+        assertFalse("a quarantined folder must not look like an installed region",
+                target.getName().matches("[0-9a-f-]{36}"));
+        assertTrue(target.getName().startsWith(RegionRetention.QUARANTINE_PREFIX));
     }
 
     @Test public void nonRegionFoldersAreLeftAlone() throws IOException {
         File root = Files.createTempDirectory("regions").toFile();
         File notes = folder(root, "notes");
-        assertTrue(RegionRetention.incomplete(root).isEmpty());
+        write(notes, "todo.txt", 8);
+
+        assertTrue(RegionRetention.plan(root, ACTIVE).isEmpty());
         assertTrue("an unrelated folder is not ours to delete", notes.isDirectory());
     }
 
     @Test public void aMissingRootIsNotAnError() {
-        assertTrue(RegionRetention.incomplete(new File("does/not/exist")).isEmpty());
-        assertTrue(RegionRetention.incomplete(null).isEmpty());
+        assertTrue(RegionRetention.plan(new File("does/not/exist"), ACTIVE).isEmpty());
+        assertTrue(RegionRetention.plan(null, ACTIVE).isEmpty());
     }
 }

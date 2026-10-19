@@ -19,7 +19,15 @@ final class RegionPackages {
      * driver already had and forced a full re-download.
      */
     static void cleanupStale(Context c){
-        for(File folder:org.eurorig.routing.RegionRetention.incomplete(new File(c.getFilesDir(),"regions")))cleanup(folder);
+        String active=c.getSharedPreferences("settings",0).getString("region","");
+        org.eurorig.routing.RegionRetention.Plan plan=
+                org.eurorig.routing.RegionRetention.plan(new File(c.getFilesDir(),"regions"),active);
+        for(File folder:plan.delete)cleanup(folder);
+        // Partial installations keep their bytes: rename so they are ignored, never erase them.
+        for(File folder:plan.quarantine){
+            File target=org.eurorig.routing.RegionRetention.quarantineName(folder);
+            if(!folder.renameTo(target))android.util.Log.w("Region","Could not quarantine "+folder.getName());
+        }
     }
     static Graph install(Context c,InputStream source) throws IOException {
         File dir=create(c);Set<String> seen=new HashSet<>();
@@ -73,10 +81,11 @@ final class RegionPackages {
             if(!c.getSharedPreferences("settings",0).edit().putBoolean("native",true).putString("region",dir.getName()).commit())throw new IOException("Could not save region selection");
             if(Store.nativeRouter!=null)Store.nativeRouter.close();Store.nativeRouter=candidate;candidate=null;
             if(Store.display!=null)Store.display.close();Store.display=candidateDisplay;candidateDisplay=null;
-            // The previously selected region is kept unless it is a partial installation.
-            if(old.matches("[0-9a-f-]{36}")){
+            // The previously selected region is always kept: a driver switching country must not lose
+            // the map already installed. Only a folder that never held any data is removed.
+            if(old.matches("[0-9a-f-]{36}")&&!old.equals(dir.getName())){
                 File previous=new File(c.getFilesDir(),"regions/"+old);
-                if(!org.eurorig.routing.RegionRetention.complete(previous))cleanup(previous);
+                if(org.eurorig.routing.RegionRetention.empty(previous))cleanup(previous);
             }
             return graph;
         }catch(JSONException|NoSuchAlgorithmException e){throw new IOException("Invalid region manifest",e);}
