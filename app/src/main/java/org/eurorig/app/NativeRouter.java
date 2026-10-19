@@ -157,16 +157,12 @@ final class NativeRouter implements AutoCloseable {
                 // cannot be read the record stays conservative for both directions.
                 int travel=RestrictionRule.DIR_UNKNOWN;
                 if(rule!=null&&(rule.directional()||rule.oneWay())&&display!=null){
-                    double wayBearing=display.wayBearing(way,point.lat,point.lon);
-                    if(Double.isFinite(wayBearing)){
-                        double heading=Geo.bearing(geometry.get(begin),geometry.get(Math.min(end,begin+1)));
-                        travel=Directions.travel(heading,wayBearing);
-                        android.util.Log.i("Direction",String.format(java.util.Locale.ROOT,
-                                "way %d travel %s heading %.0f way %.0f",way,
-                                travel==RestrictionRule.DIR_FORWARD?"forward"
-                                        :travel==RestrictionRule.DIR_BACKWARD?"backward":"unknown",
-                                heading,wayBearing));
-                    }else android.util.Log.i("Direction","way "+way+" geometry unavailable: applying both ways");
+                    double heading=Geo.bearing(geometry.get(begin),geometry.get(Math.min(end,begin+1)));
+                    travel=Directions.travelAt(display.wayShape(way),point.lat,point.lon,heading);
+                    android.util.Log.i("Direction",String.format(java.util.Locale.ROOT,
+                            "way %d travel %s heading %.0f",way,
+                            travel==RestrictionRule.DIR_FORWARD?"forward"
+                                    :travel==RestrictionRule.DIR_BACKWARD?"backward":"unknown",heading));
                 }
                 AccessPolicy.Decision decision;
                 if(rule!=null&&rule.privateAccess()&&!privateTail[i]){

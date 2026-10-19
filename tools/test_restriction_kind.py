@@ -120,6 +120,28 @@ class ClassificationTest(unittest.TestCase):
         self.assertTrue(has(kind, UNCERTAIN))
         self.assertFalse(has(kind, HARD))
 
+    def test_a_truck_exemption_suppresses_the_general_oneway(self):
+        # oneway=yes for everyone, but hgv may go both ways: nothing for a truck audit to enforce.
+        kind, _ = classify({"oneway": "yes", "oneway:hgv": "no"}, "residential")
+        self.assertFalse(has(kind, HARD))
+        self.assertFalse(has(kind, FORWARD) or has(kind, BACKWARD))
+
+    def test_conflicting_oneway_values_stay_uncertain(self):
+        kind, evidence = classify({"oneway": "yes", "oneway:hgv": "-1"}, "residential")
+        self.assertTrue(has(kind, UNCERTAIN))
+        self.assertFalse(has(kind, HARD))
+        self.assertIn("conflict", evidence)
+
+    def test_agreeing_general_and_truck_oneway_is_enforced_once(self):
+        kind, _ = classify({"oneway": "yes", "oneway:hgv": "yes"}, "residential")
+        self.assertTrue(has(kind, HARD))
+        self.assertTrue(has(kind, BACKWARD))
+
+    def test_two_truck_scoped_oneways_that_disagree_are_uncertain(self):
+        kind, _ = classify({"oneway:hgv": "yes", "oneway:motorcar": "-1"}, "residential")
+        self.assertTrue(has(kind, UNCERTAIN))
+        self.assertFalse(has(kind, HARD))
+
 
 if __name__ == "__main__":
     unittest.main()

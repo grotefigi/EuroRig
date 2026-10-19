@@ -23,6 +23,7 @@ ONEWAY_ALLOWED = {
     "yes": BACKWARD, "true": BACKWARD, "1": BACKWARD,
     "-1": FORWARD, "reverse": FORWARD,
 }
+BIDIRECTIONAL = {"no", "false", "0"}
 
 NUMERIC = ("maxheight", "maxwidth", "maxlength", "maxweight", "maxaxleload", "maxbogie")
 ACCESS_KEYS = ("access", "hgv", "vehicle", "motor_vehicle", "motorcar")
@@ -72,11 +73,41 @@ def split_direction(key):
 
 def one_way(tags):
     """True when the tags state a one-way restriction the audit can enforce."""
+    return _oneway_kind(tags)[0] != 0
+
+
+def _oneway_kind(tags):
+    """Resolve the oneway tags to (kind bits, evidence).
+
+    A truck-specific value outranks the general one, because the audit decides for a truck: if
+    oneway:hgv says the exemption applies, a general oneway=yes must not be turned into a truck
+    prohibition. Two values that disagree leave the way UNCERTAIN rather than silently picking one.
+    """
+    general = None
+    specific = None
     for key, value in tags.items():
-        if key == "oneway" or key.startswith("oneway:"):
-            if str(value).strip().lower() in ONEWAY_ALLOWED:
-                return True
-    return False
+        stated = str(value).strip().lower()
+        if key == "oneway":
+            general = stated
+        elif key.startswith("oneway:"):
+            specific = stated if specific is None else "conflict"
+    states = [s for s in (general, specific) if s is not None]
+    if not states:
+        return 0, []
+    if "conflict" in states:
+        return UNCERTAIN, ["oneway conflict: " + ",".join(f"{k}={v}" for k, v in tags.items() if k.startswith("oneway"))]
+    if specific is not None and specific in BIDIRECTIONAL:
+        # The truck exemption wins: nothing for this audit to enforce.
+        return 0, []
+    allowed = [s for s in states if s in ONEWAY_ALLOWED]
+    if not allowed:
+        if all(s in BIDIRECTIONAL for s in states):
+            return 0, []
+        return UNCERTAIN, ["oneway=" + ",".join(states)]
+    bits = {ONEWAY_ALLOWED[s] for s in allowed}
+    if len(bits) > 1:
+        return UNCERTAIN, ["oneway conflict: " + ",".join(states)]
+    return HARD | bits.pop(), ["oneway=" + allowed[0]]
 
 
 def classify(tags, highway=None):
@@ -101,15 +132,8 @@ def classify(tags, highway=None):
             kind |= UNCERTAIN
             evidence.append(f"{key}={value}")
         elif key == "oneway" or key.startswith("oneway:"):
-            # The recorded value states which direction traffic may run; the prohibition therefore
-            # faces the other one. BACKWARD bit = the way is one-way in node order.
-            stated = str(value).strip().lower()
-            if stated in ONEWAY_ALLOWED:
-                kind |= HARD | ONEWAY_ALLOWED[stated]
-                evidence.append(f"{key}={value}")
-            elif stated not in ("no", "false", "0"):
-                kind |= UNCERTAIN
-                evidence.append(f"{key}={value}")
+            # Resolved once, after the loop, so a general and a truck-specific value cannot fight.
+            continue
         elif base in ACCESS_KEYS and str(value).lower() in ACCESS_DENY:
             kind |= ACCESS
             evidence.append(f"{key}={value}")
@@ -123,6 +147,9 @@ def classify(tags, highway=None):
     # direction. The numeric columns hold one scalar per dimension (the smallest of both
     # directions), so mixed evidence cannot be represented exactly; those records stay
     # conservative and apply both ways instead of silently waiving one of them.
+    oneway_kind, oneway_evidence = _oneway_kind(tags)
+    kind |= oneway_kind
+    evidence.extend(oneway_evidence)
     if directions and not undirected and len(directions) == 1:
         kind |= directions.pop()
     if highway is not None and highway in UNSUITABLE:
