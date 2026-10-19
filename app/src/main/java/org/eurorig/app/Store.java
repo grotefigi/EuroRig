@@ -50,11 +50,24 @@ final class Store {
         if(route.authorisationStale(authorisationRevision())){guidanceRefused="Authorization changed; recalculate the route";return false;}
         travelled=0;progressRoute=route;remaining=route.metres;navigating=true;arrived=false;return true;
     }
-    /** Current declaration identity, 0 when the driver has none. */
+    /**
+     * Current declaration identity, or 0 when the driver has none <em>or it has expired</em>.
+     *
+     * <p>Expiry is a wall-clock fact, not a revision change: nobody presses a button when time runs
+     * out, so the check has to consult the clock. Folding it in here means every consumer - guidance
+     * start, the navigation loop and the invalidation helper - treats an expired declaration exactly
+     * like a revoked one, with no second code path to forget.
+     */
     static long authorisationRevision(){
         org.eurorig.routing.DestinationAuthorisation declared=destinationAuthorisation;
-        return declared==null?0:declared.revision();
+        if(declared==null)return 0;
+        return declared.current(System.currentTimeMillis())?declared.revision():0;
     }
+    /**
+     * Stops a running guidance session immediately. Set by NavigationService while it runs, so
+     * revocation does not have to wait for the next GPS fix - which may not come for minutes.
+     */
+    static volatile Runnable guidanceStopper;
     /** Why guidance refused to start, for the driver. */
     static volatile String guidanceRefused="";
     /**
@@ -64,8 +77,13 @@ final class Store {
      */
     static synchronized void invalidateIfStale(){
         if(route!=null&&route.authorisationStale(authorisationRevision())){
-            route=null;progressRoute=null;navigating=false;arrived=false;
+            route=null;progressRoute=null;arrived=false;
             guidanceRefused="Authorization changed; recalculate the route";
+            if(navigating){
+                navigating=false;
+                Runnable stopper=guidanceStopper;
+                if(stopper!=null)stopper.run();
+            }
         }
     }
     /** Revokes the driver's declaration and everything that relied on it. */

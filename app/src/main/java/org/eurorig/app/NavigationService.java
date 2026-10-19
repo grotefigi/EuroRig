@@ -45,19 +45,34 @@ public final class NavigationService extends Service implements LocationListener
         });
     }
     public int onStartCommand(Intent intent,int flags,int id){
-        if(intent!=null && "STOP".equals(intent.getAction())) {stopSelf();return START_NOT_STICKY;}
+        if(intent!=null && "STOP".equals(intent.getAction())) {Store.guidanceStopper=null;stopSelf();return START_NOT_STICKY;}
         if(intent!=null && "MUTE".equals(intent.getAction())) {if(speech!=null)speech.stop();return START_NOT_STICKY;}
         if(checkSelfPermission(Manifest.permission.ACCESS_FINE_LOCATION)!=PackageManager.PERMISSION_GRANTED || !Store.beginGuidance()){
             stopSelf();return START_NOT_STICKY;
         }
         startForeground(1,notification("Waiting for a fresh GPS fix"));
+        // Revocation must stop guidance at once, not at the next fix: a fix may be minutes away.
+        Store.guidanceStopper=this::stopForAuthorisation;
         progress=new Progress(Store.route);
         lastFix=SystemClock.elapsedRealtime();main.removeCallbacks(watchdog);main.postDelayed(watchdog,5000);
+        main.removeCallbacks(authorisationCheck);main.postDelayed(authorisationCheck,1000);
         Store.guidance="Waiting for a fresh GPS fix";
         try {
             locations.requestLocationUpdates(LocationManager.GPS_PROVIDER,1000,0,this);
         } catch(SecurityException|IllegalArgumentException e) {Store.guidance="GPS unavailable: check location settings";stopSelf();}
         return START_NOT_STICKY;
+    }
+    /** Expiry is a clock fact: re-checked on a timer so a gap in GPS cannot extend a stale route. */
+    private final Runnable authorisationCheck=new Runnable(){
+        public void run(){
+            if(!Store.navigating)return;
+            if(Store.route!=null&&Store.route.authorisationStale(Store.authorisationRevision()))stopForAuthorisation();
+            else main.postDelayed(this,1000);
+        }
+    };
+    private void stopForAuthorisation(){
+        Store.navigating=false;Store.guidance="Authorization withdrawn. Recalculate the route.";
+        speak(Store.guidance);stopSelf();
     }
     private Notification notification(String text){
         PendingIntent open=PendingIntent.getActivity(this,0,new Intent(this,MainActivity.class),PendingIntent.FLAG_IMMUTABLE|PendingIntent.FLAG_UPDATE_CURRENT);
@@ -71,7 +86,7 @@ public final class NavigationService extends Service implements LocationListener
         // Re-checked on every fix: an authorization revoked mid-drive must stop guidance, not merely
         // stop being displayed.
         if(Store.route!=null&&Store.route.authorisationStale(Store.authorisationRevision())){
-            Store.navigating=false;Store.guidance="Authorization withdrawn. Recalculate the route.";speak(Store.guidance);stopSelf();return;
+            stopForAuthorisation();return;
         }
         long age=SystemClock.elapsedRealtimeNanos()-l.getElapsedRealtimeNanos();
         if(!l.hasAccuracy()||l.getAccuracy()>50||age<0||age>10_000_000_000L){
