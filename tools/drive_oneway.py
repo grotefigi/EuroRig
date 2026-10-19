@@ -118,7 +118,9 @@ def main():
     pairs = endpoints()
     # A scenario must assert the direction it intends to test, otherwise a run can silently repeat
     # the opposite direction and still look like a pass.
-    heading = ('EAST' if float(tlon) > float(flon) else 'WEST') if flon != tlon else               ('NORTH' if float(tlat) > float(flat) else 'SOUTH')
+    dlat = (float(tlat) - float(flat)) * 111320.0
+    dlon = (float(tlon) - float(flon)) * 111320.0 * 0.7071   # cos(45 deg) for this fixture
+    heading = ('NORTH' if dlat > 0 else 'SOUTH') if abs(dlat) >= abs(dlon) else               ('EAST' if dlon > 0 else 'WEST')
     print('endpoints:', pairs, 'direction:', heading, 'expected:', expected or '(unchecked)')
     if expected and heading != expected:
         print('ABORT: direction', heading, 'does not match the expected', expected)

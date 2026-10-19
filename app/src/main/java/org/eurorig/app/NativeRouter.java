@@ -205,7 +205,9 @@ final class NativeRouter implements AutoCloseable {
                 }
                 String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null)
                         :(decision.reason.isEmpty()?null:decision.reason);
-                if(reason!=null){
+                // An admitted edge carries an explanatory reason, but it is not a refusal: treating it as
+                // one made every delivery/private approach impossible to accept.
+                if(reason!=null&&!decision.admitted()){
                     if(decision.blocked()&&rule!=null&&rule.hard(truck)){
                         // Reported so the endpoint can be moved. Never excluded, never accepted.
                         failure=reason;plan.failedWay=way;
