@@ -49,11 +49,27 @@ public final class AccessPolicy {
         /** Empty when the verdict is OK; otherwise the text the driver is shown. */
         public final String reason;
         Decision(int verdict,String reason){this.verdict=verdict;this.reason=reason==null?"":reason;}
+        /** A refusal decided outside the policy (e.g. a private road used mid-route). */
+        public static Decision blocked(String reason){return new Decision(BLOCKED,reason);}
         public boolean blocked(){return verdict==BLOCKED;}
         public boolean unverified(){return verdict==UNVERIFIED;}
         /** Admitted restricted travel: counts towards the route's restricted distance. */
         public boolean admitted(){return verdict==ADMITTED_ACCESS;}
         public boolean ok(){return verdict==OK;}
+    }
+
+    /**
+     * Marks the contiguous run of private edges at the END of a candidate route: the only private
+     * travel that can be a destination approach. A private road used anywhere earlier is a
+     * shortcut through somebody else's property, however close it passes to the destination.
+     */
+    public static boolean[] finalApproach(java.util.List<RestrictionRule> rulesByEdge){
+        boolean[] tail=new boolean[rulesByEdge.size()];
+        for(int i=rulesByEdge.size()-1;i>=0;i--){
+            RestrictionRule rule=rulesByEdge.get(i);
+            if(rule!=null&&rule.privateAccess())tail[i]=true;else break;
+        }
+        return tail;
     }
 
     private AccessPolicy(){}

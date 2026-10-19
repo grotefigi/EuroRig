@@ -21,6 +21,9 @@
   <node id="1010" lat="44.9975" lon="25.0050"/>
   <!-- warehouse C, public service road -->
   <node id="1011" lat="45.0028" lon="25.0010"/>
+  <!-- private lane parallel to the low bridge: a shortcut only a policy layer can refuse -->
+  <node id="1012" lat="45.0004" lon="25.0013"/>
+  <node id="1013" lat="45.0004" lon="25.0017"/>
 
   <way id="2001">
     <nd ref="1001"/><nd ref="1002"/>
@@ -71,4 +74,24 @@
     <nd ref="1006"/><nd ref="1011"/>
     <tag k="highway" v="service"/><tag k="name" v="Warehouse C Yard"/>
   </way>
+  <way id="2013">
+    <nd ref="1002"/><nd ref="1012"/>
+    <tag k="highway" v="service"/><tag k="name" v="Private Lane West"/><tag k="access" v="private"/>
+  </way>
+  <way id="2014">
+    <nd ref="1012"/><nd ref="1013"/>
+    <tag k="highway" v="service"/><tag k="name" v="Private Lane"/><tag k="access" v="private"/>
+  </way>
+  <way id="2015">
+    <nd ref="1013"/><nd ref="1003"/>
+    <tag k="highway" v="service"/><tag k="name" v="Private Lane East"/><tag k="access" v="private"/>
+  </way>
+  <!-- banned left turn from the low bridge into warehouse A's east gate -->
+  <relation id="3001">
+    <member type="way" ref="2002" role="from"/>
+    <member type="node" ref="1003" role="via"/>
+    <member type="way" ref="2010" role="to"/>
+    <tag k="type" v="restriction"/>
+    <tag k="restriction" v="no_left_turn"/>
+  </relation>
 </osm>

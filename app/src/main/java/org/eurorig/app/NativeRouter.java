@@ -125,6 +125,10 @@ final class NativeRouter implements AutoCloseable {
             HashSet<Long> ways=new HashSet<>();for(int i=0;i<traced.length();i++)ways.add(traced.getJSONObject(i).getLong("way_id"));
             Map<Long,RestrictionRule> rules=display.rulesFor(ways);
             plan.ways=auditedWays(traced,geometry.size());plan.rules=rules;
+            // Private travel is only an approach when it is the route's final run of edges.
+            java.util.List<RestrictionRule> byEdge=new java.util.ArrayList<>(traced.length());
+            for(int i=0;i<traced.length();i++)byEdge.add(rules.get(traced.getJSONObject(i).getLong("way_id")));
+            boolean[] privateTail=AccessPolicy.finalApproach(byEdge);
             boolean rejected=false,originHard=false,destinationHard=false;double restricted=0;
             Set<String> notes=new TreeSet<>();String failure=plan.failure;
             for(int i=0;i<traced.length();i++){
@@ -149,7 +153,14 @@ final class NativeRouter implements AutoCloseable {
                                 travel==RestrictionRule.DIR_FORWARD?"forward":"backward",heading,wayBearing));
                     }else android.util.Log.i("Direction","way "+way+" geometry unavailable: applying both ways");
                 }
-                AccessPolicy.Decision decision=AccessPolicy.decide(rule,truck,metresToDestination,toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel);
+                AccessPolicy.Decision decision;
+                if(rule!=null&&rule.privateAccess()&&!privateTail[i]){
+                    // Mid-route private travel is a shortcut through property this trip has no
+                    // authorization for, however close it passes to the destination.
+                    decision=AccessPolicy.Decision.blocked("Private road is not the destination approach");
+                }else{
+                    decision=AccessPolicy.decide(rule,truck,metresToDestination,toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel);
+                }
                 String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null)
                         :(decision.reason.isEmpty()?null:decision.reason);
                 if(reason!=null){
@@ -162,6 +173,9 @@ final class NativeRouter implements AutoCloseable {
                     // Uncertainty is surfaced, never routed as a prohibition (RR-04).
                     if(decision.unverified()){notes.add(reason);continue;}
                     failure=reason;
+                    android.util.Log.i("Audit",String.format(java.util.Locale.ROOT,
+                            "attempt %d rejected at way %d (%.0f m to destination): %s",
+                            attempt+1,way,metresToDestination,reason));
                     excluded.put(new JSONObject().put("lat",point.lat).put("lon",point.lon));
                     rejected=true;break;
                 }

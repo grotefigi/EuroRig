@@ -55,6 +55,8 @@ public final class RestrictionRule {
      */
     public boolean uncertainOnly(){return kind!=0&&(kind&(HARD|ACCESS))==0&&(kind&UNCERTAIN)!=0;}
     public boolean accessLimited(){return (flags&Graph.BLOCKED)!=0;}
+    /** The governing access value says private property, not a public or destination road. */
+    public boolean privateAccess(){return "private".equals(AccessPolicy.accessValue(tags));}
     public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination){
         return violation(truck,permittedDelivery,metresFromDestination,false);
     }
