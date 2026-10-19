@@ -140,35 +140,62 @@ final class DisplayDatabase implements AutoCloseable {
      * the endpoint destroys it and produces a fabricated "no path".
      */
     synchronized double[] legalAccessPoint(double lat,double lon,Truck truck,double radius,Set<Long> skip){
+        android.util.Log.i("AccessPoint",String.format(java.util.Locale.ROOT,
+                "request %.5f,%.5f evidence=%s skip=%s",lat,lon,restrictionEvidence,skip));
         if(!restrictionEvidence)return null;
         double dLat=radius/111320.0,dLon=radius/(111320.0*Math.max(.2,Math.cos(Math.toRadians(lat))));
         String[] args={""+(lat-dLat),""+(lat+dLat),""+(lon-dLon),""+(lon+dLon)};
-        HashMap<Long,double[]> nearest=new HashMap<>();HashMap<Long,Integer> levels=new HashMap<>();
+        // Overlap test: a way only has to reach into the search box, not enclose it.
+        LinkedHashMap<Long,double[]> nearest=new LinkedHashMap<>();
+        HashMap<Long,Integer> levels=new HashMap<>();
         try(Cursor rows=database.rawQuery("SELECT id,level,shape FROM roads WHERE north>=? AND south<=? AND east>=? AND west<=? LIMIT 800",args)){
             while(rows.moveToNext()){
                 long id=rows.getLong(0);int level=rows.getInt(1);
-                for(Graph.Node point:NativeRouter.decode(rows.getString(2))){
-                    double distance=Geo.distance(point.lat,point.lon,lat,lon);
-                    if(distance>radius)continue;
-                    double[] current=nearest.get(id);
-                    if(current==null||distance<current[0]){nearest.put(id,new double[]{distance,point.lat,point.lon});levels.put(id,level);}
+                List<Graph.Node> shape=NativeRouter.decode(rows.getString(2));
+                double best=Double.MAX_VALUE;double[] point=null;
+                // Distance to the road itself, not to its recorded vertices: vertex spacing can make a
+                // far road look near or a near road look far.
+                for(int i=0;i+1<shape.size();i++){
+                    Graph.Node a=shape.get(i),b=shape.get(i+1);
+                    double[] projection=Geo.project(lat,lon,a,b);
+                    if(projection[1]<best){
+                        best=projection[1];
+                        point=new double[]{a.lat+(b.lat-a.lat)*projection[0],a.lon+(b.lon-a.lon)*projection[0]};
+                    }
                 }
+                if(point==null||best>radius)continue;
+                nearest.put(id,new double[]{best,point[0],point[1]});
+                levels.put(id,level);
             }
         }
-        double[] chosen=null;
+        ArrayList<AccessPointChoice.Candidate> candidates=new ArrayList<>();
+        HashMap<Long,Double> metres=new HashMap<>();
+        HashMap<Long,double[]> points=new HashMap<>();
+        Map<Long,RestrictionRule> rules=rulesFor(nearest.keySet());
+        StringBuilder detail=new StringBuilder();
         for(Map.Entry<Long,double[]> entry:nearest.entrySet()){
-            if(skip!=null&&skip.contains(entry.getKey()))continue;
             double[] candidate=entry.getValue();
+            boolean skipped=skip!=null&&skip.contains(entry.getKey());
             // The requested point itself is not an alternative access point.
-            if(candidate[0]<=1.0)continue;
-            // Prefer the road a truck would actually use: a minor track 3 m away is no substitute.
-            double score=candidate[0]+(levels.get(entry.getKey())>3?radius:0);
-            if(chosen!=null&&score>=chosen[0])continue;
-            RestrictionRule rule=rulesFor(Collections.singleton(entry.getKey())).get(entry.getKey());
-            if(rule!=null&&rule.hard(truck))continue;
-            chosen=new double[]{score,candidate[1],candidate[2]};
+            boolean same=candidate[0]<=1.0;
+            RestrictionRule rule=rules.get(entry.getKey());
+            boolean hard=rule!=null&&rule.hard(truck);
+            candidates.add(new AccessPointChoice.Candidate(entry.getKey(),candidate[0],
+                    levels.get(entry.getKey()),hard||same||skipped));
+            metres.put(entry.getKey(),candidate[0]);
+            points.put(entry.getKey(),new double[]{candidate[1],candidate[2]});
+            detail.append(String.format(java.util.Locale.ROOT,"%s%d@%.0fm/l%d%s ",
+                    skipped?"skipped:":"",entry.getKey(),candidate[0],levels.get(entry.getKey()),
+                    hard?"/HARD":""));
         }
-        return chosen==null?null:new double[]{chosen[1],chosen[2]};
+        AccessPointChoice.Candidate chosen=AccessPointChoice.choose(candidates);
+        android.util.Log.i("AccessPoint",String.format(java.util.Locale.ROOT,
+                "search %.5f,%.5f r=%.0f candidates=%d chosen=%s | %s",
+                lat,lon,radius,candidates.size(),chosen==null?"none":chosen.way+"@"+(int)chosen.metres+"m",
+                detail.length()>600?detail.substring(0,600):detail.toString()));
+        if(chosen==null)return null;
+        double[] point=points.get(chosen.way);
+        return point==null?null:new double[]{point[0],point[1]};
     }
     /**
      * Geometry of one recorded way, in OSM node order (cached). Used to verify that a matched edge

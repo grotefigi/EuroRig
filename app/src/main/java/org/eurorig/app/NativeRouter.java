@@ -257,11 +257,11 @@ final class NativeRouter implements AutoCloseable {
                         finish=alternative;moved=true;
                     }
                 }
-                if(!moved)throw new IllegalStateException(plan.failure+" - no other road this truck may use within "+(int)ENDPOINT_METRES+" m of the requested point");
+                if(!moved)throw new IllegalStateException(plan.failure+". No verified alternative access point found within the "+(int)ENDPOINT_METRES+" m search limit.");
             }
             if(plan==null||plan.response==null)throw new IllegalStateException(plan==null?"No truck route"
-                    :"No verified truck route found. "+plan.failure+". Alternative approaches within "
-                    +(int)ENDPOINT_METRES+" m of the requested point were unsuccessful.");
+                    :plan.failure+". No verified alternative access point found within the "
+                    +(int)ENDPOINT_METRES+" m search limit.");
             // Delivery access is minimised, not merely granted: one bounded attempt at another entry,
             // accepted only when the alternative still passes the same audit with less restricted
             // distance. It never converts a hard exclusion into an accepted edge.
