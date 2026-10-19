@@ -315,7 +315,12 @@ final class NativeRouter implements AutoCloseable {
         try{
             return new JSONObject(engine.traceAttributesRaw(trace.toString())).getJSONArray("edges");
         }catch(RuntimeException exactFailure){
-            if(geometry.size()!=2||display==null)throw exactFailure;
+            if(geometry.size()!=2||display==null){
+                android.util.Log.i("Audit",String.format(java.util.Locale.ROOT,
+                        "matcher=edge_walk failed, fallback not applicable (points=%d, display=%s): %s",
+                        geometry.size(),display!=null,exactFailure.getMessage()));
+                throw exactFailure;
+            }
             JSONArray matched=singleEdgeMatch(trace,geometry,display);
             if(matched==null){
                 android.util.Log.i("Audit","matcher=none single segment could not be verified: "+exactFailure.getMessage());

@@ -38,34 +38,56 @@ public final class EdgeMatchValidation {
         double span=Math.abs(to[0]-from[0])*wayLength(way);
         if(span<segment*0.9)
             return String.format(java.util.Locale.ROOT,"matched stretch covers %.0f m of a %.0f m route",span,segment);
-        // The matcher reports the traversed portion; accept either that or the projected span, so a
-        // full-edge length from another implementation does not reject a valid partial-edge match.
+        // Length corroborates the geometry; it never substitutes for it. A whole-way length on a
+        // partial traversal is therefore a mismatch, not an alternative reading.
         double tolerance=Math.max(5,segment*0.05);
-        double whole=wayLength(way);
-        if(Math.abs(matchedMetres-segment)>tolerance
-                &&Math.abs(matchedMetres-span)>tolerance
-                &&Math.abs(matchedMetres-whole)>tolerance)
+        if(Math.abs(matchedMetres-segment)>tolerance&&Math.abs(matchedMetres-span)>tolerance)
             return String.format(java.util.Locale.ROOT,"matched length %.0f m disagrees with a %.0f m route",matchedMetres,segment);
+        // Direction is checked locally at both projections, so a bend between them does not look
+        // like a wrong-way match, and a reversed way still does.
         double heading=Geo.bearing(a,b);
-        double wayHeading=Geo.bearingAt(way,(from[0]+to[0])/2);
-        double delta=Math.abs(((wayHeading-heading+540)%360)-180);
-        if(delta>MAX_BEARING_DIFFERENCE)
-            return String.format(java.util.Locale.ROOT,"matched way runs %.0f deg away from the route",delta);
+        for(double fraction:new double[]{from[0],to[0]}){
+            double wayHeading=bearingAt(way,fraction);
+            if(Double.isNaN(wayHeading))return "matched way has no usable bearing";
+            double delta=Math.abs(((wayHeading-heading+540)%360)-180);
+            if(delta>MAX_BEARING_DIFFERENCE)
+                return String.format(java.util.Locale.ROOT,"matched way runs %.0f deg away from the route",delta);
+        }
         return null;
     }
 
-    /** {fraction along the way, cross-track metres} for the nearest segment. */
+    /** {fraction of the way's length, cross-track metres} for the nearest segment. */
     static double[] projectOnto(List<Graph.Node> shape,Graph.Node point){
+        double total=wayLength(shape);
+        if(total<=0)return null;
         double best=Double.MAX_VALUE;double[] result=null;
+        double travelled=0;
         for(int i=0;i+1<shape.size();i++){
             Graph.Node a=shape.get(i),b=shape.get(i+1);
+            double leg=Geo.distance(a.lat,a.lon,b.lat,b.lon);
             double[] projection=Geo.project(point.lat,point.lon,a,b);
             if(projection[1]<best){
                 best=projection[1];
-                result=new double[]{(i+projection[0])/(shape.size()-1),projection[1]};
+                result=new double[]{(travelled+projection[0]*leg)/total,projection[1]};
             }
+            travelled+=leg;
         }
         return result;
+    }
+
+    /** Segment bearing at a fraction of the way's length, so unequal legs are handled correctly. */
+    static double bearingAt(List<Graph.Node> shape,double fraction){
+        double total=wayLength(shape);
+        if(total<=0)return Double.NaN;
+        double target=Math.max(0,Math.min(1,fraction))*total;
+        double travelled=0;
+        for(int i=0;i+1<shape.size();i++){
+            Graph.Node a=shape.get(i),b=shape.get(i+1);
+            double leg=Geo.distance(a.lat,a.lon,b.lat,b.lon);
+            if(travelled+leg>=target||i==shape.size()-2)return Geo.bearing(a,b);
+            travelled+=leg;
+        }
+        return Double.NaN;
     }
 
     static double wayLength(List<Graph.Node> shape){

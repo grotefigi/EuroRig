@@ -25,11 +25,33 @@ public class EdgeMatchValidationTest {
         assertNull(EdgeMatchValidation.validate(mid1,mid2,2001,way,segment,0,1,2));
     }
 
-    @Test public void acceptsAFullEdgeLengthFromAnotherMatcher(){
-        // Some implementations report the whole edge; the projected span must still verify it.
+    @Test public void acceptsAFullWayLengthOnlyWhenTheRouteCoversTheWay(){
+        // Route spans the whole way, so a matcher reporting the full edge is telling the truth.
+        double whole=Geo.distance(west.lat,west.lon,east.lat,east.lon);
+        assertNull(EdgeMatchValidation.validate(west,east,2001,way,whole,0,1,2));
+    }
+
+    @Test public void rejectsAFullWayLengthOnAPartialTraversal(){
+        // 47 m driven inside a 79 m way: reporting 79 m does not corroborate the routed geometry.
+        double whole=Geo.distance(west.lat,west.lon,east.lat,east.lon);
         double segment=Geo.distance(mid1.lat,mid1.lon,mid2.lat,mid2.lon);
-        double full=Geo.distance(west.lat,west.lon,east.lat,east.lon);
-        assertNull(EdgeMatchValidation.validate(mid1,mid2,2001,way,full,0,1,2));
+        String problem=EdgeMatchValidation.validate(mid1,mid2,2001,way,whole,0,1,2);
+        assertNotNull(problem);
+        assertTrue(problem.contains("disagrees"));
+        assertTrue("the routed segment is still the reference",segment<whole);
+    }
+
+    @Test public void acceptsABentWayWhenTheLocalBearingsAgree(){
+        // L-shaped road: the route runs along the eastern leg, so the way's overall bearing is
+        // irrelevant and only the bearings at the projections matter.
+        List<Graph.Node> bent=List.of(
+                new Graph.Node(45.0,25.0000,""),
+                new Graph.Node(45.0,25.0005,""),
+                new Graph.Node(45.0006,25.0005,""));
+        Graph.Node a=new Graph.Node(45.0002,25.0005,""),b=new Graph.Node(45.0005,25.0005,"");
+        double segment=Geo.distance(a.lat,a.lon,b.lat,b.lon);
+        assertNull("a bend before the driven stretch must not look like a wrong-way match",
+                EdgeMatchValidation.validate(a,b,2001,bent,segment,0,1,2));
     }
 
     @Test public void rejectsAParallelRoadEightMetresAway(){

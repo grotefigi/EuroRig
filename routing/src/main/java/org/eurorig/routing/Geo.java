@@ -14,15 +14,6 @@ public final class Geo {
                 Math.cos(Math.toRadians(a.lat))*Math.sin(Math.toRadians(b.lat)) -
                 Math.sin(Math.toRadians(a.lat))*Math.cos(Math.toRadians(b.lat))*Math.cos(d)));
     }
-    /** Segment bearing on a recorded way, for correspondence checks. */
-    public static double bearingAt(java.util.List<Graph.Node> shape,double fraction){
-        if(shape==null||shape.size()<2)return Double.NaN;
-        double clamped=Math.max(0,Math.min(1,fraction));
-        int index=(int)Math.floor(clamped*(shape.size()-1));
-        if(index>=shape.size()-1)index=shape.size()-2;
-        return bearing(shape.get(index),shape.get(index+1));
-    }
-
     /** Segment projection in a local tangent plane. Returns fraction, cross-track metres. */
     public static double[] project(double lat, double lon, Graph.Node a, Graph.Node b) {
         double scale = Math.cos(Math.toRadians(lat));
