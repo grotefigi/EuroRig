@@ -216,6 +216,11 @@ final class NativeRouter implements AutoCloseable {
             Plan plan=null;String relocation="";
             // Roads already proved unusable for this truck at an endpoint: never offer them again.
             Set<Long> unusable=new LinkedHashSet<>();
+            // Positions already tried. Without this the loop can walk the origin back onto a rejected
+            // point and re-audit the same candidate (measured: A -> B -> C -> B on the bridge fixture).
+            Set<String> tried=new LinkedHashSet<>();
+            tried.add(String.format(java.util.Locale.ROOT,"%.5f,%.5f",start[0],start[1]));
+            tried.add(String.format(java.util.Locale.ROOT,"%.5f,%.5f",finish[0],finish[1]));
             for(int pass=0;pass<3;pass++){
                 plan=planRoute(start[0],start[1],finish[0],finish[1],truck,mode,delivery,display);
                 if(!plan.originHard&&!plan.destinationHard)break;
@@ -225,7 +230,10 @@ final class NativeRouter implements AutoCloseable {
                     double[] alternative=accessPoint(start[0],start[1],truck,display,unusable);
                     double metres=alternative==null?-1:Geo.distance(start[0],start[1],alternative[0],alternative[1]);
                     // A candidate at the requested point is not an alternative: it would loop.
-                    if(alternative!=null&&metres>1.0){
+                    if(alternative!=null&&metres>1.0&&!tried.add(String.format(java.util.Locale.ROOT,"%.5f,%.5f",alternative[0],alternative[1]))){
+                        android.util.Log.i("Relocation",String.format(java.util.Locale.ROOT,
+                                "candidate %.5f,%.5f already tried; stopping",alternative[0],alternative[1]));
+                    }else if(alternative!=null&&metres>1.0){
                         relocationMetres=metres;
                         relocationAtOrigin=true;relocationFrom=new double[]{start[0],start[1]};relocationTo=alternative;
                         android.util.Log.i("Relocation",String.format(java.util.Locale.ROOT,
@@ -237,7 +245,10 @@ final class NativeRouter implements AutoCloseable {
                 if(!moved&&plan.destinationHard){
                     double[] alternative=accessPoint(finish[0],finish[1],truck,display,unusable);
                     double metres=alternative==null?-1:Geo.distance(finish[0],finish[1],alternative[0],alternative[1]);
-                    if(alternative!=null&&metres>1.0){
+                    if(alternative!=null&&metres>1.0&&!tried.add(String.format(java.util.Locale.ROOT,"%.5f,%.5f",alternative[0],alternative[1]))){
+                        android.util.Log.i("Relocation",String.format(java.util.Locale.ROOT,
+                                "candidate %.5f,%.5f already tried; stopping",alternative[0],alternative[1]));
+                    }else if(alternative!=null&&metres>1.0){
                         relocationMetres=metres;
                         relocationAtOrigin=false;relocationFrom=new double[]{finish[0],finish[1]};relocationTo=alternative;
                         android.util.Log.i("Relocation",String.format(java.util.Locale.ROOT,
@@ -248,7 +259,9 @@ final class NativeRouter implements AutoCloseable {
                 }
                 if(!moved)throw new IllegalStateException(plan.failure+" - no other road this truck may use within "+(int)ENDPOINT_METRES+" m of the requested point");
             }
-            if(plan==null||plan.response==null)throw new IllegalStateException("No truck route");
+            if(plan==null||plan.response==null)throw new IllegalStateException(plan==null?"No truck route"
+                    :"No verified truck route found. "+plan.failure+". Alternative approaches within "
+                    +(int)ENDPOINT_METRES+" m of the requested point were unsuccessful.");
             // Delivery access is minimised, not merely granted: one bounded attempt at another entry,
             // accepted only when the alternative still passes the same audit with less restricted
             // distance. It never converts a hard exclusion into an accepted edge.
