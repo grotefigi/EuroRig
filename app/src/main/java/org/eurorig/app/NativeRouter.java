@@ -139,6 +139,14 @@ final class NativeRouter implements AutoCloseable {
             if(display==null||!display.restrictionEvidence){plan.response=response;break;}
             JSONObject leg=response.getJSONObject("trip").getJSONArray("legs").getJSONObject(0);
             String shape=leg.getString("shape");List<Graph.Node> geometry=decode(shape);
+            // A zero-length candidate is an engine answer, not a matcher fault; log what it returned so
+            // a bounded-replanning dead end can be told apart from an exclusion bug.
+            if(geometry.size()<2||Geo.distance(geometry.get(0).lat,geometry.get(0).lon,
+                    geometry.get(geometry.size()-1).lat,geometry.get(geometry.size()-1).lon)<1.0)
+                android.util.Log.i("RouteRun",String.format(java.util.Locale.ROOT,
+                        "%s candidate is degenerate: shape %d chars, %d points, from %.6f,%.6f to %.6f,%.6f",
+                        runId,shape.length(),geometry.size(),geometry.get(0).lat,geometry.get(0).lon,
+                        geometry.get(geometry.size()-1).lat,geometry.get(geometry.size()-1).lon));
             JSONObject trace=new JSONObject().put("encoded_polyline",shape).put("shape_match","edge_walk").put("costing","truck")
                 .put("costing_options",traceCosting(query))
                 .put("filters",new JSONObject().put("action","include").put("attributes",new JSONArray().put("edge.way_id").put("edge.begin_shape_index").put("edge.end_shape_index").put("edge.length")));
