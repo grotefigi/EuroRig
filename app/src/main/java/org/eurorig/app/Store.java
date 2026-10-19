@@ -14,6 +14,11 @@ final class Store {
     static boolean showAllRestrictions;
     /** Overlay filter: with a route, show only records on the roads that route uses. */
     static boolean routeOnlyRestrictions;
+    /**
+     * Per-trip authorization to enter private property. Deliberately not persisted: it is a
+     * statement about this delivery, not a standing preference of the device.
+     */
+    static volatile boolean privateAccessPermission;
     /** Restrictions the last route had to accept or work around; shown to the driver, never hidden. */
     static String restrictionWarning(){return nativeRouter==null?"":nativeRouter.restrictionWarning();}
     static boolean relocatedAtOrigin(){return nativeRouter!=null&&nativeRouter.relocatedAtOrigin();}

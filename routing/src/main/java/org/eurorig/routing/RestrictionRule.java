@@ -67,7 +67,11 @@ public final class RestrictionRule {
      *               violation; an unknown direction is treated as both ways.
      */
     public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination,boolean originEgress,int travel){
-        AccessPolicy.Decision decision=AccessPolicy.decide(this,truck,metresFromDestination,originEgress,permittedDelivery,travel);
+        return violation(truck,permittedDelivery,metresFromDestination,originEgress,false,travel);
+    }
+    /** @param privatePermitted explicit per-trip authorization to enter private property. */
+    public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination,boolean originEgress,boolean privatePermitted,int travel){
+        AccessPolicy.Decision decision=AccessPolicy.decide(this,truck,metresFromDestination,originEgress,permittedDelivery,privatePermitted,travel);
         // Admitted access is not a violation: the caller counts its metres, and the driver sees it
         // as an access-restricted section rather than an error.
         if(decision.ok()||decision.admitted())return null;

@@ -83,6 +83,21 @@ public class DeliveryAccessTest {
         assertTrue(graph.turnAllowed(in,allowed));
     }
 
+    /** 6b. Private property is not permission: it needs an explicit per-trip affirmation. */
+    @Test public void privatePropertyIsNotPermission(){
+        RestrictionRule privateRoad=access("private",Graph.BLOCKED);
+        AccessPolicy.Decision unproven=AccessPolicy.decide(privateRoad,truck,120,false,true,false,RestrictionRule.DIR_UNKNOWN);
+        assertTrue("a private road inside the delivery window is still not authorized",unproven.blocked());
+        assertTrue(unproven.reason.contains("Private road"));
+
+        AccessPolicy.Decision affirmed=AccessPolicy.decide(privateRoad,truck,120,false,true,true,RestrictionRule.DIR_UNKNOWN);
+        assertTrue(affirmed.admitted());
+        assertTrue("the driver is told the basis",affirmed.reason.contains("per-trip authorization"));
+
+        assertTrue("the delivery window still applies",
+                AccessPolicy.decide(privateRoad,truck,2500,false,true,true,RestrictionRule.DIR_UNKNOWN).blocked());
+    }
+
     /** 6. No lawful approach must fail explicitly, never produce a misleading accepted route. */
     @Test public void noLawfulApproachIsRefusedNotAdmitted(){
         AccessPolicy.Decision denied=AccessPolicy.decide(access("no",Graph.BLOCKED),truck,5,false,true,RestrictionRule.DIR_UNKNOWN);

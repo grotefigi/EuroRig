@@ -26,8 +26,21 @@ public final class AccessPolicy {
 
     /** Delivery exceptions only apply this close to the destination (RR: 2 km). */
     public static final double DELIVERY_RADIUS_METRES=2000;
-    /** Access values that actually grant destination traffic. */
-    private static final java.util.Set<String> GRANTS=java.util.Set.of("destination","delivery","private");
+    /** Tags that state a destination/delivery exception. */
+    private static final java.util.Set<String> DESTINATION_GRANTS=java.util.Set.of("destination","delivery");
+    /**
+     * Private property. Not a permission: it states that the road is not public, so entry needs
+     * authorization the app cannot establish from map data. Only an explicit per-trip affirmation
+     * admits it.
+     */
+    private static final java.util.Set<String> PRIVATE=java.util.Set.of("private");
+    private static final java.util.Set<String> GRANTS;
+
+    static {
+        java.util.Set<String> all=new java.util.HashSet<>(DESTINATION_GRANTS);
+        all.addAll(PRIVATE);
+        GRANTS=java.util.Collections.unmodifiableSet(all);
+    }
 
     public static final class Decision {
         public final int verdict;
@@ -51,8 +64,14 @@ public final class AccessPolicy {
         return access;
     }
 
+    /** Convenience for callers with no private-property affirmation (the default). */
     public static Decision decide(RestrictionRule rule,Truck truck,double metresToDestination,
                                   boolean originEgress,boolean deliveryPermitted,int travel){
+        return decide(rule,truck,metresToDestination,originEgress,deliveryPermitted,false,travel);
+    }
+
+    public static Decision decide(RestrictionRule rule,Truck truck,double metresToDestination,
+                                  boolean originEgress,boolean deliveryPermitted,boolean privatePermitted,int travel){
         if(rule==null)return new Decision(OK,null);
         if(!rule.applies(travel))return new Decision(OK,null);
 
@@ -76,13 +95,19 @@ public final class AccessPolicy {
                 return new Decision(BLOCKED,"Unsupported access exception");
             // Leaving a road the vehicle is already standing on is not an access exception.
             boolean leaving=originEgress&&GRANTS.contains(access);
-            if(!leaving&&!permitted(access,deliveryPermitted,metresToDestination))
-                return new Decision(BLOCKED,"Truck access restricted");
+            if(!leaving){
+                if(PRIVATE.contains(access)&&!privatePermitted)
+                    return new Decision(BLOCKED,"Private road: entry authorization not established");
+                if(!permitted(access,deliveryPermitted,privatePermitted,metresToDestination))
+                    return new Decision(BLOCKED,"Truck access restricted");
+            }
             if(rule.tags.containsKey("barrier")&&!"no".equals(rule.tags.get("barrier")))
                 return new Decision(UNVERIFIED,"Restricted access barrier needs verification");
             if(rule.tags.containsKey("bridge")&&!"no".equals(rule.tags.get("bridge")))
                 return new Decision(UNVERIFIED,"Bridge on restricted delivery access needs verification");
-            return new Decision(ADMITTED_ACCESS,"Access restricted to destination traffic");
+            return new Decision(ADMITTED_ACCESS,PRIVATE.contains(access)
+                    ?"Private road entered under per-trip authorization"
+                    :"Access restricted to destination traffic");
         }
         return new Decision(OK,null);
     }
@@ -101,11 +126,15 @@ public final class AccessPolicy {
     }
 
     /**
-     * Permission needs two independent things: the tag must grant an exception, and the delivery
-     * policy must be active at this distance. Permission and proximity alone never create one.
+     * Permission needs two independent things: a tag that states the exception, and the policy
+     * condition for it — the delivery window for destination traffic, an explicit per-trip
+     * affirmation for private property. Proximity alone never creates permission.
      */
-    private static boolean permitted(String access,boolean deliveryPermitted,double metresToDestination){
-        return GRANTS.contains(access)&&deliveryPermitted&&metresToDestination<=DELIVERY_RADIUS_METRES;
+    private static boolean permitted(String access,boolean deliveryPermitted,boolean privatePermitted,
+                                     double metresToDestination){
+        if(metresToDestination>DELIVERY_RADIUS_METRES)return false;
+        if(PRIVATE.contains(access))return privatePermitted;
+        return DESTINATION_GRANTS.contains(access)&&deliveryPermitted;
     }
 
     /**

@@ -304,16 +304,20 @@ public final class MainActivity extends Activity {
         }
         choices.check(900+Store.mode.ordinal());box.addView(choices);
         CheckBox access=new CheckBox(this);access.setText(R.string.delivery_permission);access.setChecked(Store.deliveryAccess);box.addView(access);
+        CheckBox privateAccess=new CheckBox(this);
+        privateAccess.setText("This trip: I have permission to enter private property");
+        privateAccess.setChecked(Store.privateAccessPermission);box.addView(privateAccess);
         CheckBox everyRestriction=new CheckBox(this);
         everyRestriction.setText("Show every recorded restriction, not only the ones affecting this truck");
         everyRestriction.setChecked(Store.showAllRestrictions);box.addView(everyRestriction);
         CheckBox routeOnly=new CheckBox(this);
         routeOnly.setText("Only restrictions on the current route");
         routeOnly.setChecked(Store.routeOnlyRestrictions);box.addView(routeOnly);
-        box.addView(text("Delivery access is limited to 2 km from the destination. It uses shortest routing and preserves height, width, length, gross/axle weight, ADR and turn restrictions. Unknown limits, barriers and bridges on restricted access are excluded. Permission applies to this trip on this device.",12,MUTED));
+        box.addView(text("Delivery access is limited to 2 km from the destination. It uses shortest routing and preserves height, width, length, gross/axle weight, ADR and turn restrictions. Destination and delivery tags are admitted on their own conditions; private property needs the per-trip permission above, because map data cannot prove it. Unknown limits, barriers and bridges on restricted access are excluded. Permission applies to this trip on this device.",12,MUTED));
         ScrollView scroll=new ScrollView(this);scroll.addView(box);
         new AlertDialog.Builder(this).setTitle("Route preferences").setView(scroll).setNegativeButton("Cancel",null).setPositiveButton("Save",(d,w)->{
             Store.mode=RoutingMode.values()[choices.indexOfChild(choices.findViewById(choices.getCheckedRadioButtonId()))];Store.deliveryAccess=access.isChecked();Store.route=null;
+            Store.privateAccessPermission=privateAccess.isChecked();
             Store.showAllRestrictions=everyRestriction.isChecked();
             Store.routeOnlyRestrictions=routeOnly.isChecked();
             getSharedPreferences("settings",0).edit().putString("routing_mode",Store.mode.name())

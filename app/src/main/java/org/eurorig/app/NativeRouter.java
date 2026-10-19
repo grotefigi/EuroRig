@@ -149,7 +149,7 @@ final class NativeRouter implements AutoCloseable {
                                 travel==RestrictionRule.DIR_FORWARD?"forward":"backward",heading,wayBearing));
                     }else android.util.Log.i("Direction","way "+way+" geometry unavailable: applying both ways");
                 }
-                AccessPolicy.Decision decision=AccessPolicy.decide(rule,truck,metresToDestination,toOrigin<=ENDPOINT_METRES,delivery,travel);
+                AccessPolicy.Decision decision=AccessPolicy.decide(rule,truck,metresToDestination,toOrigin<=ENDPOINT_METRES,delivery,Store.privateAccessPermission,travel);
                 String reason=rule==null?(delivery?"Delivery road has no restriction evidence":null)
                         :(decision.reason.isEmpty()?null:decision.reason);
                 if(reason!=null){
