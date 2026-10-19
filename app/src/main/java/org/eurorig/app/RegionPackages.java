@@ -13,10 +13,13 @@ import java.util.zip.*;
 /** Transactional, streaming native-region installation. Never extracts caller paths. */
 final class RegionPackages {
     private static final long MAX_TILES=128L*1024*1024*1024, MAX_DISPLAY=128L*1024*1024;
+    /**
+     * Removes partial installations only. A complete region that is not currently selected is kept:
+     * previously every other region was deleted here, so switching country destroyed the map the
+     * driver already had and forced a full re-download.
+     */
     static void cleanupStale(Context c){
-        String selected=c.getSharedPreferences("settings",0).getString("region","");
-        File[] folders=new File(c.getFilesDir(),"regions").listFiles();if(folders==null)return;
-        for(File folder:folders)if(folder.getName().matches("[0-9a-f-]{36}")&&!folder.getName().equals(selected))cleanup(folder);
+        for(File folder:org.eurorig.routing.RegionRetention.incomplete(new File(c.getFilesDir(),"regions")))cleanup(folder);
     }
     static Graph install(Context c,InputStream source) throws IOException {
         File dir=create(c);Set<String> seen=new HashSet<>();
@@ -70,7 +73,11 @@ final class RegionPackages {
             if(!c.getSharedPreferences("settings",0).edit().putBoolean("native",true).putString("region",dir.getName()).commit())throw new IOException("Could not save region selection");
             if(Store.nativeRouter!=null)Store.nativeRouter.close();Store.nativeRouter=candidate;candidate=null;
             if(Store.display!=null)Store.display.close();Store.display=candidateDisplay;candidateDisplay=null;
-            if(old.matches("[0-9a-f-]{36}"))cleanup(new File(c.getFilesDir(),"regions/"+old));
+            // The previously selected region is kept unless it is a partial installation.
+            if(old.matches("[0-9a-f-]{36}")){
+                File previous=new File(c.getFilesDir(),"regions/"+old);
+                if(!org.eurorig.routing.RegionRetention.complete(previous))cleanup(previous);
+            }
             return graph;
         }catch(JSONException|NoSuchAlgorithmException e){throw new IOException("Invalid region manifest",e);}
         finally {if(candidate!=null)candidate.close();if(candidateDisplay!=null)candidateDisplay.close();}
