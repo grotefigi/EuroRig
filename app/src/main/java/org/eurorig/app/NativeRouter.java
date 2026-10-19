@@ -73,7 +73,10 @@ final class NativeRouter implements AutoCloseable {
             .put("ignore_restrictions",false).put("ignore_access",false).put("ignore_oneways",false);
         if(mode==RoutingMode.SHORTEST||delivery)truck.put("shortest",true).put("disable_hierarchy_pruning",true).put("maneuver_penalty",0).put("low_class_penalty",0);
         else if(mode==RoutingMode.EASIEST)truck.put("maneuver_penalty",2000).put("low_class_penalty",500).put("use_highways",.7);
-        else if(mode==RoutingMode.ECONOMICAL)truck.put("use_highways",1).put("low_class_penalty",30000).put("low_class_factor",30).put("service_penalty",30000).put("use_truck_route",1);
+        // Low-class penalties of 30000 with factor 30 priced the only legal alternative out of
+        // existence on short approaches, and Valhalla answered with a zero-length trip rather than a
+        // no-route error. Preference ranks eligible roads; it must not behave like a prohibition.
+        else if(mode==RoutingMode.ECONOMICAL)truck.put("use_highways",1).put("service_penalty",30000).put("use_truck_route",1);
         if(delivery)truck.put("hgv_no_access_penalty",30000);
         return new JSONObject().put("locations",locations).put("costing","truck")
             .put("costing_options",new JSONObject().put("truck",truck))
@@ -145,8 +148,8 @@ final class NativeRouter implements AutoCloseable {
             // instead of a no-route error. That is an engine answer about our own costing options, so
             // it is reported as such rather than being handed to the matcher as a 443.
             if(leg.getJSONObject("summary").getDouble("length")<0.001)
-                throw new IllegalStateException("No route for this truck: the routing engine returned an empty path. "
-                        +"Its low-class road penalties can exclude every legal road on a short approach.");
+                throw new IllegalStateException("No verified truck route found. The routing engine could not "
+                        +"calculate a usable alternative.");
             // A zero-length candidate is an engine answer, not a matcher fault; log what it returned so
             // a bounded-replanning dead end can be told apart from an exclusion bug.
             if(geometry.size()<2||Geo.distance(geometry.get(0).lat,geometry.get(0).lon,
