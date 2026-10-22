@@ -156,6 +156,12 @@ public final class AccessPolicy {
         if(!authorisation.forDestination(destinationLat,destinationLon))return decided;
         // A declaration never outranks a physical limit.
         if(fatal(rule,truck)!=null)return decided;
+        // Declaring an entrance cannot authorize driving against its recorded one-way direction.
+        if(rule.oneWay()){
+            if(rule.kind!=0)return decided;
+            Decision direction=legacyOneWay(rule.tags,travel);
+            if(direction!=null&&direction.blocked())return decided;
+        }
         return new Decision(ADMITTED_ACCESS,"Declared entrance for this destination (driver-declared, "
                 +"not confirmed against property records)");
     }
@@ -195,13 +201,15 @@ public final class AccessPolicy {
     public static Decision decide(RestrictionRule rule,Truck truck,double metresToDestination,
                                   boolean originEgress,boolean deliveryPermitted,boolean privatePermitted,int travel){
         if(rule==null)return new Decision(OK,null);
-        if(!rule.applies(travel))return new Decision(OK,null);
+        boolean legacyOneWay=rule.kind==0&&rule.oneWay();
+        if(!legacyOneWay&&!rule.applies(travel))return new Decision(OK,null);
         // A one-way record applies exactly to travel against its recorded direction, and blocks all
         // traffic, not just trucks: it is a road-direction prohibition, not an access exception.
-        if(rule.oneWay())return new Decision(BLOCKED,"One-way road: travel against the recorded direction");
+        if(!legacyOneWay&&rule.oneWay())return new Decision(BLOCKED,"One-way road: travel against the recorded direction");
 
         String fatal=fatal(rule,truck);
         if(fatal!=null)return new Decision(BLOCKED,fatal);
+        if(legacyOneWay){Decision direction=legacyOneWay(rule.tags,travel);if(direction!=null)return direction;}
 
         // Uncertainty is a flag read from the pack; older packs carry the flag without the
         // normalised kind, so both forms must surface it.
@@ -248,6 +256,23 @@ public final class AccessPolicy {
     }
 
     /** Physical/legal impossibility: measured clearance, axle count or ADR. */
+    /** Published v2 packs predate direction bits; use their explicit truck-relevant tags. */
+    private static Decision legacyOneWay(Map<String,String> tags,int travel){
+        String value=null;
+        for(String key:new String[]{"oneway:hgv","oneway:goods","oneway:motor_vehicle","oneway:vehicle","oneway"}){
+            if(tags.containsKey(key+":conditional"))return new Decision(UNVERIFIED,"One-way condition needs verification");
+            if(tags.containsKey(key)){value=tags.get(key).trim().toLowerCase(java.util.Locale.ROOT);break;}
+        }
+        if(value==null||value.equals("no")||value.equals("0")||value.equals("false"))return null;
+        int allowed;
+        if(value.equals("yes")||value.equals("1")||value.equals("true"))allowed=RestrictionRule.DIR_FORWARD;
+        else if(value.equals("-1")||value.equals("reverse"))allowed=RestrictionRule.DIR_BACKWARD;
+        else return new Decision(UNVERIFIED,"One-way direction needs verification");
+        if(travel!=allowed)return new Decision(BLOCKED,"One-way road: travel against the recorded direction");
+        // Legal direction only settles direction; dimensions, ADR and access are still checked.
+        return null;
+    }
+
     private static String fatal(RestrictionRule rule,Truck truck){
         if(rule.height>0&&truck.height>rule.height)return "Height limit "+rule.height+" m";
         if(rule.width>0&&truck.width>rule.width)return "Width limit "+rule.width+" m";

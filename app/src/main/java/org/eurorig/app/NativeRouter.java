@@ -18,6 +18,7 @@ final class NativeRouter implements AutoCloseable {
      */
     private static final double ENDPOINT_METRES=RestrictionRule.ENDPOINT_METRES;
     private final Valhalla engine;
+    private List<Graph.Node> throughPoints=Collections.emptyList();
     /** Restrictions the route had to accept, verbatim, for the driver to see. */
     private volatile String warning="";
     /** Set when the start or destination had to move off a road this truck may not use. */
@@ -82,7 +83,7 @@ final class NativeRouter implements AutoCloseable {
         if(delivery)truck.put("hgv_no_access_penalty",30000);
         return new JSONObject().put("locations",locations).put("costing","truck")
             .put("costing_options",new JSONObject().put("truck",truck))
-            .put("units","kilometers").put("language","en-US").put("shape_format","polyline6");
+            .put("turn_lanes",true).put("units","kilometers").put("language","en-US").put("shape_format","polyline6");
     }
 
     /** A road this truck may legally and physically use, within the endpoint radius. */
@@ -99,6 +100,7 @@ final class NativeRouter implements AutoCloseable {
 
     /** Result of one audited attempt sequence. */
     private static final class Plan{
+        JSONArray traced,originalLegs;
         JSONObject response;long[] ways;Map<Long,RestrictionRule> rules=Collections.emptyMap();
         double restrictedMetres;Set<String> warnings=new TreeSet<>();String failure="";
         boolean originHard,destinationHard;
@@ -110,6 +112,7 @@ final class NativeRouter implements AutoCloseable {
         boolean lastAdmitted,lastUnverified;
         /** Audit verdict per traced edge, in route order, so the paint follows the audit. */
         int[] auditClasses;
+        int[] waypointShapeIndices=new int[0];
         /** Revision of the declaration this plan was audited under, 0 when none was used. */
         long declaredRevision;
         /** True when the accepted route needed restricted-access permission at all. */
@@ -145,6 +148,12 @@ final class NativeRouter implements AutoCloseable {
                         +" dest "+declared.destinationLat+","+declared.destinationLon,
                 originWay,lat,lon,endLat,endLon));
         JSONObject query=request(lat,lon,endLat,endLon,truck,mode,delivery);
+        if(!throughPoints.isEmpty()){
+            JSONArray original=query.getJSONArray("locations"),locations=new JSONArray().put(original.getJSONObject(0));
+            for(Graph.Node p:throughPoints)locations.put(new JSONObject().put("lat",p.lat).put("lon",p.lon).put("type","break").put("radius",100).put("search_cutoff",250));
+            locations.put(original.getJSONObject(1));query.put("locations",locations);
+        }
+        if(NavigationSettings.current!=null&&NavigationSettings.current.avoidHighways)query.getJSONObject("costing_options").getJSONObject("truck").put("exclude_highways",true);
         JSONArray excluded=new JSONArray();JSONObject candidate=null;
         if(seedExclusion!=null)excluded.put(new JSONObject().put("lat",seedExclusion[0]).put("lon",seedExclusion[1]));
         for(int attempt=0;attempt<12;attempt++){
@@ -165,7 +174,11 @@ final class NativeRouter implements AutoCloseable {
                 throw new IllegalStateException("Routing engine could not calculate another candidate: "+engineFailure.getMessage(),engineFailure);
             }
             if(display==null||!display.restrictionEvidence){plan.response=response;break;}
-            JSONObject leg=response.getJSONObject("trip").getJSONArray("legs").getJSONObject(0);
+            JSONArray originalLegs=response.getJSONObject("trip").getJSONArray("legs");
+            if(originalLegs.length()!=throughPoints.size()+1)throw new IllegalStateException("Routing engine omitted a selected stop");
+            int[] stopIndices=waypointShapeIndices(originalLegs);
+            JSONObject leg=joinLegs(originalLegs);
+            if(originalLegs.length()>1)response.getJSONObject("trip").put("legs",new JSONArray().put(leg));
             String shape=leg.getString("shape");List<Graph.Node> geometry=decode(shape);
             // Reproduced directly against the same tiles: with low_class_penalty/low_class_factor set,
             // Valhalla answers a request whose only legal path is a minor road with a zero-length trip
@@ -184,8 +197,8 @@ final class NativeRouter implements AutoCloseable {
                         geometry.get(geometry.size()-1).lat,geometry.get(geometry.size()-1).lon));
             JSONObject trace=new JSONObject().put("encoded_polyline",shape).put("shape_match","edge_walk").put("costing","truck")
                 .put("costing_options",traceCosting(query))
-                .put("filters",new JSONObject().put("action","include").put("attributes",new JSONArray().put("edge.way_id").put("edge.begin_shape_index").put("edge.end_shape_index").put("edge.length")));
-            JSONArray traced=traceEdges(trace,geometry,display);
+                .put("filters",new JSONObject().put("action","include").put("attributes",new JSONArray().put("edge.way_id").put("edge.begin_shape_index").put("edge.end_shape_index").put("edge.length").put("edge.names").put("edge.road_class").put("edge.speed_limit").put("edge.lane_count").put("edge.drive_on_right").put("node.intersecting_edge").put("node.type")));
+            JSONArray traced=traceLegs(originalLegs,trace,display);
             HashSet<Long> ways=new HashSet<>();for(int i=0;i<traced.length();i++)ways.add(traced.getJSONObject(i).getLong("way_id"));
             Map<Long,RestrictionRule> rules=display.rulesFor(ways);
             plan.ways=auditedWays(traced,geometry.size());plan.rules=rules;
@@ -240,8 +253,10 @@ final class NativeRouter implements AutoCloseable {
                 // An admitted edge carries an explanatory reason, but it is not a refusal: treating it as
                 // one made every delivery/private approach impossible to accept.
                 if(reason!=null&&!decision.admitted()){
-                    if(decision.blocked()&&rule!=null&&rule.hard(truck)){
-                        // Reported so the endpoint can be moved. Never excluded, never accepted.
+                    if(decision.blocked()&&rule!=null&&rule.hard(truck)
+                            &&(toOrigin<=ENDPOINT_METRES||toDestination<=ENDPOINT_METRES)){
+                        // Only an endpoint limit needs relocation. A hard limit in the middle
+                        // must join the exclusion/replan path below, otherwise every retry is identical.
                         failure=reason;plan.failedWay=way;lastRejection=reason;
                         if(toOrigin<=ENDPOINT_METRES)originHard=true;else if(toDestination<=ENDPOINT_METRES)destinationHard=true;
                         rejected=true;break;
@@ -269,7 +284,7 @@ final class NativeRouter implements AutoCloseable {
                 }
             }
             plan.warnings.addAll(notes);
-            if(!rejected){plan.response=response;plan.restrictedMetres=restricted;plan.auditClasses=auditClasses;candidate=response;break;}
+            if(!rejected){plan.traced=traced;plan.originalLegs=originalLegs;plan.response=response;plan.restrictedMetres=restricted;plan.auditClasses=auditClasses;plan.waypointShapeIndices=stopIndices;candidate=response;break;}
             plan.failure=failure;
             if(originHard||destinationHard){plan.originHard=originHard;plan.destinationHard=destinationHard;return plan;}
             if(attempt==11)throw new IllegalStateException("No verified route found within the search limit: "+failure);
@@ -277,6 +292,11 @@ final class NativeRouter implements AutoCloseable {
         return plan;
     }
 
+    Router.Route routeVia(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery,List<Graph.Node> points){
+        if(points.size()>5)throw new IllegalArgumentException("At most five waypoints are supported");
+        throughPoints=new ArrayList<>(points);
+        try{return route(lat,lon,endLat,endLon,truck,mode,delivery);}finally{throughPoints=Collections.emptyList();}
+    }
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck) {return route(lat,lon,endLat,endLon,truck,null,false);}
     Router.Route route(double lat,double lon,double endLat,double endLon,Truck truck,RoutingMode mode,boolean delivery) {
         runId=Long.toString(System.nanoTime()&0xFFFFFFF,36);
@@ -374,6 +394,7 @@ final class NativeRouter implements AutoCloseable {
             if(legs.length()!=1)throw new IllegalStateException("Unexpected route legs");
             JSONObject leg=legs.getJSONObject(0);
             List<Graph.Node> nodes=decode(leg.getString("shape"));
+            for(Graph.Node via:throughPoints){double gap=Double.POSITIVE_INFINITY;for(int i=0;i+1<nodes.size();i++)gap=Math.min(gap,Geo.project(via.lat,via.lon,nodes.get(i),nodes.get(i+1))[1]);if(gap>250)throw new IllegalStateException("A waypoint is not reached by the audited route");}
             // The engine snaps endpoints to edges. Record how far the routed end really is from the
             // requested destination so the driver is never told an unverified approach was reached.
             Graph.Node routedStart=nodes.get(0),routedEnd=nodes.get(nodes.size()-1);
@@ -400,7 +421,8 @@ final class NativeRouter implements AutoCloseable {
             Graph graph=new Graph("Valhalla truck route","© OpenStreetMap contributors · ODbL 1.0","Installed routing snapshot",false,
                 nodes.toArray(new Graph.Node[0]),edges,Collections.emptyList());
             double seconds=leg.getJSONObject("summary").getDouble("time");
-            Router.Route accepted=new Router.Route(graph,Arrays.asList(edges),instructions,seconds,restrictedMetres);
+            Router.Route accepted=new Router.Route(graph,Arrays.asList(edges),instructions,seconds,restrictedMetres,throughPoints,plan.waypointShapeIndices);
+            accepted.navigation=RouteNavigation.build(accepted,maneuvers,plan.traced,exactLaneSteps(plan.originalLegs,truck),display);
             // Remember which declaration this route relied on, so revoking it can stop guidance.
             accepted.authorisationRevision=plan.declaredRevision;
             accepted.requiresAuthorisation=plan.requiresAuthorisation;
@@ -413,6 +435,48 @@ final class NativeRouter implements AutoCloseable {
             throw new IllegalStateException("Offline truck routing: "+e.getMessage(),e);
         }
     }
+    /**
+     * Waypoints are native route stops. Join their geometry for one complete access audit;
+     * no stop resets origin egress, the 2 km delivery window or terminal private access.
+     * Each unchanged engine leg can be exactly traced without edge_walk's via-loop failure.
+     */
+    static int[] waypointShapeIndices(JSONArray legs)throws JSONException{
+        int[] indices=new int[Math.max(0,legs.length()-1)];int offset=0;
+        for(int i=0;i<indices.length;i++){offset+=decode(legs.getJSONObject(i).getString("shape")).size()-1;indices[i]=offset;}
+        return indices;
+    }
+    static JSONObject joinLegs(JSONArray legs)throws JSONException{
+        if(legs.length()==0)throw new IllegalStateException("Routing engine returned no legs");
+        if(legs.length()==1)return legs.getJSONObject(0);
+        List<Graph.Node> joined=new ArrayList<>();JSONArray maneuvers=new JSONArray();double length=0,time=0;
+        for(int n=0;n<legs.length();n++){
+            JSONObject leg=legs.getJSONObject(n);List<Graph.Node> nodes=decode(leg.getString("shape"));int offset=joined.isEmpty()?0:joined.size()-1;
+            if(!joined.isEmpty()){Graph.Node end=joined.get(joined.size()-1),start=nodes.get(0);if(end.lat!=start.lat||end.lon!=start.lon)throw new IllegalStateException("Waypoint route has disconnected legs");}
+            joined.addAll(nodes.subList(n==0?0:1,nodes.size()));
+            JSONArray instructions=leg.getJSONArray("maneuvers");
+            for(int k=0;k<instructions.length();k++){JSONObject m=new JSONObject(instructions.getJSONObject(k).toString());for(String key:new String[]{"begin_shape_index","end_shape_index"})if(m.has(key)){int index=m.getInt(key);if(index<0||index>=nodes.size())throw new IllegalStateException("Invalid waypoint maneuver geometry");m.put(key,offset+index);}maneuvers.put(m);}
+            length+=leg.getJSONObject("summary").getDouble("length");time+=leg.getJSONObject("summary").getDouble("time");
+        }
+        StringBuilder encoded=new StringBuilder();long lat=0,lon=0;
+        for(Graph.Node point:joined){long nextLat=Math.round(point.lat*1e6),nextLon=Math.round(point.lon*1e6);encodeDelta(encoded,nextLat-lat);encodeDelta(encoded,nextLon-lon);lat=nextLat;lon=nextLon;}
+        JSONObject merged=new JSONObject(legs.getJSONObject(0).toString());merged.put("shape",encoded.toString()).put("maneuvers",maneuvers);merged.getJSONObject("summary").put("length",length).put("time",time);return merged;
+    }
+    private static void encodeDelta(StringBuilder encoded,long delta){long value=delta<0?~(delta<<1):delta<<1;while(value>=0x20){encoded.append((char)((0x20|(value&0x1f))+63));value>>=5;}encoded.append((char)(value+63));}
+    private JSONArray traceLegs(JSONArray legs,JSONObject trace,DisplayDatabase display)throws JSONException{
+        if(legs.length()==1)return traceEdges(trace,decode(legs.getJSONObject(0).getString("shape")),display);
+        JSONArray joined=new JSONArray();int offset=0;
+        for(int n=0;n<legs.length();n++){
+            String shape=legs.getJSONObject(n).getString("shape");List<Graph.Node> geometry=decode(shape);if(n>0)offset--;
+            JSONObject exact=new JSONObject(trace.toString()).put("encoded_polyline",shape);
+            JSONArray edges=traceEdges(exact,geometry,display);
+            // Verify coverage in the leg's own index space before translating to the trip.
+            auditedWays(edges,geometry.size());
+            for(int k=0;k<edges.length();k++){JSONObject edge=new JSONObject(edges.getJSONObject(k).toString());edge.put("begin_shape_index",offset+edge.getInt("begin_shape_index")).put("end_shape_index",offset+edge.getInt("end_shape_index"));joined.put(edge);}
+            offset+=geometry.size();
+        }
+        auditedWays(joined,offset);return joined;
+    }
+
     /**
      * Directed edges for the audited route. edge_walk is the exact matcher and stays the only path
      * for every route it handles. A route of exactly one segment whose end lies inside an edge
@@ -556,6 +620,24 @@ final class NativeRouter implements AutoCloseable {
         }
         for(long way:ways)if(way==0)throw new IllegalStateException("Restriction audit did not cover the whole route. No verified truck route is available.");
         return ways;
+    }
+    /** Lane advice is optional; a geometry mismatch drops advice, never replaces the audited path. */
+    private JSONArray exactLaneSteps(JSONArray legs,Truck truck){
+        JSONArray result=new JSONArray();if(legs==null)return result;int offset=0;
+        try{for(int n=0;n<legs.length();n++){
+            String shape=legs.getJSONObject(n).getString("shape");List<Graph.Node> audited=decode(shape);
+            JSONObject q=request(audited.get(0).lat,audited.get(0).lon,audited.get(audited.size()-1).lat,audited.get(audited.size()-1).lon,truck);
+            q.remove("locations");q.put("encoded_polyline",shape).put("shape_match","edge_walk").put("format","osrm").put("overview","full").put("steps",true);
+            JSONObject response=new JSONObject(engine.traceRouteRaw(q.toString()));JSONArray paths=response.optJSONArray("matchings");if(paths==null)paths=response.optJSONArray("routes");
+            if(paths==null||paths.length()!=1){offset+=audited.size()-1;continue;}
+            JSONObject path=paths.getJSONObject(0);List<Graph.Node> matched=decode(path.getString("geometry"));
+            boolean same=matched.size()==audited.size();if(same)for(int i=0;i<matched.size();i++)if(Geo.distance(matched.get(i).lat,matched.get(i).lon,audited.get(i).lat,audited.get(i).lon)>.25){same=false;break;}
+            if(same){JSONArray osrmLegs=path.getJSONArray("legs");for(int l=0;l<osrmLegs.length();l++){JSONArray steps=osrmLegs.getJSONObject(l).getJSONArray("steps");for(int s=0;s<steps.length();s++){
+                JSONObject step=steps.getJSONObject(s);JSONArray intersections=step.optJSONArray("intersections");if(intersections!=null)for(int k=0;k<intersections.length();k++){JSONObject intersection=intersections.getJSONObject(k);int index=intersection.optInt("geometry_index",-1);if(index>=0&&index<matched.size())intersection.put("geometry_index",index+offset);else intersection.remove("geometry_index");}result.put(step);
+            }}}
+            offset+=audited.size()-1;
+        }}catch(JSONException|RuntimeException e){android.util.Log.w("NavigationEvidence","Exact lane trace unavailable; maneuver preview retained",e);}
+        return result;
     }
     static List<Graph.Node> decode(String shape) {
         ArrayList<Graph.Node> nodes=new ArrayList<>();long lat=0,lon=0;int[] offset={0};

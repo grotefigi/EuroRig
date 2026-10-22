@@ -11,3 +11,5 @@ analysis/private/
 dist/
 
 .compaction/
+.gradle-home/
+work/

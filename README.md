@@ -2,6 +2,11 @@
 
 Free, open-source truck navigation, made by drivers for drivers.
 
+The local `codex/approved-interface` integration adds the approved native interface
+and selected-route simulation with a 0–200 km/h slider. It is not the published
+GitHub APK. See the [native APK guide](docs/NATIVE-APK-GUIDE.md) and
+[verification and outstanding limits](docs/NATIVE-INTERFACE-VERIFICATION.md).
+
 **0.5.0-dev: Romania is the first country for device testing.** The app installs
 with no maps. Download a country once; roads, search, truck routing and GPS then
 run locally. Coverage target: Europe excluding Russia.

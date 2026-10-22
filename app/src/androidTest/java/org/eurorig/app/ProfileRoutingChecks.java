@@ -36,8 +36,8 @@ final class ProfileRoutingChecks {
                 }
                 rejected(()->router.route(45.08,27.001,45.08,27.01,standard,mode,true),"Delivery cannot override low bridge clearance in "+mode);
                 rejected(()->router.route(45.04,27.001,45.04,27.01,standard,mode,false),"Standard access cannot enter hgv=no in "+mode);
-                Router.Route delivery=router.route(45.04,27.001,45.04,27.01,standard,mode,true);
-                require(delivery.restrictedMetres>300&&delivery.restrictedMetres<2000,"Audited permitted delivery segment in "+mode);
+                // This fixture says hgv=no, not hgv=destination. A preference cannot create access.
+                rejected(()->router.route(45.04,27.001,45.04,27.01,standard,mode,true),"Delivery cannot override hgv=no in "+mode);
                 Truck adr=new Truck(4,2.55,16.5,40,11.5,true,false,true,true,5,80,1,3);
                 Router.Route adrRoute=router.route(45.12,27.001,45.12,27.015,adr,mode,false);
                 require(adrRoute.edges.stream().noneMatch(edge->edge.way==20000013L),"ADR C tunnel excluded in "+mode);
@@ -57,6 +57,12 @@ final class ProfileRoutingChecks {
         require(!trace.getJSONObject("truck").has("disable_hierarchy_pruning")&&query.toString().equals(original),"Trace omits crash option without changing the route request");
         JSONObject expected=new JSONObject(query.getJSONObject("costing_options").toString());expected.getJSONObject("truck").remove("disable_hierarchy_pruning");
         require(trace.toString().equals(expected.toString()),"Trace retains every other truck option");
+        JSONObject first=new JSONObject().put("shape","??AA").put("summary",new JSONObject().put("length",1).put("time",10)).put("maneuvers",new JSONArray().put(new JSONObject().put("begin_shape_index",0).put("end_shape_index",1).put("instruction","First")));
+        JSONObject second=new JSONObject().put("shape","AA??AA").put("summary",new JSONObject().put("length",2).put("time",20)).put("maneuvers",new JSONArray().put(new JSONObject().put("begin_shape_index",0).put("end_shape_index",2).put("instruction","Second")));
+        JSONObject joined=NativeRouter.joinLegs(new JSONArray().put(first).put(second));
+        require(NativeRouter.decode(joined.getString("shape")).size()==4&&joined.getJSONObject("summary").getDouble("time")==30&&joined.getJSONArray("maneuvers").getJSONObject(1).getInt("end_shape_index")==3,"Native waypoint legs share a boundary, preserve interior vertices and translate maneuvers");
+        require(second.getJSONArray("maneuvers").getJSONObject(0).getInt("end_shape_index")==2,"Joining never mutates the original leg used for exact tracing");
+        JSONObject disconnected=new JSONObject(second.toString()).put("shape","CCAA");boolean gapRejected=false;try{NativeRouter.joinLegs(new JSONArray().put(first).put(disconnected));}catch(IllegalStateException expectedGap){gapRejected=true;}require(gapRejected,"Disconnected waypoint legs never become a straight route across a gap");
         JSONArray complete=new JSONArray().put(edge(0,2,10)).put(edge(2,2,11)).put(edge(2,4,12));
         require(Arrays.equals(NativeRouter.auditedWays(complete,5),new long[]{10,10,12,12}),"Full edge coverage accepts shared junctions and zero-length edges");
         for(JSONArray bad:new JSONArray[]{new JSONArray(),new JSONArray().put(edge(0,2,10)),new JSONArray().put(edge(0,1,10)).put(edge(2,4,12)),

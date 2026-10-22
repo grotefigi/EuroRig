@@ -6,6 +6,7 @@ import java.util.*;
 public final class Router {
     public static final class Route {
         public final Graph graph;
+        public NavigationData navigation=NavigationData.EMPTY;
         public final List<Graph.Edge> edges;
         public final double metres, seconds, restrictedMetres;
         /**
@@ -21,6 +22,11 @@ public final class Router {
          */
         public boolean requiresAuthorisation;
         public final double[] cumulative;
+        public final List<Graph.Node> waypoints;
+        private final double[] waypointMetres;
+        public int waypointCount(){return waypointMetres.length;}
+        public double toNextWaypoint(double travelled){for(double stop:waypointMetres)if(stop>travelled+35)return Math.max(0,stop-travelled);return Math.max(0,metres-travelled);}
+        public int passedWaypoints(double travelled){int passed=0;for(double stop:waypointMetres){if(travelled+35<stop)break;passed++;}return passed;}
         private final SortedMap<Integer,String> maneuvers;
         Route(Graph graph, List<Graph.Edge> edges) {
             this(graph,edges,null,-1);
@@ -30,12 +36,24 @@ public final class Router {
             this(graph,edges,maneuvers,duration,0);
         }
         public Route(Graph graph,List<Graph.Edge> edges,SortedMap<Integer,String> maneuvers,double duration,double restrictedMetres){
+            this(graph,edges,maneuvers,duration,restrictedMetres,Collections.emptyList(),new int[0]);
+        }
+        /** Native break-leg boundaries retain stop order even when a route crosses itself. */
+        public Route(Graph graph,List<Graph.Edge> edges,SortedMap<Integer,String> maneuvers,double duration,double restrictedMetres,List<Graph.Node> waypointPoints,int[] waypointShapeIndices){
+            if(waypointPoints.size()!=waypointShapeIndices.length)throw new IllegalArgumentException("Waypoint geometry is incomplete");
+            waypoints=Collections.unmodifiableList(new ArrayList<>(waypointPoints));
             this.restrictedMetres=restrictedMetres;
             this.graph=graph; this.edges=Collections.unmodifiableList(edges);
             this.maneuvers=maneuvers==null?null:Collections.unmodifiableSortedMap(new TreeMap<>(maneuvers));
             cumulative=new double[edges.size()+1]; double s=0;
             for(int i=0;i<edges.size();i++) { cumulative[i+1]=cumulative[i]+edges.get(i).metres; s+=edges.get(i).seconds(); }
             metres=cumulative[edges.size()]; seconds=duration>=0?duration:s;
+            waypointMetres=new double[waypointShapeIndices.length];int previous=0;
+            for(int i=0;i<waypointShapeIndices.length;i++){
+                int index=waypointShapeIndices[i];
+                if(index<previous||index<0||index>edges.size())throw new IllegalArgumentException("Invalid waypoint geometry order");
+                waypointMetres[i]=cumulative[index];previous=index;
+            }
         }
         public boolean nativeGeometry(){return maneuvers!=null;}
         /**
@@ -103,7 +121,7 @@ public final class Router {
                     best[id]=cost;parent[id]=current.edge;
                     Graph.Node a=g.nodes[e.to], b=g.nodes[end];
                     double remaining=Geo.distance(a.lat,a.lon,b.lat,b.lon);
-                    queue.add(new Item(id,cost,cost+(mode==null?remaining/(80/3.6):remaining)));
+                    queue.add(new Item(id,cost,cost+(mode==null||mode==RoutingMode.FASTEST?remaining/(300/3.6):remaining)));
                 }
             }
         }

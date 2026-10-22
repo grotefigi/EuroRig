@@ -8,6 +8,7 @@ import java.util.concurrent.*;
 
 /** Single process state shared with the navigation service. */
 final class Store {
+    static final java.util.List<Graph.Node> viaPoints=new java.util.ArrayList<>();
     static volatile Graph graph;
     static NativeRouter nativeRouter;
     /** Overlay filter: false shows only records that affect the current truck. */
@@ -30,6 +31,12 @@ final class Store {
     /** Driver-facing wording for how the route ends, kept in one place with the audit. */
     static String arrivalText(){return nativeRouter==null?"":nativeRouter.arrivalText();}
     static volatile DisplayDatabase display;
+    /** Public NDW truck-parking feed; null until the activity or service starts it. */
+    @android.annotation.SuppressLint("StaticFieldLeak") // Application-scoped, holds no activity.
+    static volatile ParkingRepository parking;
+    /** Sites the guidance thread proved reachable on the current carriageway. */
+    static volatile java.util.List<org.eurorig.routing.parking.ParkingAccess.Match> parkingMatches=java.util.Collections.emptyList();
+    static volatile String parkingNote="";
     static volatile Router.Route route;
     static volatile Router.Route progressRoute;
     static volatile double travelled;
@@ -37,14 +44,15 @@ final class Store {
     static volatile RoutingMode mode=RoutingMode.ECONOMICAL;
     static volatile boolean deliveryAccess;
     static volatile int start=0, end=3;
-    static volatile boolean originChosen, destinationChosen;
+    static volatile boolean originChosen, destinationChosen, originFromGps;
     static final ExecutorService worker=Executors.newSingleThreadExecutor();
     static final ExecutorService mapWorker=Executors.newSingleThreadExecutor();
     static volatile boolean navigating;
+    static volatile boolean simulating;
     static volatile boolean installing;
-    static synchronized boolean beginInstall(){if(navigating||installing)return false;installing=true;return true;}
+    static synchronized boolean beginInstall(){if(navigating||simulating||installing)return false;installing=true;return true;}
     static synchronized boolean beginGuidance(){
-        if(installing||graph==null||graph.demo||route==null||route.edges.isEmpty())return false;
+        if(installing||simulating||graph==null||graph.demo||route==null||route.edges.isEmpty())return false;
         // A route audited under an authorization that has since been revoked or replaced must not
         // start guiding: the driver withdrew the permission the audit relied on.
         if(route.authorisationStale(authorisationRevision(),privateAccessPermission)){guidanceRefused="Authorization changed; recalculate the route";return false;}
@@ -107,8 +115,10 @@ final class Store {
     static volatile String guidance="Choose your destination";
     static volatile double remaining, speed, bearing=Double.NaN;
     static volatile long fixTime;
+    static volatile float fixAccuracy=Float.NaN;
     static volatile boolean voiceEnabled=true;
     static void load(Context context) throws IOException {
+        NavigationSettings.reload(context);
         RegionPackages.cleanupStale(context);
         if(graph==null) {
             SharedPreferences settings=context.getSharedPreferences("settings",0);
@@ -141,17 +151,20 @@ final class Store {
             if(graph.name.equals(saved.getString("country","")))try{
                 int a=coordinate(Double.parseDouble(saved.getString("start_lat","")),Double.parseDouble(saved.getString("start_lon","")),saved.getString("start_label",""));
                 int b=coordinate(Double.parseDouble(saved.getString("end_lat","")),Double.parseDouble(saved.getString("end_lon","")),saved.getString("end_label",""));
-                if(a>=0&&b>=0){start=a;end=b;originChosen=saved.getBoolean("origin_chosen",true);destinationChosen=saved.getBoolean("destination_chosen",true);}
+                viaPoints.clear();try{org.json.JSONArray vias=new org.json.JSONArray(saved.getString("via_points","[]"));for(int i=0;i<Math.min(5,vias.length());i++){org.json.JSONObject savedVia=vias.getJSONObject(i);double x=savedVia.getDouble("lat"),y=savedVia.getDouble("lon");if(coordinate(x,y)>=0)viaPoints.add(new Graph.Node(x,y,savedVia.optString("name","Waypoint")));}}catch(org.json.JSONException invalid){viaPoints.clear();}
+                if(a>=0&&b>=0){start=a;end=b;originChosen=saved.getBoolean("origin_chosen",true);originFromGps=saved.getBoolean("origin_from_gps",false);destinationChosen=saved.getBoolean("destination_chosen",true);}
             }catch(NumberFormatException ignored){/* A new map keeps its initial endpoints. */}
         }
     }
     static void saveEndpoints(Context context){
+        org.json.JSONArray vias=new org.json.JSONArray();for(Graph.Node v:viaPoints)try{vias.put(new org.json.JSONObject().put("lat",v.lat).put("lon",v.lon).put("name",v.label));}catch(org.json.JSONException impossible){throw new IllegalStateException(impossible);}
+        context.getSharedPreferences("endpoints",0).edit().putString("via_points",vias.toString()).apply();
         if(graph==null)return;Graph.Node a=graph.nodes[start],b=graph.nodes[end];
-        context.getSharedPreferences("endpoints",0).edit().putString("country",graph.name).putBoolean("origin_chosen",originChosen).putBoolean("destination_chosen",destinationChosen).putString("start_lat",Double.toString(a.lat)).putString("start_lon",Double.toString(a.lon)).putString("start_label",a.label).putString("end_lat",Double.toString(b.lat)).putString("end_lon",Double.toString(b.lon)).putString("end_label",b.label).apply();
+        context.getSharedPreferences("endpoints",0).edit().putString("country",graph.name).putBoolean("origin_chosen",originChosen).putBoolean("origin_from_gps",originFromGps).putBoolean("destination_chosen",destinationChosen).putString("start_lat",Double.toString(a.lat)).putString("start_lon",Double.toString(a.lon)).putString("start_label",a.label).putString("end_lat",Double.toString(b.lat)).putString("end_lon",Double.toString(b.lon)).putString("end_label",b.label).apply();
     }
     static Router.Route calculate(Graph g,int from,int to,Truck t){
-        if(nativeRouter==null)return new Router().route(g,from,to,t,mode);
-        Graph.Node a=g.nodes[from],b=g.nodes[to];return nativeRouter.route(a.lat,a.lon,b.lat,b.lon,t,mode,deliveryAccess);
+        if(nativeRouter==null){if(!viaPoints.isEmpty())throw new IllegalStateException("Waypoints need the native country map");return new Router().route(g,from,to,t,mode);}
+        Graph.Node a=g.nodes[from],b=g.nodes[to];return nativeRouter.routeVia(a.lat,a.lon,b.lat,b.lon,t,mode,deliveryAccess,new java.util.ArrayList<>(viaPoints));
     }
     static void setRegionEndpoints(){
         for(int i=0;i<graph.nodes.length;i++){

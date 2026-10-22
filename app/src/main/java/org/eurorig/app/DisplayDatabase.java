@@ -55,6 +55,14 @@ final class DisplayDatabase implements AutoCloseable {
             if(!c.moveToFirst())throw new IOException("Missing display metadata: "+key);return c.getString(0);
         }
     }
+    synchronized Map<Long,JSONObject> navigationTags(List<Graph.Edge> edges){
+        HashMap<Long,JSONObject> result=new HashMap<>();if(!hasTable("navigation_roads"))return result;
+        LinkedHashSet<Long> ways=new LinkedHashSet<>();for(Graph.Edge edge:edges)ways.add(edge.way);
+        ArrayList<Long> ids=new ArrayList<>(ways);
+        for(int begin=0;begin<ids.size();begin+=400){List<Long> batch=ids.subList(begin,Math.min(ids.size(),begin+400));String[] args=new String[batch.size()];for(int i=0;i<args.length;i++)args[i]=Long.toString(batch.get(i));
+            try(Cursor c=database.rawQuery("SELECT way,tags FROM navigation_roads WHERE way IN ("+String.join(",",Collections.nCopies(args.length,"?"))+")",args)){while(c.moveToNext())try{result.put(c.getLong(0),new JSONObject(c.getString(1)));}catch(JSONException invalid){android.util.Log.w("NavigationEvidence","Invalid optional way tags",invalid);}}
+        }return result;
+    }
     synchronized List<Graph.Node> search(String text){
         String[] tokens=Graph.normalize(text).trim().split("[^\\p{L}\\p{N}]+");StringBuilder expression=new StringBuilder();
         for(String token:tokens){if(token.isEmpty())continue;if(expression.length()>0)expression.append(' ');expression.append(token).append('*');}
@@ -62,6 +70,24 @@ final class DisplayDatabase implements AutoCloseable {
         try(Cursor c=database.rawQuery("SELECT p.label,p.lat,p.lon FROM search s JOIN places p ON p.id=s.rowid WHERE s.text MATCH ? ORDER BY CASE p.kind WHEN 'city' THEN 0 WHEN 'town' THEN 1 WHEN 'village' THEN 2 ELSE 3 END, length(p.label) LIMIT 30",new String[]{expression.toString()})){
             while(c.moveToNext())points.add(new Graph.Node(c.getDouble(1),c.getDouble(2),c.getString(0)));
         }return points;
+    }
+    synchronized List<Graph.Node> nearby(String kind,double lat,double lon){
+        ArrayList<Graph.Node> points=new ArrayList<>();
+        try(Cursor c=database.rawQuery("SELECT label,lat,lon FROM places WHERE kind=? AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? ORDER BY abs(lat-?)+abs(lon-?)*.7 LIMIT 30",new String[]{kind,""+(lat-.3),""+(lat+.3),""+(lon-.4),""+(lon+.4),""+lat,""+lon})){
+            while(c.moveToNext())points.add(new Graph.Node(c.getDouble(1),c.getDouble(2),c.getString(0)));
+        }return points;
+    }
+    /** Labels only when native vector tiles already supply road geometry. */
+    synchronized Graph cartographicLabels(double south,double west,double north,double east,double pixels){
+        ArrayList<Graph.Node> names=new ArrayList<>();HashSet<String> seen=new HashSet<>();
+        String[] args={""+level(pixels),""+south,""+north,""+west,""+east};
+        try(Cursor rows=database.rawQuery("SELECT name,shape FROM roads WHERE level<=? AND north>=? AND south<=? AND east>=? AND west<=? AND name<>'' ORDER BY level LIMIT 350",args)){
+            while(rows.moveToNext()&&names.size()<80){String title=rows.getString(0);if(!seen.add(title))continue;List<Graph.Node> shape=NativeRouter.decode(rows.getString(1));if(!shape.isEmpty()){Graph.Node p=shape.get(shape.size()/2);names.add(new Graph.Node(p.lat,p.lon,title));}}
+        }
+        try(Cursor rows=database.rawQuery("SELECT label,lat,lon FROM places WHERE kind IN ('city','town','village') AND lat BETWEEN ? AND ? AND lon BETWEEN ? AND ? LIMIT 30",new String[]{""+south,""+north,""+west,""+east})){
+            while(rows.moveToNext())if(seen.add(rows.getString(0)))names.add(new Graph.Node(rows.getDouble(1),rows.getDouble(2),rows.getString(0)));
+        }
+        return new Graph(name,attribution,date,false,names.toArray(new Graph.Node[0]),new Graph.Edge[0],Collections.emptyList());
     }
     static int level(double pixels){return pixels<6500?2:pixels<10000?3:pixels<18000?5:6;}
     synchronized Graph visible(double south,double west,double north,double east,double pixels){
@@ -274,8 +300,8 @@ final class DisplayDatabase implements AutoCloseable {
             StringJoiner placeholders=new StringJoiner(",");
             String[] args=new String[count];
             for(int i=0;i<count;i++){args[i]=Long.toString(ids.get(offset+i));placeholders.add("?");}
-            try(Cursor rows=database.rawQuery("SELECT r.id,r.level,r.shape,coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0)"+columns
-                    +" FROM roads r JOIN road_rules q ON q.way=r.id WHERE r.id IN ("+placeholders+") AND r.level<=4",args)){
+            try(Cursor rows=database.rawQuery("SELECT r.id,r.level,r.shape,coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0)"+columns+",coalesce(q.tags,'{}')"
+                    +" FROM roads r JOIN road_rules q ON q.way=r.id WHERE r.id IN ("+placeholders+") AND r.level<=6",args)){
                 while(rows.moveToNext()&&found.size()<limit){
                     MappedRestriction item=read(rows,truck);
                     if(item!=null)found.add(item);
@@ -289,31 +315,38 @@ final class DisplayDatabase implements AutoCloseable {
     private static MappedRestriction read(Cursor rows,Truck truck){
         double height=rows.getDouble(3),width=rows.getDouble(4),length=rows.getDouble(5),weight=rows.getDouble(6),axle=rows.getDouble(7);
         int kind=rows.getInt(9);String evidence=rows.getString(10);
+        Map<String,String> tags=parseTags(rows.getString(11));
+        RestrictionRule rule=new RestrictionRule(height,width,length,weight,axle,rows.getInt(8),tags,kind,evidence);
+        if(kind==0){if(height>0||width>0||length>0||weight>0||axle>0||(rule.flags&Graph.HAZMAT)!=0)kind|=RestrictionRule.HARD;if(rule.accessLimited())kind|=RestrictionRule.ACCESS;if((rule.flags&Graph.UNCERTAIN)!=0)kind|=RestrictionRule.UNCERTAIN;}
+
         if(kind==0&&(height<=0&&width<=0&&length<=0&&weight<=0&&axle<=0))return null;
         if((kind&RestrictionRule.PREFERENCE)!=0&&(kind&(RestrictionRule.HARD|RestrictionRule.ACCESS|RestrictionRule.UNCERTAIN))==0)return null;
-        String label=label(height,width,length,weight,axle,kind,evidence);
+        String label=rule.oneWay()?"One way · direction dependent":label(height,width,length,weight,axle,kind,evidence);
+        if(label==null&&rule.hazardViolation(truck)!=null)label="ADR load restriction";
+        if(label==null&&rule.hard(truck))label="Truck limit";
         if(label==null)return null;
         List<Graph.Node> shape;
         try{shape=NativeRouter.decode(rows.getString(2));}catch(RuntimeException malformed){return null;}
         if(shape.size()<2)return null;
         boolean exceeded=(height>0&&truck.height>height)||(width>0&&truck.width>width)||(length>0&&truck.length>length)
                 ||(weight>0&&truck.weight>weight)||(axle>0&&truck.axleWeight>axle);
-        return new MappedRestriction(rows.getLong(0),shape,label,kind,height,width,length,weight,axle,evidence,exceeded);
+        return new MappedRestriction(rows.getLong(0),shape,label,kind,height,width,length,weight,axle,evidence,exceeded,rule);
     }
 
     /** One recorded restriction with the geometry it applies to and everything needed to explain it. */
     static final class MappedRestriction{
         final long way;final List<Graph.Node> shape;final String label;final int kind;
-        final double height,width,length,weight,axle;final String evidence;final boolean exceeded;
+        final double height,width,length,weight,axle;final String evidence;final boolean exceeded;final RestrictionRule rule;
         MappedRestriction(long way,List<Graph.Node> shape,String label,int kind,
                           double height,double width,double length,double weight,double axle,
-                          String evidence,boolean exceeded){
+                          String evidence,boolean exceeded,RestrictionRule rule){
             this.way=way;this.shape=shape;this.label=label;this.kind=kind;
             this.height=height;this.width=width;this.length=length;this.weight=weight;this.axle=axle;
-            this.evidence=evidence==null?"":evidence;this.exceeded=exceeded;
+            this.evidence=evidence==null?"":evidence;this.exceeded=exceeded;this.rule=rule;
         }
         /** Would this record actually affect the given vehicle? */
         boolean affects(Truck truck){
+            if(rule.hard(truck)||rule.relevantUncertainty(truck))return true;
             if(height>0&&truck.height>height)return true;
             if(width>0&&truck.width>width)return true;
             if(length>0&&truck.length>length)return true;
@@ -324,6 +357,13 @@ final class DisplayDatabase implements AutoCloseable {
         }
         /** Physical/legal limit this vehicle exceeds: never a delivery exception. */
         boolean physicallyBlocked(){ return exceeded; }
+        boolean blockedFor(Truck truck){
+            // Evaluate both real directions with the router's policy. A one-way alone
+            // must not paint the entire street as forbidden. A low bridge, weight limit
+            // or HGV ban on that same one-way still blocks this truck in both directions.
+            return AccessPolicy.decide(rule,truck,Double.POSITIVE_INFINITY,false,false,false,RestrictionRule.DIR_FORWARD).blocked()
+                    &&AccessPolicy.decide(rule,truck,Double.POSITIVE_INFINITY,false,false,false,RestrictionRule.DIR_BACKWARD).blocked();
+        }
     }
 
     /**
@@ -331,35 +371,27 @@ final class DisplayDatabase implements AutoCloseable {
      * Reads the same normalised records the router audits; there is no second parser.
      */
     synchronized List<MappedRestriction> restrictionsInView(double south,double west,double north,double east,int limit){
+        return restrictionsInView(south,west,north,east,limit,Integer.MAX_VALUE);
+    }
+    synchronized List<MappedRestriction> restrictionsInView(double south,double west,double north,double east,int limit,int maxLevel){
         ArrayList<MappedRestriction> found=new ArrayList<>();
         if(!restrictionEvidence)return found;
         Truck truck=Store.truck;
         String columns=classified?",coalesce(q.kind,0),coalesce(q.evidence,'')":",0,''";
-        // The 0.02 degree cell index turns a full bbox scan into a handful of range probes
-        // (150 ms -> 7 ms here); the bbox form is only a fallback for packs without it.
-        boolean indexed=hasTable("cells");
-        String from=" FROM roads r JOIN road_rules q ON q.way=r.id WHERE ";
-        String where=indexed?"r.id IN (SELECT road FROM cells WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?)"
-                :"r.north>=? AND r.south<=? AND r.east<=? AND r.west<=?";
-        String[] args=indexed
-                ?new String[]{""+(int)Math.floor(south/.02),""+(int)Math.floor(north/.02),""+(int)Math.floor(west/.02),""+(int)Math.floor(east/.02),""+limit}
-                :new String[]{""+south,""+north,""+west,""+east,""+limit};
-        try(Cursor rows=database.rawQuery("SELECT r.id,r.level,r.shape,coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0)"+columns
-                +from+where+" AND r.level<=4 LIMIT ?",args)){
-            while(rows.moveToNext()){
-                double height=rows.getDouble(3),width=rows.getDouble(4),length=rows.getDouble(5),weight=rows.getDouble(6),axle=rows.getDouble(7);
-                int kind=rows.getInt(9);String evidence=rows.getString(10);
-                if(kind==0&&(height<=0&&width<=0&&length<=0&&weight<=0&&axle<=0))continue;
-                if((kind&RestrictionRule.PREFERENCE)!=0&&(kind&(RestrictionRule.HARD|RestrictionRule.ACCESS|RestrictionRule.UNCERTAIN))==0)continue;
-                String label=label(height,width,length,weight,axle,kind,evidence);
-                if(label==null)continue;
-                List<Graph.Node> shape;
-                try{shape=NativeRouter.decode(rows.getString(2));}catch(RuntimeException malformed){continue;}
-                if(shape.size()<2)continue;
-                boolean exceeded=(height>0&&truck.height>height)||(width>0&&truck.width>width)||(length>0&&truck.length>length)
-                        ||(weight>0&&truck.weight>weight)||(axle>0&&truck.axleWeight>axle);
-                found.add(new MappedRestriction(rows.getLong(0),shape,label,kind,height,width,length,weight,axle,evidence,exceeded));
-            }
+        ArrayList<String> args=new ArrayList<>();String indexed="";
+        if(maxLevel>2&&hasTable("cells")){
+            indexed="r.id IN (SELECT road FROM cells WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?";
+            Collections.addAll(args,""+(int)Math.floor(south/.02),""+(int)Math.floor(north/.02),""+(int)Math.floor(west/.02),""+(int)Math.floor(east/.02));
+            if(spatialIndex){indexed+=" UNION SELECT road FROM large_cells WHERE lat BETWEEN ? AND ? AND lon BETWEEN ? AND ?";
+                Collections.addAll(args,""+(int)Math.floor(south/.25),""+(int)Math.floor(north/.25),""+(int)Math.floor(west/.25),""+(int)Math.floor(east/.25));}
+            indexed+=") AND ";
+        }
+        // Exact viewport intersection after the cell lookup avoids outside-cell records
+        // displacing visible roads. LIMIT -1 deliberately includes every matching record.
+        Collections.addAll(args,""+south,""+north,""+west,""+east,""+maxLevel,""+limit);
+        try(Cursor rows=database.rawQuery("SELECT r.id,r.level,r.shape,coalesce(q.height,0),coalesce(q.width,0),coalesce(q.length,0),coalesce(q.weight,0),coalesce(q.axle,0),coalesce(q.flags,0)"+columns+",coalesce(q.tags,'{}')"
+                +" FROM roads r JOIN road_rules q ON q.way=r.id WHERE "+indexed+"r.north>=? AND r.south<=? AND r.east>=? AND r.west<=? AND r.level<=? LIMIT ?",args.toArray(new String[0]))){
+            while(rows.moveToNext()){MappedRestriction item=read(rows,truck);if(item!=null)found.add(item);}
         }
         return found;
     }
