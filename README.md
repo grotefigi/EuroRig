@@ -127,11 +127,14 @@ Verification pins the official API 36 revision 2 platform JAR and checks build-t
 Use Python 3.12 in a dedicated environment for tooling tests. The Windows bootstrap installs its pinned test dependency in `.toolchain/qa-python`.
 
 ```powershell
+if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = "$PWD/.toolchain/sdk" }
 ./tools/build.ps1 -Tasks ':routing:test',':app:assembleDebug',':app:assembleDebugAndroidTest',':app:lintDebug'
 python -m pip install -r tools/test-requirements.txt
 python tools/verify_android_sdk.py $env:ANDROID_HOME
 python tools/run_tooling_tests.py
 ```
+
+If Windows policy blocks PowerShell scripts, use `gradlew.bat :routing:test :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug` with JDK 21 configured. No execution-policy change is required.
 
 Use `bash gradlew` on other hosts. `-PmapCatalogUrl=https://your-host/catalog.json`
 overrides the mirror. For country builds install `tools/map-requirements.txt` in

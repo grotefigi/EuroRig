@@ -19,11 +19,24 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install required Android build components
-        run: '"$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "platforms;android-36" "build-tools;36.0.0"'
+        run: |
+          python - <<'PY'
+          import os, subprocess
+          from pathlib import Path
+          executable = 'sdkmanager.bat' if os.name == 'nt' else 'sdkmanager'
+          manager = Path(os.environ['ANDROID_HOME']) / 'cmdline-tools/latest/bin' / executable
+          subprocess.run([str(manager), 'platforms;android-36', 'build-tools;36.0.0'], check=True)
+          PY
       - name: Verify Android build components
         run: python tools/verify_android_sdk.py "$ANDROID_HOME"
       - name: Configure local SDK
-        run: printf 'sdk.dir=%s\n' "$ANDROID_HOME" > local.properties
+        run: |
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          sdk = Path(os.environ['ANDROID_HOME']).as_posix().replace(':', '\\:')
+          Path('local.properties').write_text('sdk.dir=' + sdk + '\n')
+          PY
       - name: Install display compiler test dependency
         run: python -m pip install -r tools/test-requirements.txt
       - name: Verify routing, compiler and Android build

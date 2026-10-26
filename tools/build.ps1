@@ -6,7 +6,8 @@ if ($LocalJdk) { $env:JAVA_HOME = $LocalJdk.FullName }
 if ($env:JAVA_HOME) { $env:PATH = "$env:JAVA_HOME/bin;$env:PATH" }
 # A short socket directory avoids JDK Unix-domain socket failures on Windows.
 New-Item -ItemType Directory -Force "$ProjectRoot/.toolchain/t" | Out-Null
-$env:JAVA_TOOL_OPTIONS = "$env:JAVA_TOOL_OPTIONS -Djdk.net.unixdomain.tmpdir=$ProjectRoot/.toolchain/t"
+$SocketOption = '"-Djdk.net.unixdomain.tmpdir=' + $ProjectRoot + '/.toolchain/t"'
+$env:JAVA_TOOL_OPTIONS = "$env:JAVA_TOOL_OPTIONS $SocketOption"
 Push-Location $ProjectRoot
 try {
     if (Test-Path "$ProjectRoot/gradlew.bat") { & "$ProjectRoot/gradlew.bat" @Tasks }
