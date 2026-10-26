@@ -1,0 +1,17 @@
+{
+  "format": 1,
+  "engine": "valhalla",
+  "native_version": "0.6.3",
+  "name": "Andorra test region",
+  "coverage": "Andorra only; validation sample",
+  "routing_source": "https://github.com/Rallista/valhalla-mobile/tree/84e809df72c2b8c0c3e966d336841bbe707d4b71/android/valhalla/src/androidTest/assets",
+  "routing_date": "unknown",
+  "display_source": "https://download.geofabrik.de/europe/andorra.html",
+  "display_downloaded": "2026-10-06",
+  "attribution": "© OpenStreetMap contributors",
+  "license": "ODbL-1.0",
+  "sha256": {
+    "routing.tar": "02e68c8cdb1e8ac9379855ac7bee2da21ee9240b1c314fbf5e2bf98c77f45cfd",
+    "display.europack": "028380422c5d77db36bcdadc65899f20f5bae35216f7ce73f4436ad7a3c708ed"
+  }
+}

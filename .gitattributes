@@ -1,0 +1,10 @@
+* text=auto eol=lf
+*.java text eol=lf
+*.py text eol=lf
+*.md text eol=lf
+*.ps1 text eol=lf
+gradlew text eol=lf
+*.bat text eol=crlf
+*.europack binary
+*.tar binary
+app/src/main/assets/licenses/* -whitespace

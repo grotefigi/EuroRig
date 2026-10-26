@@ -1,0 +1,34 @@
+{
+  "device": {
+    "model": "SM-X716B",
+    "android_release": "16"
+  },
+  "package_identities": [
+    "org.eurorig.app.dev",
+    "org.eurorig.app.preview"
+  ],
+  "installed_apks": [
+    {
+      "package": "org.eurorig.app.dev",
+      "sha256": "905104f4051c79fce40c6b9fba216abd5fe3e61e272c4b7bcdebf8b84097a782",
+      "bytes": 81540270,
+      "certificate_sha256": "409674d8b1c59cd838025f2e2da2bbcb585c03d832de1119dcc9e62e6b1928d8"
+    },
+    {
+      "package": "org.eurorig.app.preview",
+      "sha256": "bfd1422d3a0b3d701e9a285df8308245dee459ed389ad15f21a0ab544ef37908",
+      "bytes": 81557265,
+      "certificate_sha256": "88f0c6f45311e1331f8416fe7a89b6e8652c618e50784f97251635ce3d24906d"
+    },
+    {
+      "package": "org.eurorig.app.preview.test",
+      "sha256": "c4292e5e59a6fbd557681b685c57e222ddda5f269f84c2fc3602d2142475c432",
+      "bytes": 2472506,
+      "certificate_sha256": "88f0c6f45311e1331f8416fe7a89b6e8652c618e50784f97251635ce3d24906d"
+    }
+  ],
+  "preview_preferences": {
+    "file_count": 7,
+    "archive_sha256": "2a5279d725b2d7bfbda50e936d5a0414abc03cdb8624bddfd10762a0458457bb"
+  }
+}

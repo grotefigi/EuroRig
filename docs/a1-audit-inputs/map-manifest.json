@@ -1,0 +1,26 @@
+{
+  "package": "org.eurorig.app.preview",
+  "files": [
+    {
+      "artifact": "detail MBTiles",
+      "bytes": 527015936,
+      "sha256": "a9938dc3e3401c21f6bc78bebc7dd50b7699efb6802420298b4a20d1a61a7484"
+    },
+    {
+      "artifact": "regional routing archive",
+      "bytes": 516413440,
+      "sha256": "7f419236ecf3c9c052a6b70a1953d9ed6640733b747e44296906238596fd167a"
+    },
+    {
+      "artifact": "region manifest",
+      "bytes": 460,
+      "sha256": "3bd4d28499f9506ebe6d0ff7f623df87eee3aff1b86ee94eb406d4ad992486d3"
+    },
+    {
+      "artifact": "display database",
+      "bytes": 798195712,
+      "sha256": "8ffe21db72b6e4cf64a1cce4e53a971edab8e4d3a1489f503a5d195971a77b5f",
+      "match": "PASS"
+    }
+  ]
+}

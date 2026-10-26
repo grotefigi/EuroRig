@@ -1,0 +1,32 @@
+EuroRig 0.3.0 development build
+Original EuroRig source: MIT. Fictional training data: CC0.
+
+Valhalla Mobile 0.6.3 and Valhalla models 0.5.2: MIT,
+Adventure Consortium Inc (dba Rallista), Valhalla contributors,
+Mapillary AB and Mapzen. https://github.com/Rallista/valhalla-mobile
+Underlying Valhalla source revision: e2f017b16080f49203de245a211b09efab09cf72.
+
+Native dependencies: Boost (Boost Software License), Protobuf (BSD),
+RapidJSON (MIT/BSD), robin-hood hashing (MIT), unordered_dense (MIT),
+LZ4 (BSD), Howard Hinnant date (MIT), Abseil (Apache 2.0),
+LLVM libc++ (Apache 2.0 with LLVM exceptions).
+
+Java/Kotlin dependencies: AndroidX, Kotlin, Kotlin coroutines, JetBrains
+annotations, Moshi, Okio and Guava listenablefuture (Apache 2.0).
+Stadia Maps OSRM OpenAPI 0.0.10: BSD 3-Clause. This transitive model library
+does not provide a navigation service to EuroRig.
+Full licence texts are in assets/licenses and the source archive.
+
+Map data: © OpenStreetMap contributors, Open Database License 1.0.
+https://www.openstreetmap.org/copyright
+https://opendatacommons.org/licenses/odbl/1-0/
+No maps are bundled in the application APK. Country packages are downloaded
+separately and include OSM attribution, snapshot date and checksums. The Romania
+test package and its original Geofabrik PBF are available with the map release:
+https://github.com/grotefigi/EuroRig/releases/tag/maps-current
+Derived routing and display/search databases are offered under ODbL 1.0.
+
+Andorra and fictional fixtures are included only in the source and test APK.
+Their provenance is recorded in app/src/androidTest/assets/andorra-manifest.json.
+
+Eurowag, RoadLords and Sygic code, maps, art and voices are not included.

@@ -1,0 +1,23 @@
+{
+  "_note": "Shared corridor definitions for ETA calibration. Coordinates are city/airport centres; the engine snaps to the nearest routable node on each side. 'kind' is the character the corridor exercises.",
+  "corridors": [
+    {"id": "galati_nadlac", "kind": "long motorway haul", "a": [45.4350, 28.0080], "b": [46.1667, 20.7500],
+     "a_name": "Galati", "b_name": "Nadlac", "multi": null},
+    {"id": "galati_bucharest", "kind": "mixed motorway+national", "a": [45.4350, 28.0080], "b": [44.4268, 26.1025],
+     "a_name": "Galati", "b_name": "Bucharest", "multi": null},
+    {"id": "bucharest_brasov", "kind": "mixed, mountain (DN1/A3)", "a": [44.4268, 26.1025], "b": [45.6579, 25.6012],
+     "a_name": "Bucharest", "b_name": "Brasov", "multi": null},
+    {"id": "valcea_sibiu", "kind": "national road DN7 (Olt valley)", "a": [45.1047, 24.3662], "b": [45.7970, 24.1520],
+     "a_name": "Ramnicu Valcea", "b_name": "Sibiu", "multi": null},
+    {"id": "bucharest_otopeni", "kind": "short urban", "a": [44.4325, 26.1039], "b": [44.5722, 26.1022],
+     "a_name": "Bucharest centre", "b_name": "Otopeni airport", "multi": null},
+    {"id": "cluj_oradea", "kind": "mixed motorway A3 + national", "a": [46.7712, 23.6236], "b": [47.0556, 21.9271],
+     "a_name": "Cluj-Napoca", "b_name": "Oradea", "multi": null},
+    {"id": "piatra_iasi", "kind": "national road ~110 km", "a": [46.9275, 26.3709], "b": [47.1585, 27.6014],
+     "a_name": "Piatra Neamt", "b_name": "Iasi", "multi": null},
+    {"id": "galati_szeged", "kind": "cross-border RO->HU", "a": [45.4350, 28.0080], "b": [46.2530, 20.1480],
+     "a_name": "Galati", "b_name": "Szeged", "multi": ["romania", "hungary"]},
+    {"id": "galati_vrsac", "kind": "cross-border RO->RS", "a": [45.4350, 28.0080], "b": [45.1167, 21.3033],
+     "a_name": "Galati", "b_name": "Vrsac", "multi": ["romania", "serbia"]}
+  ]
+}

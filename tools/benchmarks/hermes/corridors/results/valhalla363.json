@@ -1,0 +1,62 @@
+{
+  "tile_dir": "C:/AI/EuroRig/tools/valhalla/tiles",
+  "truck": {
+    "height": 4.0,
+    "width": 2.55,
+    "length": 16.5,
+    "weight": 40.0,
+    "axle_load": 11.5,
+    "axle_count": 5,
+    "top_speed": 80.0
+  },
+  "corridors": {
+    "galati_nadlac": {
+      "km": 762.6,
+      "min": 737.0,
+      "avg_kmh": 62.1,
+      "wall_s": 0.247
+    },
+    "galati_bucharest": {
+      "km": 238.9,
+      "min": 225.1,
+      "avg_kmh": 63.7,
+      "wall_s": 0.059
+    },
+    "bucharest_brasov": {
+      "km": 185.8,
+      "min": 204.1,
+      "avg_kmh": 54.6,
+      "wall_s": 0.05
+    },
+    "valcea_sibiu": {
+      "km": 100.3,
+      "min": 103.4,
+      "avg_kmh": 58.2,
+      "wall_s": 0.03
+    },
+    "bucharest_otopeni": {
+      "km": 21.6,
+      "min": 26.3,
+      "avg_kmh": 49.1,
+      "wall_s": 0.022
+    },
+    "cluj_oradea": {
+      "km": 164.6,
+      "min": 151.8,
+      "avg_kmh": 65.1,
+      "wall_s": 0.047
+    },
+    "piatra_iasi": {
+      "km": 135.2,
+      "min": 127.2,
+      "avg_kmh": 63.8,
+      "wall_s": 0.033
+    },
+    "galati_szeged": {
+      "error": "No path could be found for input"
+    },
+    "galati_vrsac": {
+      "error": "No path could be found for input"
+    }
+  }
+}

@@ -1,0 +1,16 @@
+.gradle/
+**/build/
+.toolchain/
+local.properties
+*.europack
+!app/src/androidTest/assets/demo.europack
+!app/src/androidTest/assets/andorra.europack
+!app/src/androidTest/assets/fixtures/display.europack
+__pycache__/
+analysis/private/
+*.apk
+dist/
+
+.compaction/
+.gradle-home/
+work/

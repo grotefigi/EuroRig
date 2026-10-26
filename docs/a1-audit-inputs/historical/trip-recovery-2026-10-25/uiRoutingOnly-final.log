@@ -1,0 +1,23 @@
+INSTRUMENTATION_RESULT: stream=FAIL: java.lang.AssertionError: java.lang.AssertionError: Reordering changes only the selected order
+	at org.eurorig.app.NativeInterfaceChecks.ui(NativeInterfaceChecks.java:113)
+	at org.eurorig.app.UiRoutingChecks.run(UiRoutingChecks.java:56)
+	at org.eurorig.app.NativeSmokeInstrumentation.onStart(NativeSmokeInstrumentation.java:27)
+	at android.app.Instrumentation$InstrumentationThread.run(Instrumentation.java:2683)
+Caused by: java.lang.AssertionError: Reordering changes only the selected order
+	at org.eurorig.app.UiRoutingChecks.require(UiRoutingChecks.java:94)
+	at org.eurorig.app.UiRoutingChecks.lambda$run$5(UiRoutingChecks.java:57)
+	at org.eurorig.app.UiRoutingChecks$$ExternalSyntheticLambda8.run(D8$$SyntheticClass:0)
+	at org.eurorig.app.NativeInterfaceChecks.lambda$ui$27(NativeInterfaceChecks.java:113)
+	at org.eurorig.app.NativeInterfaceChecks$$ExternalSyntheticLambda29.run(D8$$SyntheticClass:0)
+	at android.app.Instrumentation$SyncRunnable.run(Instrumentation.java:2703)
+	at android.os.Handler.handleCallback(Handler.java:1070)
+	at android.os.Handler.dispatchMessage(Handler.java:125)
+	at android.os.Looper.dispatchMessage(Looper.java:358)
+	at android.os.Looper.loopOnce(Looper.java:288)
+	at android.os.Looper.loop(Looper.java:392)
+	at android.app.ActivityThread.main(ActivityThread.java:10346)
+	at java.lang.reflect.Method.invoke(Native Method)
+	at com.android.internal.os.RuntimeInit$MethodAndArgsCaller.run(RuntimeInit.java:638)
+	at com.android.internal.os.ZygoteInit.main(ZygoteInit.java:972)
+
+INSTRUMENTATION_CODE: 1

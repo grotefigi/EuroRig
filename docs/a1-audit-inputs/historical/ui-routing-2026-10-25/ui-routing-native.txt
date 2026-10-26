@@ -1,0 +1,2 @@
+PASS: independent country options, ten audited stops, native editor/reorder, equal-endpoint validation and main-map controls
+

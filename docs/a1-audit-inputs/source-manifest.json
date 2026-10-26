@@ -1,0 +1,15 @@
+{
+  "repo": "<redacted source checkout>",
+  "branch": "codex/eurorig-ui-routing-fixes",
+  "head": "09a348df2098337a04970a8350b16365577be0f0",
+  "bundle_sha256": "57aa5b4ffccdb306ca3675ef98931f0bc42994e8fc0aa55f3fe69f84aea3c445",
+  "bundle_verify": "PASS",
+  "worktree_patch_sha256": "f0a2655a8a69f51e19c1ed5c4f0411aaac851fa91b0099197fc5838399bbeba7",
+  "patch_reverse_check": "PASS",
+  "untracked_files": [
+    "docs/A1-PRESERVATION-2026-10-25.md",
+    "docs/planning/MINICPM_GATES.md",
+    "docs/planning/MINICPM_WORK.md"
+  ],
+  "untracked_archive_sha256": "c34239bc629fa4b725d77824ed48a45da8fc25aa62c2b21500bf59c0a25c7a72"
+}

@@ -1,0 +1,46 @@
+{
+  "base_commit": "600b6dd",
+  "java": {
+    "tests": 211,
+    "failures": 0,
+    "errors": 0,
+    "skips": 0
+  },
+  "python": {
+    "tests": 76,
+    "failures": 0,
+    "skips": 0
+  },
+  "lint": {
+    "Warning": 82
+  },
+  "marker_pixel_identical": 12,
+  "native": {
+    "correctnessOnly": "PASS",
+    "profilesOnly": "PASS",
+    "uiRoutingOnly": "PASS"
+  },
+  "original_preview_pref_files_restored": 7,
+  "installed_preview_apks": [
+    {
+      "package": "org.eurorig.app.preview",
+      "apk_sha256": "2ea94110817e593e8cfd1a6e021f47b844168fa1e11889f7adce33821de7b61a"
+    },
+    {
+      "package": "org.eurorig.app.preview.test",
+      "apk_sha256": "0bd7a0039a518967022bf4d94c2b6e0f7224414c20e3fc719fadc3d4422e557f"
+    }
+  ],
+  "source_sha256": {
+    "app/src/main/java/org/eurorig/app/MapControlMenu.java": "20370bae86dfad86c3020fdf3c6574f7c4f80af122db4c439a6170c69ab83f15",
+    "app/src/main/java/org/eurorig/app/VehicleMarkerView.java": "d96a23e5ea03815a5280e36162c1677e6d508d4abe3002b354ab91190e840c8c",
+    "app/src/main/java/org/eurorig/app/Store.java": "fa5608028ecb9dc9b82c06bc41e900692f9e13d494e3a20c5be0e992393c980e",
+    "app/src/main/java/org/eurorig/app/MainActivity.java": "b134f24fd0a86147b613d107e9a631de168e775ea0ea9632de0102ce008f3504",
+    "app/src/main/java/org/eurorig/app/NavigationService.java": "fad6b7ea8fc37c4467e1a77b237d34619e239d5e7f036d3e985de3df14af3ac4",
+    "app/src/main/java/org/eurorig/app/NativeRouter.java": "eee959389338097fbca3aea21167b27a3c0049e3a6a42e0db18095c8ef0f000c",
+    "app/src/androidTest/java/org/eurorig/app/NativeSmokeInstrumentation.java": "77a9a5ec77a22d53ddcba0b998a92f82b8d61295864d037aaf4351c4f88d5f41",
+    "app/src/androidTest/java/org/eurorig/app/NativeCorrectnessChecks.java": "fa7718c1ff07f148a1056622d3b21f26b22506b6bc7e0630df074c88e3e9a73c",
+    "app/src/androidTest/java/org/eurorig/app/ProfileRoutingChecks.java": "60ee2bb7343febfb2caf1b261ce74558d1e77a566b3b1d9c5503542f14da0e4b",
+    "routing/src/test/java/org/eurorig/routing/TruckMassTest.java": "6c4cb901ec8c99a0587fb59aa9536798beb2fa50c6b6e9743ae4e9f75d12711f"
+  }
+}
