@@ -15,6 +15,7 @@ import urllib.request
 from pathlib import Path
 from compile_display import compile_display
 from enrich_display import enrich
+from audit_restriction_coverage import write_report
 from package_region import package,sha256
 
 
@@ -27,13 +28,15 @@ def fetch(url,destination):
 def build_country(work,pbf,name,start,end,jobs):
     if importlib.metadata.version('pyvalhalla')!='3.6.3':raise ValueError('Use pyvalhalla 3.6.3, matching Valhalla Mobile 0.6.3')
     import valhalla
-    work=Path(work).resolve();pbf=Path(pbf).resolve()
+    work=Path(work).resolve();pbfs=[Path(p).resolve() for p in ([pbf] if isinstance(pbf,(str,Path)) else pbf)]
     if work.exists():raise ValueError('Choose a fresh work directory; existing map builds are preserved')
     work.mkdir(parents=True)
     root=Path(__file__).resolve().parents[1]
     config=json.loads((root/'app/src/main/assets/valhalla-default.json').read_text(encoding='utf-8'))
     mj=config['mjolnir'];mj.update(tile_dir=str(work/'tiles'),tile_extract='',admin=str(work/'admins.sqlite'),concurrency=jobs)
-    for key in ('timezone','tile_url','traffic_extract'):mj.pop(key,None)
+    # Timezone data is required: time-conditional access rules are evaluated against it.
+    for key in ('tile_url','traffic_extract'):mj.pop(key,None)
+    mj['timezone']=str(work/'timezones.sqlite')
     config_file=work/'config.json';config_file.write_text(json.dumps(config),encoding='utf-8')
     binary_directory=Path(valhalla.__file__).parent/'bin';env=os.environ.copy()
     # Windows wheels bundle dependent DLLs; never replace the rest of PATH.
@@ -43,11 +46,13 @@ def build_country(work,pbf,name,start,end,jobs):
         if not binary.is_file():raise FileNotFoundError('Native build tool missing: '+str(binary))
         command=[str(binary),'-c',str(config_file)]
         if tool=='valhalla_build_tiles':command.extend(['-j',str(jobs)])
-        command.append(str(pbf));print('Running',tool,flush=True)
+        command.extend(str(p) for p in pbfs);print('Running',tool,flush=True)
         with (work/(tool+'.log')).open('w',encoding='utf-8') as log:
             subprocess.run(command,env=env,stdout=log,stderr=subprocess.STDOUT,check=True)
-    display=work/'display.sqlite';meta=compile_display([pbf],display,name,{'start':start,'end':end})
-    meta['restrictions']=enrich([pbf],display)
+    display=work/'display.sqlite';meta=compile_display(pbfs,display,name,{'start':start,'end':end})
+    meta['restrictions']=enrich(pbfs,display)
+    coverage=work/'restriction-coverage.json'
+    write_report([display],coverage)
     tiles=work/'routing.tar';count=0
     with tarfile.open(tiles,'w',format=tarfile.USTAR_FORMAT) as archive:
         for file in sorted((work/'tiles').rglob('*.gph')):
@@ -56,10 +61,12 @@ def build_country(work,pbf,name,start,end,jobs):
             count+=1
     stamp=meta['sources'][0]['osm_timestamp'];output=work/(name+'.eurorig')
     package(tiles,display,output,name,'OpenStreetMap / Geofabrik',stamp)
-    provenance={'source_sha256':sha256(pbf),'osm_timestamp':stamp,'valhalla_core':'3.6.3',
-                'valhalla_commit':'e2f017b16080f49203de245a211b09efab09cf72','timezone_database':False,
+    provenance={'source_sha256':sha256(pbfs[0]),'pbf_files':[p.name for p in pbfs],'osm_timestamp':stamp,'valhalla_core':'3.6.3',
+                'valhalla_commit':'e2f017b16080f49203de245a211b09efab09cf72','timezone_database':True,
                 'build_admins':True,'roads':meta['roads'],'places':meta['places'],'routing_tiles':count,
                 'package_sha256':sha256(output),'package_bytes':output.stat().st_size}
+    provenance['restriction_coverage_sha256']=sha256(coverage)
+    provenance['restriction_legal_completeness']='unknown'
     (work/'provenance.json').write_text(json.dumps(provenance,indent=2)+'\n',encoding='utf-8')
     print('Built',output,flush=True)
     return provenance
@@ -67,7 +74,7 @@ def build_country(work,pbf,name,start,end,jobs):
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('work');parser.add_argument('--pbf',required=True)
+    parser.add_argument('work');parser.add_argument('--pbf',required=True,nargs='+')
     parser.add_argument('--name',default='Romania');parser.add_argument('--jobs',type=int,default=4)
     parser.add_argument('--start',type=float,nargs=2,default=[44.5257,26.0734]);parser.add_argument('--end',type=float,nargs=2,default=[44.6008,26.0511])
     args=parser.parse_args()

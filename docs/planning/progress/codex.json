@@ -1,0 +1,594 @@
+{
+  "lane": "codex",
+  "updated_at": "2026-10-26T07:42:05.676309+00:00",
+  "current": "A3: adding skip-rejecting tooling checks and genuine SDK identity validation; preparing a fresh source checkout and cold Windows bootstrap, both APKs and current lint triage.",
+  "items": {
+    "A1": {
+      "status": "complete",
+      "evidence": "docs/A1-PRESERVATION-2026-10-25.md; tested archival source commit 7aa7c24cbef9edd6ad7e96e19f0147838a5e2e1c; 336 exact source files and the pinned approved checkpoint restored; four bound passing Tab S9 suites; APK signatures, live maps, private truck/prefs inputs and raw logs preserved; isolated byte-identical preference restore; independent review found no A1 gap. Historical unbound reports preserved and excluded from acceptance.",
+      "blocker": null
+    },
+    "A2": {
+      "status": "complete",
+      "evidence": "docs/A2-NATIVE-INVENTORY-2026-10-26.md; complete six-suite run against A1 source 7aa7c24c; exact APK/map/input/log bindings and restored prefs verified; four corrupt controls rejected; independent acceptance review.",
+      "blocker": null
+    },
+    "A3": {
+      "status": "in_progress",
+      "evidence": "docs/CORRECTNESS-2026-10-25.md; normal and preview APK builds pass, 211 Java/76 Python tests, lint 0 errors/82 warnings; hosted CI/cold bootstrap remain unverified",
+      "blocker": null
+    },
+    "A4": {
+      "status": "complete",
+      "evidence": "docs/UI-ROUTING-2026-10-25.md; current tablet QA identity/storage and recipe verified",
+      "blocker": null
+    },
+    "B1": {
+      "status": "in_progress",
+      "evidence": "tools/restriction_kind.py; tools/enrich_display.py; tools/migrate_rules.py; RouteSection.java; supported ADR bans now classify as HARD, version-5 migration reclassifies existing records, and zero-kind legacy edges retain their actual audit verdict. New regressions reproduced the old failures. Routing suite: 212 tests, zero failures/errors/skips. Rebuilt isolated Preview passes uiRoutingOnly on Tab S9 Android 16; prior Preview APKs preserved and original .dev timestamp unchanged.",
+      "blocker": null
+    },
+    "B2": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "B3": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "B4": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "B5": {
+      "status": "in_progress",
+      "evidence": "tools/apply_authority_rules.py; tools/test_apply_authority_rules.py; tools/package_region.py; docs/RESTRICTION-SOURCE-INTAKE.md. Revalidated batches now apply numeric limits and unconditional HGV bans to a separate display map and retain per-way provenance plus reviewed package attribution. Tampering, expired review, uncertain-access conflicts, partial multiway writes, output overwrite and injected I/O failures are covered. All 102 tooling tests pass; independent final review found no remaining concrete issue. Real country restrictions were not imported because approved rights/currentness and exact matches remain unresolved.",
+      "blocker": null
+    },
+    "B6": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "C1": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "C2": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "C3": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "C4": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D1": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D2": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D3": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D4": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D5": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D6": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "E1": {
+      "status": "partial",
+      "evidence": "docs/CORRECTNESS-2026-10-25.md; coincident-stop native mapping preserves all stop boundaries; native fixtures and formerly failing tablet ten-stop/editor suite pass; lifecycle qualification remains open",
+      "blocker": null
+    },
+    "E2": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "E3": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "E4": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "E5": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "E6": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "E7": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "F1": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "F2": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "F3": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "F4": {
+      "status": "blocked",
+      "evidence": null,
+      "blocker": "Pixel 8 Pro is not currently available for physical qualification"
+    },
+    "F5": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "G1": {
+      "status": "pending",
+      "evidence": null,
+      "blocker": null
+    },
+    "G2": {
+      "status": "pending",
+      "evidence": null,
+      "blocker": null
+    },
+    "G3": {
+      "status": "pending",
+      "evidence": null,
+      "blocker": null
+    },
+    "G4": {
+      "status": "pending",
+      "evidence": null,
+      "blocker": null
+    },
+    "G5": {
+      "status": "pending",
+      "evidence": null,
+      "blocker": null
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-25T23:28:44.296411+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Native Codex agent workflow configured; evidence-only A1 receipt audit in progress. Accepted product progress remains 1/37 (2.7%).",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T23:32:56.190081+00:00",
+      "item": "A1",
+      "status": "in_progress",
+      "summary": "Native Codex workflow configured; four-run A1 receipt audit completed and statically checked. A1 remains in_progress pending run-bound source/maps/device/OS/truck inputs and resolution of trip-recovery reorder failure. Accepted product progress remains 1/37 (2.7%).",
+      "evidence": "docs/A1-PRESERVATION-2026-10-25.md; public four-run matrix records verified gaps; private preservation artifacts retained locally; complete run-tree, map, device/OS, and truck/load/ADR bindings remain missing.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T23:40:13.638964+00:00",
+      "item": "A1",
+      "status": "in_progress",
+      "summary": "Stop-drag handler updated; isolated Preview app/instrumentation build passes; routing suite 211/211. Independent reviewer found no definite code issue. Runtime drag/map/truck receipt remains blocked because ADB sees no device and no emulator is installed. A1 remains in_progress; accepted product progress stays 1/37 (2.7%).",
+      "evidence": "docs/A1-PRESERVATION-2026-10-25.md; rebuilt isolated Preview app/instrumentation; 211 routing tests pass; stop-drag code change awaits runtime device verification; historical receipt gaps remain.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T23:57:58.449605+00:00",
+      "item": "A1",
+      "status": "in_progress",
+      "summary": "A1 reorder fix and isolated device checks now pass on Tab S9. A1 remains in_progress because historical receipt run bindings are still missing; accepted product progress remains 1/37 (2.7%).",
+      "evidence": "docs/A1-PRESERVATION-2026-10-25.md; current isolated Preview app/instrumentation hashes and map hashes recorded; Tab S9 Android 16 direct uiRoutingOnly, correctnessOnly and profilesOnly instrumentation all PASS; :routing:test 211/211; preference restore asserted and original .dev timestamp unchanged; older historical receipts remain unbound.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T00:04:21.053134+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Implementing ADR classification and audit-visibility fixes through source enrichment, stored-map migration and route-section rendering. Fresh Preview instrumentation logs are captured; historical A1 bindings remain missing.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T00:18:28.469834+00:00",
+      "item": "B5",
+      "status": "in_progress",
+      "summary": "Reviewed authority application implemented: revalidates original inputs, applies numeric/HGV bans to a map clone, retains stricter limits and source attribution, and packages the result. Adversarial and multi-country integration checks are running; real source rights and exact road matching remain unresolved.",
+      "evidence": "tools/apply_authority_rules.py; tools/test_apply_authority_rules.py; tools/package_region.py; supported source records now reach road_rules and packaged display.sqlite instead of stopping at candidate staging.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T00:26:17.358267+00:00",
+      "item": "B1",
+      "status": "in_progress",
+      "summary": "ADR classification, migration and audited route-section visibility fixes are implemented and verified. Full truck/ADR capability acceptance remains open.",
+      "evidence": "tools/restriction_kind.py; tools/enrich_display.py; tools/migrate_rules.py; RouteSection.java; supported ADR bans now classify as HARD, version-5 migration reclassifies existing records, and zero-kind legacy edges retain their actual audit verdict. New regressions reproduced the old failures. Routing suite: 212 tests, zero failures/errors/skips. Rebuilt isolated Preview passes uiRoutingOnly on Tab S9 Android 16; prior Preview APKs preserved and original .dev timestamp unchanged.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T00:26:17.450037+00:00",
+      "item": "B5",
+      "status": "in_progress",
+      "summary": "Implemented and verified ADR classification/rendering fixes and the reviewed-batch-to-map-to-package pipeline. 102 tooling tests and 212 routing tests pass; rebuilt Preview uiRoutingOnly passes on Tab S9. Next acceptance blocker is real RO/MD source approval/currentness and exact road matching; B1/B5 remain in_progress.",
+      "evidence": "tools/apply_authority_rules.py; tools/test_apply_authority_rules.py; tools/package_region.py; docs/RESTRICTION-SOURCE-INTAKE.md. Revalidated batches now apply numeric limits and unconditional HGV bans to a separate display map and retain per-way provenance plus reviewed package attribution. Tampering, expired review, uncertain-access conflicts, partial multiway writes, output overwrite and injected I/O failures are covered. All 102 tooling tests pass; independent final review found no remaining concrete issue. Real country restrictions were not imported because approved rights/currentness and exact matches remain unresolved.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T00:30:20.672945+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Reviewing DeepSeek Round-2 against current EuroRig code. Independently checking source-adapter and importer candidates before integration; submitted worker results remain unaccepted until reviewed and reproduced.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T00:47:14.103842+00:00",
+      "item": "A1",
+      "status": "in_progress",
+      "summary": "Round-2 adapter/importer batch verified and finished. Focusing exclusively on A1: create a complete archival source commit, bind current source/APKs/maps/device/truck inputs to fresh test receipts, and verify backup restoration. Historical unbound reports will remain explicitly unaccepted.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:16:33.266669+00:00",
+      "item": "A1",
+      "status": "complete",
+      "summary": "A1 accepted after three passing gates and independent review. Moving to A2 in ID order; later partial packages remain unfinished.",
+      "evidence": "docs/A1-PRESERVATION-2026-10-25.md; tested archival source commit 7aa7c24cbef9edd6ad7e96e19f0147838a5e2e1c; 336 exact source files and the pinned approved checkpoint restored; four bound passing Tab S9 suites; APK signatures, live maps, private truck/prefs inputs and raw logs preserved; isolated byte-identical preference restore; independent review found no A1 gap. Historical unbound reports preserved and excluded from acceptance.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:16:33.352967+00:00",
+      "item": "A2",
+      "status": "in_progress",
+      "summary": "A2: reviewing each native suite for device-data safety, then reproducing ADR-C first and recording individual profile, navigation, GPS, interface, parking and importer outcomes against the preserved source/APKs.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:29:15.416999+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: dedicated API 36 emulator booted; preparing the preserved Preview and map inputs.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:29:41.195509+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running profilesOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:29:45.675185+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: profilesOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:29:45.818647+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running navigationOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:29:56.414636+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: navigationOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:29:56.804651+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running interfaceOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:30:31.056872+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: interfaceOnly FAIL; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:30:31.564335+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running gpsOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:31:11.569528+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: gpsOnly FAIL; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:31:11.802316+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running parkingOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:32:30.290243+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: parkingOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:32:30.402503+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running importOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:32:31.803714+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: importOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:33:03.107483+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: interfaceOnly-isolated-replay FAIL; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:33:41.829959+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: gpsOnly-isolated-replay FAIL; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:38:33.118863+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: dedicated API 36 emulator booted; preparing the preserved Preview and map inputs.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:39:12.087136+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running profilesOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:39:20.741683+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: profilesOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:39:20.908030+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running interfaceOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:39:55.456328+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: interfaceOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:39:55.607929+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running gpsOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T01:40:11.015126+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: gpsOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:34:46.554600+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Resumed A2 in roadmap ID order. Corrected-emulator profile/interface/GPS replay passed; verifying the complete six-suite current inventory before A3.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:35:23.660520+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: dedicated API 36 emulator booted; preparing the preserved Preview and map inputs.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:35:45.846228+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running profilesOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:35:51.500728+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: profilesOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:35:51.619663+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running navigationOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:36:07.185968+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: navigationOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:36:07.350253+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running interfaceOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:36:26.896623+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: interfaceOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:36:27.048699+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running gpsOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:36:41.327510+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: gpsOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:36:41.462942+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running parkingOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:37:59.824799+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: parkingOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:37:59.903498+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2: running importOnly on the dedicated emulator. ADR/profile reproduction is the first suite.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:38:01.169946+00:00",
+      "item": null,
+      "status": null,
+      "summary": "A2 native inventory: importOnly PASS; individual outcomes are recorded, not an all-pass claim.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:42:05.594613+00:00",
+      "item": "A2",
+      "status": "complete",
+      "summary": "A2 accepted: six native suites PASS with bound inputs and preserved isolated failures; independent review records TTS assertion and natural-landscape coverage limits. Starting A3 fresh build/CI in ID order.",
+      "evidence": "docs/A2-NATIVE-INVENTORY-2026-10-26.md; complete six-suite run against A1 source 7aa7c24c; exact APK/map/input/log bindings and restored prefs verified; four corrupt controls rejected; independent acceptance review.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T07:42:05.676309+00:00",
+      "item": "A3",
+      "status": "in_progress",
+      "summary": "A3: adding skip-rejecting tooling checks and genuine SDK identity validation; preparing a fresh source checkout and cold Windows bootstrap, both APKs and current lint triage.",
+      "evidence": null,
+      "blocker": null
+    }
+  ]
+}

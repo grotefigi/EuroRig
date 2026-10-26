@@ -7,16 +7,17 @@ public final class Progress {
     private double travelled;
     public Progress(Router.Route route) { this.route=route; }
     public static final class Fix {
-        public final int edge, maneuver;
+        public final int edge, maneuver, passedWaypoints;
         public final double offRoute, remaining, toManeuver;
         public final boolean arrived;
-        Fix(int edge,int maneuver,double offRoute,double remaining,double toManeuver,boolean arrived) {
-            this.edge=edge;this.maneuver=maneuver;this.offRoute=offRoute;this.remaining=remaining;
+        Fix(int edge,int maneuver,double offRoute,double remaining,double toManeuver,boolean arrived,int passedWaypoints) {
+            this.edge=edge;this.maneuver=maneuver;this.passedWaypoints=passedWaypoints;this.offRoute=offRoute;this.remaining=remaining;
             this.toManeuver=toManeuver;this.arrived=arrived;
         }
     }
     public Fix update(double lat,double lon) {
-        if(route.edges.isEmpty()) return new Fix(0,0,0,0,0,true);
+        // Nothing to arrive at: an empty route must never look like a completed journey.
+        if(route.edges.isEmpty()) return new Fix(0,0,0,0,0,false,0);
         double distance=Double.POSITIVE_INFINITY, position=travelled; int selected=current;
         int end=Math.min(route.edges.size(),current+8);
         // Native polylines may have many short points between GPS fixes.
@@ -30,6 +31,6 @@ public final class Progress {
         int next=route.nextManeuver(current);
         Graph.Edge last=route.edges.get(route.edges.size()-1); Graph.Node destination=route.graph.nodes[last.to];
         boolean arrived=route.metres-travelled<35 && Geo.distance(lat,lon,destination.lat,destination.lon)<35;
-        return new Fix(current,next,distance,Math.max(0,route.metres-travelled),Math.max(0,route.cumulative[next]-travelled),arrived);
+        return new Fix(current,next,distance,Math.max(0,route.metres-travelled),Math.max(0,route.cumulative[next]-travelled),arrived,route.passedWaypoints(travelled));
     }
 }

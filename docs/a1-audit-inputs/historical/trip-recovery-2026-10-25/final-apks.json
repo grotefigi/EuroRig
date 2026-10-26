@@ -1,0 +1,10 @@
+[
+  {
+    "package": "org.eurorig.app.preview",
+    "apk_sha256": "80c2c5e6baa3cc562030df247c02d8280d33289c35106d6b550cc85381e331f3"
+  },
+  {
+    "package": "org.eurorig.app.preview.test",
+    "apk_sha256": "cdf3bb554df97e82ebeee8f4dc996640b78cffdfeaeac4ff004c7a7e631ed9cd"
+  }
+]

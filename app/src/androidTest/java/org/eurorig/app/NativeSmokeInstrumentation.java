@@ -11,24 +11,49 @@ import java.util.zip.*;
 
 /** Runs actual native routing and the country index on a dedicated test device. */
 public final class NativeSmokeInstrumentation extends Instrumentation {
-    private String packagePath;
-    private boolean profilesOnly;
-    private boolean cameraOnly;
-    private boolean corridorsOnly;
-    public void onCreate(Bundle arguments){super.onCreate(arguments);packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));cameraOnly="true".equals(arguments.getString("cameraOnly"));corridorsOnly="true".equals(arguments.getString("corridorsOnly"));start();}
+    private String packagePath,performanceScene;
+    private int performanceSeconds=6;
+    private boolean profilesOnly,locationOnly,labelsOnly,mapControlOnly;
+    private boolean cameraOnly,navigationOnly;
+    private boolean parkingOnly,uiRoutingOnly;
+    private boolean corridorsOnly,importOnly;
+    private boolean correctnessOnly,markerBaseline;
+    private boolean interfaceOnly,gpsOnly,performanceOnly,richMapOnly,browsingOnly,crossedOnly;
+    public void onCreate(Bundle arguments){super.onCreate(arguments);importOnly="true".equals(arguments.getString("importOnly"));correctnessOnly="true".equals(arguments.getString("correctnessOnly"));markerBaseline="true".equals(arguments.getString("markerBaseline"));uiRoutingOnly="true".equals(arguments.getString("uiRoutingOnly"));navigationOnly="true".equals(arguments.getString("navigationOnly"));performanceSeconds=Integer.parseInt(arguments.getString("performanceSeconds","6"));mapControlOnly="true".equals(arguments.getString("mapControlOnly"));locationOnly="true".equals(arguments.getString("locationOnly"));labelsOnly="true".equals(arguments.getString("labelsOnly"));performanceScene=arguments.getString("performanceScene");crossedOnly="true".equals(arguments.getString("crossedOnly"));browsingOnly="true".equals(arguments.getString("browsingOnly"));richMapOnly="true".equals(arguments.getString("richMapOnly"));performanceOnly="true".equals(arguments.getString("performanceOnly"));packagePath=arguments.getString("packagePath");profilesOnly="true".equals(arguments.getString("profilesOnly"));cameraOnly="true".equals(arguments.getString("cameraOnly"));corridorsOnly="true".equals(arguments.getString("corridorsOnly"));interfaceOnly="true".equals(arguments.getString("interfaceOnly"));parkingOnly="true".equals(arguments.getString("parkingOnly"));gpsOnly="true".equals(arguments.getString("gpsOnly"));start();}
     public void onStart(){
         Bundle result=new Bundle();
         try{
+            if(importOnly){result.putString("stream","PASS: "+RegionImportChecks.run(this)+"; live settings preserved\n");finish(-1,result);return;}
+            if(correctnessOnly){NativeCorrectnessChecks.run(this,markerBaseline);result.putString("stream","PASS: native truck payload boundaries and "+(markerBaseline?"original marker receipts":"profile corruption/recovery, touch/cancel/keyboard/accessibility controls and marker receipts")+"\n");finish(-1,result);return;}
+            if(uiRoutingOnly){UiRoutingChecks.run(this);result.putString("stream","PASS: independent country options, ten audited stops, native editor/reorder, equal-endpoint validation and main-map controls\n");finish(-1,result);return;}
+            if(navigationOnly){result.putString("stream","PASS: early lane guidance and camera settings "+NavigationChecks.run(this)+"\n");finish(-1,result);return;}
+            if(parkingOnly){result.putString("stream","PASS: NDW truck parking "+ParkingChecks.run(this,packagePath)+"\n");finish(-1,result);return;}
+            if(mapControlOnly){result.putString("stream","PASS: map controls and waypoint reroute "+MapControlChecks.run(this)+"\n");finish(-1,result);return;}
+            if(locationOnly){result.putString("stream","PASS: foreground location "+LocationChecks.run(this)+"\n");finish(-1,result);return;}
+            if(labelsOnly){result.putString("stream","PASS: anchored labels "+LabelMotionChecks.run(this)+"\n");finish(-1,result);return;}
+            if(crossedOnly){result.putString("stream","PASS: crossed truck restrictions "+CrossedRoadChecks.run(this)+"\n");finish(-1,result);return;}
+            if(browsingOnly){result.putString("stream","PASS: browsing workflows "+BrowsingChecks.run(this)+"\n");finish(-1,result);return;}
+            if(richMapOnly){result.putString("stream","PASS: rich offline map "+RichMapChecks.run(this)+"\n");finish(-1,result);return;}
+            if(performanceOnly){result.putString("stream","PASS: performance measurement "+MapPerformanceChecks.run(this,performanceScene!=null&&performanceScene.startsWith("city"),"city-night".equals(performanceScene),performanceSeconds)+"\n");finish(-1,result);return;}
+            if(gpsOnly){GpsInterfaceChecks.run(this);result.putString("stream","PASS: actual platform GPS provider, foreground guidance, route progress and stop\n");finish(-1,result);return;}
+            if(interfaceOnly){
+                if(packagePath!=null){try(InputStream in=new FileInputStream(packagePath)){RegionPackages.install(getTargetContext(),in);}}
+                Store.load(getTargetContext());require(Store.nativeRouter!=null&&Store.display!=null,"Romania package installed");
+                // Real A3 geometry from the verified Romania display database, away from private entrances.
+                Store.viaPoints.clear();Store.start=Store.coordinate(44.598789,26.176042,"A3 · chosen origin");Store.end=Store.coordinate(44.538575,26.184271,"A3 · chosen destination");Store.originChosen=true;Store.destinationChosen=true;Store.saveEndpoints(getTargetContext());
+                Router.Route route=Store.calculate(Store.graph,Store.start,Store.end,Store.truck);require(route.nativeGeometry()&&route.metres>500,"Real offline Romania truck route");
+                checkCamera(route);result.putString("stream","PASS: Romania offline route, local roads, native simulator slider 0–200 km/h, zero/200 speed, pause, map/marker independence, rotation and profiles\n");finish(-1,result);return;
+            }
             if(corridorsOnly){CorridorChecks.run(getTargetContext());result.putString("stream","PASS: native corridor measurements written; inspect individual outcomes\n");finish(-1,result);return;}
             if(profilesOnly){TruckMapChecks.run(getTargetContext(),getContext());ProfileRoutingChecks.run(getTargetContext(),getContext());result.putString("stream","PASS: native profile, ADR display and truck map retention checks\n");finish(-1,result);return;}
-            if(cameraOnly){Store.load(getTargetContext());Router.Route route=Store.calculate(Store.graph,Store.start,Store.end,Store.truck);checkCamera(route);result.putString("stream","PASS: actual map viewport, navigation zoom, every route fix follows, pan/rotation, route trail removal and heading arrow pixels\n");finish(-1,result);return;}
+            if(cameraOnly){Store.load(getTargetContext());Router.Route route=Store.calculate(Store.graph,Store.start,Store.end,Store.truck);checkCamera(route);result.putString("stream","PASS: attached native map, local offline roads, selected-route simulation, 0–200 km/h slider, zero holds position, map/marker independence and rotation\n");finish(-1,result);return;}
             require(!Arrays.asList(getTargetContext().getAssets().list("")).contains("andorra-routing.tar"),"No bundled maps");
             Store.load(getTargetContext());require(Store.graph==null,"First launch has no map");
             Graph display;
             if(packagePath!=null){try(InputStream in=new FileInputStream(packagePath)){display=RegionPackages.install(getTargetContext(),in);}}
             else display=RegionPackages.install(getTargetContext(),new ByteArrayInputStream(packageBytes(false)));
             Store.graph=display;Store.start=0;Store.end=1;Store.setRegionEndpoints();
-            double a=packagePath==null?42.5063:44.5257,b=packagePath==null?1.5218:26.0734,c=packagePath==null?42.5086:44.6008,d=packagePath==null?1.5394:26.0511;
+            double a=packagePath==null?42.5063:44.598789,b=packagePath==null?1.5218:26.176042,c=packagePath==null?42.5086:44.538575,d=packagePath==null?1.5394:26.184271;
             if(packagePath!=null){
                 require(Store.display!=null&&display.nodes.length==2,"Country display stays on disk");
                 require(!Store.display.search("Bucuresti").isEmpty(),"Offline Romanian search");
@@ -76,8 +101,7 @@ public final class NativeSmokeInstrumentation extends Instrumentation {
         }catch(Throwable e){result.putString("stream","FAIL: "+android.util.Log.getStackTraceString(e));finish(1,result);}
     }
     private void checkCamera(Router.Route route)throws Throwable{
-        Throwable[] failure={null};runOnMainSync(()->{try{CameraChecks.run(getTargetContext(),route);RouteDisplayChecks.run(getTargetContext());}catch(Throwable e){failure[0]=e;}});
-        if(failure[0]!=null)throw failure[0];
+        NativeInterfaceChecks.run(this,route);
     }
     private static void require(boolean value,String message){if(!value)throw new AssertionError(message);}
     private byte[] packageBytes(boolean corrupt)throws IOException{

@@ -1,0 +1,52 @@
+> Task :app:preBuild UP-TO-DATE
+> Task :app:preDebugBuild UP-TO-DATE
+> Task :app:mergeDebugNativeDebugMetadata NO-SOURCE
+> Task :app:generateDebugBuildConfig UP-TO-DATE
+> Task :routing:compileJava UP-TO-DATE
+> Task :app:generateDebugResources UP-TO-DATE
+> Task :routing:processResources NO-SOURCE
+> Task :routing:classes UP-TO-DATE
+> Task :app:packageDebugResources UP-TO-DATE
+> Task :routing:jar UP-TO-DATE
+> Task :app:processDebugNavigationResources UP-TO-DATE
+> Task :app:parseDebugLocalResources UP-TO-DATE
+> Task :app:generateDebugRFile UP-TO-DATE
+> Task :app:compileDebugKotlin NO-SOURCE
+> Task :app:javaPreCompileDebug UP-TO-DATE
+
+> Task :app:compileDebugJavaWithJavac FAILED
+C:\EverythingAI\EuroRig\app\src\main\java\org\eurorig\app\RoadMapView.java:237: error: incompatible types: PointF cannot be converted to Point
+        map.animateCamera(CameraUpdateFactory.zoomBy(factor,new PointF(getWidth()/2f,getHeight()/2f)),300);
+                                                            ^
+Note: Some input files use or override a deprecated API.
+Note: Recompile with -Xlint:deprecation for details.
+Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
+1 error
+
+[Incubating] Problems report is available at: file:///C:/EverythingAI/EuroRig/build/reports/problems/problems-report.html
+
+FAILURE: Build failed with an exception.
+
+* What went wrong:
+Execution failed for task ':app:compileDebugJavaWithJavac' (registered by plugin 'com.android.internal.application').
+> Compilation failed; see the compiler output below.
+  Note: Recompile with -Xlint:deprecation for details.
+  C:\EverythingAI\EuroRig\app\src\main\java\org\eurorig\app\RoadMapView.java:237: error: incompatible types: PointF cannot be converted to Point
+          map.animateCamera(CameraUpdateFactory.zoomBy(factor,new PointF(getWidth()/2f,getHeight()/2f)),300);
+                                                              ^
+  Note: Some input files use or override a deprecated API.
+  Note: Some messages have been simplified; recompile with -Xdiags:verbose to get full output
+  1 error
+
+* Try:
+> Check your code and dependencies to fix the compilation error(s)
+> Run with --scan to get full insights from a Build Scan (powered by Develocity).
+
+Deprecated Gradle features were used in this build, making it incompatible with Gradle 10.
+
+You can use '--warning-mode all' to show the individual deprecation warnings and determine if they come from your own scripts or plugins.
+
+For more on this, please refer to https://docs.gradle.org/9.6.0/userguide/command_line_interface.html#sec:command_line_warnings in the Gradle documentation.
+
+BUILD FAILED in 1s
+10 actionable tasks: 1 executed, 9 up-to-date

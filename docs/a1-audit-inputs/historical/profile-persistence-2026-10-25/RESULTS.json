@@ -1,0 +1,36 @@
+{
+  "base_commit": "17eda0e",
+  "java": [
+    211,
+    0,
+    0,
+    0
+  ],
+  "lint": {
+    "Warning": 82
+  },
+  "native": {
+    "correctnessOnly": "PASS",
+    "profilesOnly": "PASS",
+    "uiRoutingOnly": "PASS"
+  },
+  "preview_preferences_restored": 7,
+  "routing_field_round_trips": 320,
+  "malformed_field_controls": 51,
+  "apks": [
+    {
+      "package": "org.eurorig.app.preview",
+      "apk_sha256": "93c235e784d5b30ebac23f7348842c1251a3c5f57fb00ea1b8fc5cbcecbe35cb"
+    },
+    {
+      "package": "org.eurorig.app.preview.test",
+      "apk_sha256": "061ada2f6e13b6c37afdecb06a50250eb86b06af80810a0630ed45caa76fda48"
+    }
+  ],
+  "source_sha256": {
+    "app/src/main/java/org/eurorig/app/VehicleProfiles.java": "ecbe6002a4ed57ee88508f24e6c96b59e6aa6987a7bc1ac7230722292a41ad1d",
+    "app/src/main/java/org/eurorig/app/InterfacePages.java": "c337097d4ebd54629f6b50bfc4c1ea144b4eedfa7e79b1263c541bafa550c347",
+    "app/src/androidTest/java/org/eurorig/app/ProfilePersistenceChecks.java": "d326ba771cb4f92ea56c299c22f67988044b07b37e6c48caadabb40f45e2292f",
+    "app/src/androidTest/java/org/eurorig/app/NativeCorrectnessChecks.java": "99a78581edc3415495415aa9ea4539d99b7bff656b80e1ea7e0367b45f3f9fcd"
+  }
+}

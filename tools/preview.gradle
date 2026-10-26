@@ -1,0 +1,11 @@
+// Isolated device testing keeps the owner's development app and storage intact.
+gradle.beforeProject { project ->
+    if (project.path == ':app') {
+        project.plugins.withId('com.android.application') {
+            project.extensions.getByName('androidComponents').finalizeDsl { android ->
+                android.buildTypes.debug.applicationIdSuffix = '.preview'
+                android.sourceSets.debug.manifest.srcFile(new File(project.rootDir, 'tools/preview-manifest.xml'))
+            }
+        }
+    }
+}

@@ -2,6 +2,11 @@
 
 Free, open-source truck navigation, made by drivers for drivers.
 
+The local `codex/approved-interface` integration adds the approved native interface
+and selected-route simulation with a 0–200 km/h slider. It is not the published
+GitHub APK. See the [native APK guide](docs/NATIVE-APK-GUIDE.md) and
+[verification and outstanding limits](docs/NATIVE-INTERFACE-VERIFICATION.md).
+
 **0.5.0-dev: Romania is the first country for device testing.** The app installs
 with no maps. Download a country once; roads, search, truck routing and GPS then
 run locally. Coverage target: Europe excluding Russia.
@@ -105,7 +110,7 @@ assets. Existing 0.3 clients retain their original catalogue and package.
 
 ## Implementation and build
 
-Minimum Android 8/API 26, compile/target API 37. Valhalla Mobile 0.6.3/core 3.6.3
+Minimum Android 8/API 26, compile API 36 and target API 37. Valhalla Mobile 0.6.3/core 3.6.3
 memory-maps local routing tiles. Truck costing receives dimensions, loaded
 weights, hazmat and toll/ferry/unpaved exclusions. It has no car-route fallback.
 SQLite roads and FTS4 search stay on disk; bounded queries render a viewport.
@@ -115,13 +120,21 @@ GPX export are local. Failed transactional imports retain the active map.
 See [UI audit](docs/UI_AUDIT.md) for exercised controls and remaining gaps, and
 [driver feature priorities](docs/DRIVER_FEATURES.md) for the expanded roadmap.
 
-Use JDK 21, SDK platform 37.0/build-tools 36.0.0, Gradle 9.6.0 and AGP 9.4.0.
+Use JDK 21, SDK platform 36/build-tools 36.0.0, Gradle 9.6.0 and AGP 9.4.0.
 Configure private `local.properties` with `sdk.dir`.
+CI installs the required SDK platform/build tools explicitly; target API 37 does not change the compile-platform package selected in `app/build.gradle`.
+Verification pins the official API 36 revision 2 platform JAR and checks build-tools 36.0.0; renamed platform folders are rejected.
+Use Python 3.12 in a dedicated environment for tooling tests. The Windows bootstrap installs its pinned test dependency in `.toolchain/qa-python`.
 
 ```powershell
+if (-not $env:ANDROID_HOME) { $env:ANDROID_HOME = "$PWD/.toolchain/sdk" }
 ./tools/build.ps1 -Tasks ':routing:test',':app:assembleDebug',':app:assembleDebugAndroidTest',':app:lintDebug'
-python -m unittest discover -s tools -p 'test_*.py'
+python -m pip install -r tools/test-requirements.txt
+python tools/verify_android_sdk.py $env:ANDROID_HOME
+python tools/run_tooling_tests.py
 ```
+
+If Windows policy blocks PowerShell scripts, use `gradlew.bat :routing:test :app:assembleDebug :app:assembleDebugAndroidTest :app:lintDebug` with JDK 21 configured. No execution-policy change is required.
 
 Use `bash gradlew` on other hosts. `-PmapCatalogUrl=https://your-host/catalog.json`
 overrides the mirror. For country builds install `tools/map-requirements.txt` in

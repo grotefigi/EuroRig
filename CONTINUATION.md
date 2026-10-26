@@ -1,0 +1,102 @@
+# EuroRig active continuation — 2026-10-25
+
+## New worker assignment and local office
+
+The owner requested more DeepSeek work. `docs/planning/DEEPSEEK_ROUND2.md` and `C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/ROUND2/DEEPSEEK_ROUND2.md` provide one complete eight-batch assignment, fourteen source-bound inputs, archive text references and a separate progress template. The first-round worker lane is preserved; round two updates only its current text with explicit `X/8` counters. No external DeepSeek job was launched from this chat.
+
+The owner also requested `Charonyuu/whatsmyagentdoing`. The `myoffice` skill is installed under `C:/Users/Administrator/.codex/skills/myoffice` at revision `c9dc82f7bca2503fa32fadb40db86cd15946df71`, version 0.3.0. Its read-only session watcher runs in a hidden background Node process on `127.0.0.1:4545`; the visible browser tab shows the built-in 3D office and the actual EuroRig Codex session. No demo data or session hooks are used. Automatic version polling is disabled for this process. Private installation/process/browser receipts are under `analysis/private/myoffice-2026-10-25/`. The office visualizes recorded session events; it does not keep an agent working after a turn or prove completed engineering work. Future turns can use `/myoffice`; startup is also available through the installed CLI without restarting this chat.
+
+## Latest implementation checkpoint
+
+Active branch: `codex/eurorig-ui-routing-fixes` in this managed approved-interface worktree. [UI/routing verification](docs/UI-ROUTING-2026-10-25.md) records the implementation, source hashes, native evidence and remaining limits.
+
+Implemented and tested: ten chosen-order stops, actual native drag-and-drop, in-place stop replacement, destination editing, actionable equal-endpoint validation, nonzero round trips, independent country preferences applied to the native edge audit, and genuine audited route choices. Main-map GPS/Route buttons are removed; menu functions remain. Reference-style editor/options screens use original native code/assets. Compact landscape scrolls the editor body so the footer cannot hide all stops.
+
+Current checks: 211 Java tests and 84 Python tests pass without failures or skips; normal/preview app/test builds and lint pass (0 errors, 82 warnings). The latest physical Tab S9 run passes correctness/payload/profile-corruption checks, native profiles/ADR and UI routing. Earlier receipts also cover restriction overlay, interface/simulator, browsing and remaining-stop rerouting. Compact 412 × 915 dp layouts were checked earlier; settings were restored. No Pixel or road validation is claimed.
+
+Latest correctness work builds from `600b6dd`: native menu handling retains cancellation/keyboard/accessibility semantics; cached vehicle-marker paths match all twelve original renders pixel-for-pixel. Malformed active truck preferences no longer silently authorize routes with a standard replacement profile: review/save is required, accepted routes are cleared and active guidance stops. Six new JVM mass tests and Android request tests verify exact loaded/permitted distinctions and the 100 t native bridge boundary. See `docs/CORRECTNESS-2026-10-25.md` and `docs/TRUCK-CAPABILITIES.md`.
+
+A fresh journey regression initially failed because a saved intermediate stop equaled the destination. Valhalla produced a stationary leg with code 443 and a measured 15.85 m snapped gap. The final implementation shares identical consecutive native input locations and maps all original user stops to their audited boundaries. Nonconsecutive return legs, exact matching, connectedness and whole-route hard-rule checks remain intact. Native duplicate-origin/destination fixtures and the formerly failing real-map ten-stop/editor suite now pass. Private preview preferences, rotation settings and original development-package identity were verified after restoration.
+
+The next persistence checkpoint extends `17eda0e`: named-profile JSON rejects malformed present values and integer truncation, preserves legacy broad hazmat, keeps readable siblings during recovery and materializes missing legacy fields for the editor. A missing active ID gets a copy of the unchanged current truck; original failed input is retained and the list shows a review notice. All 320 exact routing-field combinations, 51 malformed-field controls, constructor recovery cases and current tablet correctness/profile/UI-routing suites pass. Normal/preview builds, 211 Java tests and lint 0 errors/82 warnings pass. See `docs/PROFILE-PERSISTENCE-2026-10-25.md`; new private evidence has its own profile-persistence folder, preserving the preceding checkpoint's receipts.
+
+DeepSeek DS02 was independently reviewed: all 1,061 trace anchors resolve, but multiple contradiction/coverage claims are false. Use it as an index only; corrected dispositions are in `docs/DS02-REVIEW-2026-10-25.md`. Preserve worker originals and its live lane. All twelve batch reports now exist; eight batches are submitted and four have worker-reported blockers. The follow-up DS03/DS12 review verifies 362 manifest entries but rejects numeric source fields contaminated with detour chainage. No source rule was imported; rights/currentness and joins remain unresolved. New `test_adr_evidence.py` proves actual compiler/enrichment retention of four ADR-relevant ways and one node despite zero generic kind; 77 Python tests pass. Read `docs/DS03-DS12-REVIEW-2026-10-25.md` before designing the next header-bound candidate adapter. Full combination/ADR support, accepted authority imports, emulator GPS/navigation, hosted CI and physical Pixel qualification remain open.
+
+That candidate adapter is now implemented and verified as `tools/cestrin_candidates.py`, documented in `docs/CESTRIN-CANDIDATES.md`. It supports the observed OG43 Word-HTML layout only, binds measurements to headers/units/numbered columns, preserves raw data and refuses output overwrite. The captured-table run yields 202 rows / 192 physical measurements / 68 quarantined rows. Gross-mass basis is explicitly unknown, and no accepted authority-intake/map data are emitted. All seven new tests pass; the full tooling total is 84. Desktop `Codex-DS03-DS12-Review-2026-10-25/og43-header-bound-v1.json` and `PARSER_RESULTS.json` are the corrected candidates/receipts; the earlier draft is marked superseded. Worker source hashes do not resolve to its fourteen raw files, so only the corrected byte-bound provenance may be reviewed further. Next: independently establish reuse/currentness/applicability, obtain exact road/chainage matches and add other source layouts without city-specific routing branches.
+
+`org.eurorig.app.preview` (EuroRig Preview) is installed beside the preserved original `.dev` application. Their signing certificates differ; do not uninstall the original to bypass that. Private APKs, map inventory, screenshots, native logs and the current task ledger are ignored under `analysis/private/ui-routing-2026-10-25/`. The installed preview and companion APK hashes are independently compared with the saved artifacts.
+
+**Unfinished critical data work:** Galați's citywide municipal restrictions are absent from the recovered map. Existing records render correctly for the matched truck, but this does not establish coverage. Current official annexes/amendments and exact road matches could not be verified; no historical proposal was imported as law. Country congestion avoidance remains visibly unavailable. The task ledger records municipal coverage as a required handoff, not completion. Next work starts with roadmap B5/C1 and the truck/ADR capability matrix; the historical ADR-C fixture now passes, so do not repeat its old failure as a current finding.
+
+Earlier sections below preserve the recovery and planning history; their 199-test/84-warning figures describe the earlier fixture-only checkpoint.
+
+## Current direction: scalable restriction imports
+
+Latest independent build step: `.github/workflows/build.yml` now installs/checks SDK platform 36 and build-tools 36.0.0; `tools/bootstrap_windows.py` downloads Gradle 9.6.0, matching the wrapper. Target API 37 and app behavior remain unchanged. A new git-archive source snapshot plus these three reviewed configuration/documentation overlays passed 205 Java tests, 76 tooling tests, both debug/test APK builds and lint with zero errors/85 warnings. See `docs/CI-SDK-VERIFICATION-2026-10-25.md`. Dependency caches were reused; no hosted workflow, cold bootstrap or device install was run. A3 stays in progress.
+
+The owner now requires two execution lanes and live shared progress. Read `docs/planning/CODEX_WORK.md`, `DEEPSEEK_WORK.md` and `LIVE_PROGRESS.md`. Codex handles design/implementation/acceptance; DeepSeek has twelve bulk-preparation batches in one assignment. Both update their own JSON lane through `tools/roadmap_progress.py` at start, milestones, blockers and end. The local dashboard refreshes every three seconds; the overall figure is 1/37 accepted packages (2.7%), not an effort estimate. Read DeepSeek's current state from its lane file; its final report records eight submitted and four blocked batches. Preserve its updates; a stale timestamp does not prove continued execution. Codex configured no provider/account or scheduled job. Continue the bounded EurowagNav behavior/interface investigation alongside the shared data pipeline.
+
+The owner rejected manual research for every city. ROADMAP section 7 now requires bulk OSM/authority sources, shared source-format adapters, one rule/provenance contract, exact road/zone matching and automated change/coverage reports. Review only exceptions and representative rule classes. Municipal gaps still require real licensed sources; automation must not invent missing rules. Eurowag is an authorized UI benchmark; proprietary map-data import requires confirmed reuse rights.
+
+First implemented step: `tools/audit_restriction_coverage.py` audits any enriched display maps read-only, distinguishing stored node/way evidence, numeric/HGV/ADR/conditional records and uncertainty. Spatial buckets use road bounding-box centres, not jurisdiction boundaries. `build_country.py` automatically writes `restriction-coverage.json` and its hash in provenance for each new build. It always states legal completeness is unknown. The audit checkpoint passed 51 Python tests; the live-progress helper adds eight, bringing the current suite to 59 passing tests with no skips. A full native country rebuild was not run; external authority adapters, rule import, source-update reconciliation and UI coverage reporting remain open.
+
+Next step implemented: `tools/authority_intake.py` and `docs/RESTRICTION-SOURCE-INTAKE.md` define a reviewed CSV-to-staging adapter. Separate reviewer inputs bind source, exact OSM-way matches and finalized map snapshots by hash. It normalizes supported height/width/length/loaded-mass/axle/HGV records and quarantines unknown rights/currentness, conditions, permitted-mass meanings, missing/ambiguous matches and overlapping conflicts. It preserves raw inputs and emits deterministic accepted/rejected bundles; it never edits a map or grants access. Seventeen tests bring the full tooling suite to 76 passing tests with no skips. Persistent synthetic CLI receipts are in `C:/Users/Administrator/Desktop/EuroRig-FastModel-Work/Codex-Source-Intake-2026-10-25/synthetic-demo/RESULTS.json`: both country configurations stage one record and reject two, while an existing 3.5 m map rule remains unchanged despite a 4.25 m candidate. Real authority-format adapters, source reviews, rule merge, expiry and native routing/overlay trace tests remain open. DeepSeek DS03 now has this exact preparation contract linked from its plan. B5 is still in progress; the product acceptance percentage is unchanged.
+
+The owner also requested the [EurowagNav repository review](docs/research/EUROWAGNAV-REUSE-2026-10-25.md). Remote `master` is pinned at `82c2cd05ed713ac4ed9bd291dc8c31d2ff26d6e6`; local research files were matched to remote blobs. Reuse the restriction requirements, feed leads and existing pipeline design. Its old destination-authorization proposal is already implemented; historical audit/engine claims need current reproductions. The archive has no directly importable map database. NAPSPAN advertises a trial and paid plans, so it is not a free production dependency. No commercial map extraction or device operation occurred.
+
+Mercury's one-go bundle was reviewed under `C:/Users/Administrator/Desktop/EuroRig-FastModel-Work/Codex-OneGo-Review-2026-10-25/`. Its test-only patch passes a fresh isolated 216-test run; the active project still has 205 Java tests because that patch is not applied. Its original verifier accepted all five corrupted controls. Review-owned translation drafts now compile/link with Android tools but remain candidates. All worker originals are preserved. Historical official Galați annexes were located visually in the saved scan; current applicability and exact map joins remain unverified, and no municipal rule was imported.
+
+## Agreed roadmap and next implementation
+
+[ROADMAP.md](ROADMAP.md) is the current full delivery plan, replacing the earlier broad milestone list. Its 37 work packages include priorities, dependencies, deliverables, acceptance conditions, comparison protocol, release gates and external blockers. Roadmap review is recorded in `docs/planning/GATES.md`; this is planning evidence, not navigation completion.
+
+The 2026-10-25 planning update now identifies `65f3104` as the implementation checkpoint, marks A4 verified for the current tablet build and keeps partially implemented packages open. The immediate queue starts with the truck/ADR evidence matrix, current municipal sources, CI/lint reconciliation and the RO–MD border corpus; it does not repeat the completed QA variant or the now-passing historical ADR-C reproduction.
+
+The committed fast-model work plan (`5101f9d:docs/planning/FAST_MODEL_WORK.md`) defines eight bounded worker task types; preserve its current local deletion. The owner supplied the pilot and subsequent one-go outputs. Their independent review and corrected candidates are on the Desktop as described above. No provider is integrated or benchmarked here. Legal/routing decisions, independent oracles and final acceptance remain with the lead reviewer.
+
+The owner confirmed a private Romania/Moldova first release, all standard legal truck combinations and ADR profiles, Tab S9 and Pixel 8 Pro, Romanian/English UI and speech, offline core and optional online extras. Use free data and zero recurring hosting spend; no fixed deadline or subscriptions. Permit-dependent abnormal loads come later. Tolls/traffic may be explicitly unavailable without trustworthy free coverage.
+
+Trips must support ten intermediate stops in the driver's chosen order, with manual drag-and-drop reordering and no automatic optimization. After process death, restore the trip and ask to resume after fresh GPS/profile/authorization checks. The Pixel is currently unavailable: continue tablet/emulator work, but do not certify Pixel behavior without it.
+
+Codex alone will perform current tests and compare public-coordinate, matched-profile routes against the authorized Eurowag UI. Preserve settings and private evidence. No proprietary code/maps/assets may enter EuroRig. No driver program or actual road validation is available; comparison/replay results must not be labeled road validation.
+
+Immediate work follows ROADMAP section 9. QA isolation and the historical ADR-C reproduction have current passing evidence. Finish CI/compile-SDK reconciliation and the broader native-suite inventory; complete the truck/ADR support matrix and RO–MD municipal-source/border checks, then guidance/recovery and remaining trip acceptance. Broader country/profile support remains unproved despite passing individual fixtures.
+
+## Correct source and UI baseline
+
+The user explicitly requires the newer navigation/map interface, not the old `main` interface.
+
+This managed worktree starts at `6531ad50b8c6fabaed27f2cd6dc3378d7d51c5bb` from `codex/approved-interface`, version 0.5.4-dev (version code 9). It is the active continuation checkout. Original newer source was recovered from `C:/Users/Administrator/Documents/Codex/2026-10-24/retrue/work/EuroRig` without modifying that checkout.
+
+The original main checkout at `C:/EverythingAI/eurofig` retains all inherited dirty changes, the repaired decoder and its 75-test evidence. Do not overwrite or blindly merge those changes. The newer branch already has correct `PackInput` compaction. The handoff's unfinished via-way and HTTP features are not part of this newer baseline.
+
+## Tablet and recovery
+
+Authorized device: SM-X716B, Android 16. The original `org.eurorig.app.dev` 0.5.4-dev app is running the correct MapLibre interface with Romania-Moldova. Temporary old-main test app installations were removed after the user corrected the UI baseline.
+
+Verified recovery is private and ignored at `C:/EverythingAI/eurofig/analysis/private/tablet-2026-10-25/`. It contains:
+
+- App data TAR: 3,212,622,848 bytes covering 22 private files.
+- Four unique country packages, including Romania-Moldova and the CESTRIN bridge-height variant, plus MBTiles.
+- Three distinct main APKs, two existing companion test APKs, and relevant screenshots/XML.
+- A complete source Git bundle of the newer checkout, with SHA-256 and `git bundle verify` evidence.
+
+Recovered payloads, companion APKs and source bundle total 5,995,915,353 bytes. Original source APKs, maps and private-file hashes were checked against local copies. Duplicate shared downloads point to one verified copy. Protected unrelated third-party folders were inaccessible; no access controls were changed.
+
+## Test evidence and limits
+
+The separate old-main build passed the tablet's native instrumentation, including real offline engine routing, truck dimensions/weights/axles, ADR, delivery, import checks and camera behavior. Its visible test route was 1.7 km. This evidence does not validate the newer interface branch's complete behavior. The original development app's current correct UI is captured in `approved-interface-ui.xml/png` under the private recovery folder.
+
+The initial `:routing:test` run measured 199 tests with 1 failure because the region-package fixture was absent from both the clean source checkout and this worktree. This is now repaired: `routing/src/test/resources/region-package.eurorig` is a 5600-byte ZIP generated by the existing packager from the original synthetic profile assets. Its extension matches actual country packages and avoids the ignore rule for generated `.europack` display graphs. The Java import test now uses this filename, and the adjacent README documents regeneration. Both payloads byte-match the source assets and their manifest hashes.
+
+Current approved-branch validation: **199 routing tests pass with 0 failures, 0 errors and 0 skips; 43 Python tooling tests pass without skips.** Both `:app:assembleDebug` and `:app:assembleDebugAndroidTest` pass. `:app:lintDebug` passes with 0 errors and 84 warnings. `GATES.md` records all five acceptance gates and their evidence. Production routing and UI code were not changed by this fixture repair.
+
+No road test or live guidance validation was performed. Device smoke scripts that clear app data remain restricted to dedicated emulators. Preserve the original development app and maps when testing.
+
+## Build environment
+
+JDK 21: `C:/Users/Administrator/AppData/Local/Temp/aebuild/jdk21/jdk-21.0.12.1+1`.
+
+Tooling tests use the ignored `.toolchain/qa-python` virtual environment, created with the bundled Python 3.12 runtime. It has the existing pinned `osmium==4.3.1` build dependency installed so display compiler tests execute instead of skipping. Reproduce with `.toolchain/qa-python/Scripts/python.exe -m unittest discover -s tools -p test_*.py` on this Windows checkout.
+
+Set `JAVA_TOOL_OPTIONS=-Djdk.net.unixdomain.tmpdir=C:/EverythingAI/eurofig/.toolchain/t` on this host to avoid Gradle's loopback/socket failure. This branch compiles against SDK 36, targets 37, and uses MapLibre 11.5.0. Locate SDK 36 at `C:/Users/Administrator/Documents/Codex/2026-10-24/retrue/work/android/sdk` before Android builds; do not silently change the compile SDK or UI baseline.

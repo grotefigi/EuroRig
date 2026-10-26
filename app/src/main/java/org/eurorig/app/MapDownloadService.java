@@ -48,7 +48,7 @@ public final class MapDownloadService extends Service {
                     File file=client.download(address,map.getString("sha256"),map.getLong("bytes"),new File(getFilesDir(),"downloads"),mapId,()->cancelled,(done,total)->update("Downloading "+name+" · "+Math.round(done*100.0/total)+"%"));
                     update("Checking "+name+"…");
                     getSharedPreferences("maps",0).edit().putString("ready_"+mapId,name+"|"+file.getName()).commit();
-                    if(!Store.navigating&&(country!=null||Store.graph==null)){
+                    if(!Store.navigating&&!Store.simulating&&(country!=null||Store.graph==null)){
                         final java.util.concurrent.CountDownLatch installed=new java.util.concurrent.CountDownLatch(1);
                         final Exception[] failure={null};
                         Store.worker.execute(()->{
@@ -58,7 +58,7 @@ public final class MapDownloadService extends Service {
                         }catch(Exception|LinkageError e){failure[0]=new IOException(e.getMessage(),e);}finally{Store.installing=false;installed.countDown();}});
                         installed.await();if(failure[0]!=null)throw failure[0];
                     }
-                    update(name+(Store.navigating?" downloaded · install after guidance stops":" ready for offline navigation"));
+                    update(name+(Store.navigating||Store.simulating?" downloaded · install after guidance or simulation stops":" ready for offline navigation"));
                 }
             }catch(Exception e){status=cancelled?"Downloads paused. Press download to resume.":"Map download: "+e.getMessage();}
             finally{running=false;stopForeground(STOP_FOREGROUND_REMOVE);stopSelf();}
