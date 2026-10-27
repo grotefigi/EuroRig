@@ -1,4 +1,7 @@
 import json
+import os
+import subprocess
+import sys
 import tempfile
 import threading
 import unittest
@@ -27,6 +30,13 @@ class ProgressTests(unittest.TestCase):
         self.assertEqual(100, snapshot(self.root)['deepseek']['percent'])
         update(self.root, 'codex', 'A1', 'complete', evidence='independent receipt')
         self.assertEqual(50, snapshot(self.root)['overall']['percent'])
+
+    def test_show_handles_romanian_text_on_a_legacy_console(self):
+        update(self.root, 'codex', current='România: restricții')
+        env = dict(os.environ, PYTHONIOENCODING='cp1252')
+        command = [sys.executable, str(Path(__file__).with_name('roadmap_progress.py')), '--data-dir', str(self.root), 'show']
+        result = subprocess.run(command, capture_output=True, env=env, check=True)
+        self.assertEqual('România: restricții', json.loads(result.stdout)['lanes']['codex']['current'])
 
     def test_lane_updates_preserve_the_other_writer(self):
         original = (self.root/'codex.json').read_bytes()

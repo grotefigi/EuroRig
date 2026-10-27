@@ -158,7 +158,7 @@ def main():
     change.add_argument('--expect-updated-at')
     args = parser.parse_args()
     if args.command == 'show':
-        print(json.dumps(snapshot(args.data_dir), ensure_ascii=False, indent=2))
+        print(json.dumps(snapshot(args.data_dir), ensure_ascii=True, indent=2))
     elif args.command == 'update':
         update(args.data_dir, args.lane, args.item, args.status, args.current, args.evidence, args.blocker, args.expect_updated_at)
         print('PROGRESS_UPDATED ' + args.lane)
