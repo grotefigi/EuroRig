@@ -1,8 +1,10 @@
 # DeepSeek execution plan and complete handoff
 
+**27 October:** This is a historical assignment. Round two reported eight submitted batches on 25 October; submissions still need review and do not establish product acceptance. Current project ownership and priorities are in [the Claude handover](../HANDOVER-CLAUDE-2026-10-27.md).
+
 ## Current assignment: round two
 
-The next ready assignment is [DEEPSEEK_ROUND2.md](DEEPSEEK_ROUND2.md), also delivered at `C:/EverythingAI/Project EuroRig/Workers/DeepSeek/ROUND2/DEEPSEEK_ROUND2.md`. It supplies eight concrete batches, fixed inputs, structural oracles, sandbox patch contracts and a single final handoff. It incorporates Codex's corrections to the first run and provides three local archive text references, so that bounded archive work no longer depends on GitHub access.
+The historical [DEEPSEEK_ROUND2.md](DEEPSEEK_ROUND2.md) supplies eight batches, fixed inputs, structural oracles, sandbox patch contracts and a final handoff. Its reported submissions are preserved locally for independent review.
 
 Preserve the original twelve DS01–DS12 statuses/evidence. Round two uses its own run `PROGRESS.json` with eight IDs and mirrors its submitted/blocked counters through the DeepSeek **current text only**. Do not reset the first-round lane or change the shared dashboard denominator. The historical first assignment below remains useful context; the new round-two instructions define current scope. Creating the brief does not launch an external model.
 

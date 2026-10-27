@@ -58,6 +58,8 @@ The canonical application source is [EuroRig](https://github.com/grotefigi/EuroR
 
 Open [PR #1](https://github.com/grotefigi/EuroRig/pull/1) and its branch contain distinct country-set, map-cache, queue and guidance work not present in the approved-interface line. Preserve the PR and review its changes feature by feature before integration; it is not superseded. Unverified map-matching and turn experiments from the older worktree are preserved separately in the `archive/early-routing-20261027` branch, not accepted production behavior. The active local history and pre-redaction progress were backed up privately for recovery.
 
+Public `main` is a clean source-tree snapshot based on the previous public main. It does not contain every historical local commit or ignored receipt referenced in older documents. The verified local history bundle is `analysis/private/claude-handover-20261027/final-local-history.bundle` in the original approved-interface worktree. Treat that bundle and its surrounding receipts as private.
+
 The CESTRIN parser test headers in this checkout are synthetic and contain no publisher records. Source-format matching, rights, applicability and real imports still require independent evidence. Historical HyperResearch reports remain local research leads; their licence and feature claims need current primary-source verification before reuse.
 
 ## Verification and handover discipline

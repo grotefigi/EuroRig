@@ -1,5 +1,7 @@
 # DeepSeek round two — complete one-go assignment
 
+**Historical assignment:** the worker reported all eight batches submitted on 25 October. Review the retained results against current source and evidence before reuse. See [the project handover](../HANDOVER-CLAUDE-2026-10-27.md); this brief is not a new request to restart the run.
+
 Work through all eight batches below in one continuous run. This is the second preparation assignment for EuroRig. Produce useful scripts, fixtures and reviewable patches in a sandbox; Codex owns production integration, architecture, legal interpretation and acceptance. Do not ask the owner which batch to start next. Document a genuine missing input and continue independent work.
 
 ## Workspace and fixed inputs

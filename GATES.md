@@ -1,5 +1,7 @@
 # Gates: approved-interface package fixture and build
 
+Historical fixture-repair ledger. Its evidence applies to the recorded earlier checkout, not the current project or roadmap. For current status, see [the Claude handover](docs/HANDOVER-CLAUDE-2026-10-27.md).
+
 OWNS: routing/src/test/java/org/eurorig/routing/PackageImportTest.java, routing/src/test/resources/region-package.eurorig, routing/src/test/resources/README.md, GATES.md, CONTINUATION.md
 
 Scope: restore the absent package-import fixture using original synthetic assets and the existing packager, then validate the approved-interface branch.
