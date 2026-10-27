@@ -7,14 +7,32 @@ public final class RestrictionRule {
     public final double height,width,length,weight,axle;
     public final int flags;
     public final Map<String,String> tags;
+    private final boolean originalTagsNull;
     public RestrictionRule(double height,double width,double length,double weight,double axle,int flags,Map<String,String> tags){
-        this.height=height;this.width=width;this.length=length;this.weight=weight;this.axle=axle;this.flags=flags;this.tags=tags;
+        // A rule built from a partial fixture must not crash the audit; it carries no evidence.
+        this.height=height;this.width=width;this.length=length;this.weight=weight;this.axle=axle;this.flags=flags;
+        this.tags=tags==null?Map.of():tags;
+        this.originalTagsNull = tags == null;
     }
     public boolean accessLimited(){return (flags&Graph.BLOCKED)!=0;}
     public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination){
-        return violation(truck,permittedDelivery,metresFromDestination,false);
+        return violation(truck,permittedDelivery,metresFromDestination,false,null);
     }
     public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination,boolean originEgress){
+        return violation(truck,permittedDelivery,metresFromDestination,originEgress,null);
+    }
+    public String violation(Truck truck,boolean permittedDelivery,double metresFromDestination,boolean originEgress,Graph graph){
+        // A rule with no evidence (null tags) must not silently allow access
+        if(originalTagsNull) return "No evidence mapped; restricted access needs verification";
+        
+        // Check via-way turn restrictions (only if graph is not null)
+        if(graph != null && graph.viaWayTurns != null) {
+            for (ViaWayTurnRestriction vwt : graph.viaWayTurns) {
+                String reason = vwt.violation(truck, permittedDelivery, metresFromDestination);
+                if (reason != null) return reason;
+            }
+        }
+        
         if(height>0&&truck.height>height)return "Height limit "+height+" m";
         if(width>0&&truck.width>width)return "Width limit "+width+" m";
         if(length>0&&truck.length>length)return "Length limit "+length+" m";
@@ -41,11 +59,33 @@ public final class RestrictionRule {
         if(accessLimited()){
             String access="yes";
             for(String key:new String[]{"access","vehicle","motor_vehicle","motorcar","hgv"})if(tags.containsKey(key))access=tags.get(key);
+            // Directional access: :forward/:backward/:left/:right constraints
+            String directional=null;
+            for(String dir:new String[]{"forward","backward","left","right"}){
+                String key="access:"+dir;
+                if(tags.containsKey(key)){directional=tags.get(key);break;}
+            }
+            if(directional!=null&&!(directional.equals("yes")||directional.equals("destination")||directional.equals("delivery")||directional.equals("private")))
+                return "Directional access restricted: "+directional;
+            
+            // Conditional access: access:conditional, hgv:conditional
+            String conditional=null;
+            for(String key:new String[]{"access:conditional","hgv:conditional"}){
+                if(tags.containsKey(key)){conditional=tags.get(key);break;}
+            }
+            if(conditional!=null){
+                // Conditional restrictions are uncertain - mark as UNCERTAIN
+                return "Conditional access restriction: "+conditional;
+            }
             boolean leaving=originEgress&&(access.equals("private")||access.equals("destination")||access.equals("delivery"));
+            // Fail closed on the distance: unknown (NaN/infinite) or negative values used to
+            // slip through the "<= 2000" comparison and quietly grant delivery access.
+            boolean known=Double.isFinite(metresFromDestination)&&metresFromDestination>=0;
+            if(!leaving&&!known)return "Delivery distance is unknown; restricted access needs verification";
             if(!leaving&&(!permittedDelivery||metresFromDestination>2000))return "Truck access restricted";
             if(tags.containsKey("barrier")&&!"no".equals(tags.get("barrier")))return "Restricted access barrier needs verification";
             if(tags.containsKey("bridge")&&!"no".equals(tags.get("bridge")))return "Bridge on restricted delivery access needs verification";
-            if(!access.equals("no")&&!access.equals("destination")&&!access.equals("delivery")&&!access.equals("private"))return "Unsupported access exception";
+            if(!access.equals("yes")&&!access.equals("no")&&!access.equals("destination")&&!access.equals("delivery")&&!access.equals("private"))return "Unsupported access exception";
         }
         return null;
     }

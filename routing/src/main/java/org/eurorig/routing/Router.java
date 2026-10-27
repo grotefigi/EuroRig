@@ -52,9 +52,85 @@ public final class Router {
         Item(int edge,double cost,double estimate) { this.edge=edge;this.cost=cost;this.estimate=estimate; }
         public int compareTo(Item other) { return Double.compare(estimate,other.estimate); }
     }
-    public Route route(Graph g, int start, int end, Truck t) {
-        return route(g,start,end,t,null);
+    public List<Route> routes(Graph g, int start, int end, Truck t, int alternatives) {
+        List<Route> result = new ArrayList<>();
+        if (start < 0 || end < 0 || start >= g.nodes.length || end >= g.nodes.length) {
+            throw new IllegalArgumentException("Choose points inside the map");
+        }
+        if (start == end) {
+            result.add(new Route(g, new ArrayList<>()));
+            return result;
+        }
+        
+        // Track edges blocked by previous alternatives
+        Set<Graph.Edge> blockedEdges = new HashSet<>();
+        
+        double[] best = new double[g.edges.length];
+        int[] parent = new int[g.edges.length];
+        
+        for (int alt = 0; alt < alternatives; alt++) {
+            Arrays.fill(best, Double.POSITIVE_INFINITY);
+            Arrays.fill(parent, -1);
+            PriorityQueue<Item> queue = new PriorityQueue<>();
+            queue.add(new Item(-1, 0, 0));
+            
+            while (!queue.isEmpty()) {
+                if (Thread.currentThread().isInterrupted()) {
+                    throw new IllegalStateException("Routing cancelled");
+                }
+                Item current = queue.poll();
+                if (current.edge >= 0 && current.cost > best[current.edge]) {
+                    continue;
+                }
+                Graph.Edge incoming = current.edge < 0 ? null : g.edges[current.edge];
+                int node = incoming == null ? start : incoming.to;
+                
+                if (node == end) {
+                    List<Graph.Edge> path = new ArrayList<>();
+                    for (int e = current.edge; e >= 0; e = parent[e]) {
+                        path.add(g.edges[e]);
+                    }
+                    Collections.reverse(path);
+                    result.add(new Route(g, path));
+                    
+                    // Block all edges in this route for next alternative
+                    for (Graph.Edge e : path) {
+                        blockedEdges.add(e);
+                    }
+                    break;
+                }
+                
+                for (int id : g.outgoing[node]) {
+                    Graph.Edge e = g.edges[id];
+                    if (blockedEdges.contains(e)) {
+                        continue;
+                    }
+                    if (e.blockedReason(t) != null || !g.turnAllowed(incoming, e)) {
+                        continue;
+                    }
+                    double cost = current.cost + e.seconds();
+                    if (cost < best[id]) {
+                        best[id] = cost;
+                        parent[id] = current.edge;
+                        Graph.Node a = g.nodes[e.to], b = g.nodes[end];
+                        double remaining = Geo.distance(a.lat, a.lon, b.lat, b.lon);
+                        queue.add(new Item(id, cost, cost + remaining / (80 / 3.6)));
+                    }
+                }
+            }
+        }
+        
+        return result;
     }
+    
+    public Route route(Graph g, int start, int end, Truck t) {
+        List<Route> routes = routes(g, start, end, t, 1);
+        if (routes.isEmpty()) {
+            throw new IllegalStateException("No route for this truck in the installed map. Check coverage, dimensions and avoidances.");
+        }
+        return routes.get(0);
+    }
+    
     public Route route(Graph g,int start,int end,Truck t,RoutingMode mode){
         if(start<0||end<0||start>=g.nodes.length||end>=g.nodes.length) throw new IllegalArgumentException("Choose points inside the map");
         if(start==end) return new Route(g,new ArrayList<>());

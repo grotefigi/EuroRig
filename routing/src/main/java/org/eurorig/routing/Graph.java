@@ -53,8 +53,12 @@ public final class Graph {
     public final Edge[] edges;
     public final List<Integer>[] outgoing;
     private final Map<Integer, List<Turn>> turns = new HashMap<>();
-    @SuppressWarnings("unchecked")
+    List<ViaWayTurnRestriction> viaWayTurns = new ArrayList<>();
     public Graph(String name, String attribution, String date, boolean demo, Node[] nodes, Edge[] edges, List<Turn> restrictions) {
+        this(name,attribution,date,demo,nodes,edges,restrictions,Collections.emptyList());
+    }
+    @SuppressWarnings("unchecked")
+    public Graph(String name, String attribution, String date, boolean demo, Node[] nodes, Edge[] edges, List<Turn> restrictions, List<ViaWayTurnRestriction> viaWayTurns) {
         this.name=name; this.attribution=attribution; this.date=date; this.demo=demo; this.nodes=nodes; this.edges=edges;
         outgoing = new List[nodes.length];
         for (int i=0; i<nodes.length; i++) outgoing[i]=new ArrayList<>();
@@ -64,12 +68,18 @@ public final class Graph {
             outgoing[e.from].add(i);
         }
         for (Turn t:restrictions) turns.computeIfAbsent(t.via, k->new ArrayList<>()).add(t);
+        for (ViaWayTurnRestriction v : viaWayTurns) this.viaWayTurns.add(v);
     }
     public boolean turnAllowed(Edge incoming, Edge next) {
         if (incoming==null) return true;
         if (incoming.from==next.to) return false; // Do not suggest immediate truck U-turns.
+        // Check node-based turn restrictions
         for (Turn t:turns.getOrDefault(next.from, Collections.emptyList())) {
             if (t.from==incoming.way && ((t.only && t.to!=next.way) || (!t.only && t.to==next.way))) return false;
+        }
+        // Check via-way turn restrictions
+        for (ViaWayTurnRestriction v : viaWayTurns) {
+            if (v.isRestricted(incoming.way, next.way, true)) return false;
         }
         return true;
     }
@@ -99,6 +109,7 @@ public final class Graph {
         PackInput(InputStream source){this.source=source;}
         private void ensure(int n)throws IOException{
             if(limit-position>=n)return;
+            // Preserve unread bytes before refilling, including split primitives.
             int remaining=limit-position;
             if(remaining>0)System.arraycopy(buffer,position,buffer,0,remaining);
             position=0;limit=remaining;
@@ -120,6 +131,11 @@ public final class Graph {
             int written=0;while(written<out.length){ensure(1);int n=Math.min(limit-position,out.length-written);System.arraycopy(buffer,position,out,written,n);position+=n;written+=n;}
         }
         int read()throws IOException{return position<limit?buffer[position++]&255:source.read();}
+        boolean hasRemaining()throws IOException{
+            if(position<limit)return true;
+            int value=source.read();if(value<0)return false;
+            buffer[0]=(byte)value;position=0;limit=1;return true;
+        }
     }
     private static String string(PackInput in) throws IOException {
         int n=in.readInt(); if(n<0 || n>65536) throw new IOException("Invalid text length");
@@ -157,7 +173,17 @@ public final class Graph {
             if(via<0||via>=nodes.length) throw new IOException("Invalid turn restriction");
             turns.add(new Turn(via,from,to,only));
         }
+        // Read via-way turn restrictions
+        List<ViaWayTurnRestriction> viaWayTurns=new ArrayList<>();
+        // Original EuroPack v1 files end after node-based restrictions.
+        int m=in.hasRemaining()?count(in,500000):0;
+        for(int i=0;i<m;i++) {
+            long via=in.readLong(); long from=in.readLong(),to=in.readLong(); boolean only=in.readBoolean();
+            String type=string(in);
+            if(via<0) throw new IOException("Invalid via-way turn restriction");
+            viaWayTurns.add(new ViaWayTurnRestriction(via,from,to,only,type));
+        }
         if(in.read()!=-1) throw new IOException("Unexpected trailing map data");
-        return new Graph(name,attr,date,demo,nodes,edges,turns);
+        return new Graph(name,attr,date,demo,nodes,edges,turns,viaWayTurns);
     }
 }

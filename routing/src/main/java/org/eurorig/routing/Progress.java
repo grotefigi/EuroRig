@@ -26,6 +26,17 @@ public final class Progress {
             double along=route.cumulative[i]+p[0]*e.metres;
             if(p[1]<distance && along>=travelled-50) { distance=p[1];position=along;selected=i; }
         }
+        // Forward re-acquisition. The window above is deliberately short, so a fix that
+        // lands past it (GPS gap, tunnel, eight-plus edges) used to leave the tracker
+        // stuck off-route forever. Scan the rest of the route only when nothing in the
+        // window matched, and only accept a fix genuinely on the route that lies ahead:
+        // the loop guard the short window exists for still holds because `along` may
+        // never fall behind the travelled distance.
+        if(distance>=60) for(int i=end;i<route.edges.size();i++) {
+            Graph.Edge e=route.edges.get(i); double[] p=Geo.project(lat,lon,route.graph.nodes[e.from],route.graph.nodes[e.to]);
+            double along=route.cumulative[i]+p[0]*e.metres;
+            if(p[1]<distance && p[1]<60 && along>=travelled-50) { distance=p[1];position=along;selected=i; }
+        }
         if(distance<60) { travelled=Math.max(travelled,position);current=selected; }
         int next=route.nextManeuver(current);
         Graph.Edge last=route.edges.get(route.edges.size()-1); Graph.Node destination=route.graph.nodes[last.to];

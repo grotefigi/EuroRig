@@ -12,7 +12,7 @@ public class RoutingTest {
     private Graph.Edge road(int from,int to,long way,int flags){return new Graph.Edge(from,to,way,"Road "+way,"primary",0,0,0,0,0,flags,50);}
     private Graph graph(Graph.Edge[] roads,Graph.Turn... turns){
         Graph.Node[] nodes={new Graph.Node(44,26,"A"),new Graph.Node(44,26.01,"B"),new Graph.Node(44.01,26.01,"C"),new Graph.Node(44.01,26,"D")};
-        return new Graph("Test","Fixture","v1",true,nodes,roads,Arrays.asList(turns));
+        return new Graph("Test","Fixture","v1",true,nodes,roads,Arrays.asList(turns),List.of());
     }
     @Test public void truckDetoursAroundLowBridgeAndWeightLimit() throws Exception {
         Graph g=demo();Router.Route r=new Router().route(g,0,3,Truck.standard());
@@ -82,5 +82,53 @@ public class RoutingTest {
         Graph normal=Graph.read(new ByteArrayInputStream(bytes));
         assertEquals(normal.edges[normal.edges.length-1].name,graph.edges[graph.edges.length-1].name);
         assertEquals(normal.nodes[normal.nodes.length-1].lon,graph.nodes[graph.nodes.length-1].lon,0);
+    }
+    @Test public void packDecoderDoesNotUseAvailableAsEof()throws Exception{
+        byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("../app/src/androidTest/assets/demo.europack"));
+        Graph normal=demo();
+        for(int chunk:new int[]{1,3,7}){
+            InputStream partial=new ByteArrayInputStream(bytes){
+                public synchronized int available(){return 0;}
+                public synchronized int read(byte[] b,int off,int len){return super.read(b,off,Math.min(len,chunk));}
+            };
+            Graph graph=Graph.read(partial);
+            assertEquals(normal.nodes.length,graph.nodes.length);assertEquals(normal.edges.length,graph.edges.length);
+            assertEquals(normal.edges[normal.edges.length-1].name,graph.edges[graph.edges.length-1].name);
+        }
+    }
+    @Test(timeout=5000) public void packDecoderMakesProgressAfterZeroByteReads()throws Exception{
+        byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("../app/src/androidTest/assets/demo.europack"));
+        InputStream partial=new ByteArrayInputStream(bytes){
+            public synchronized int read(byte[] b,int off,int len){return 0;}
+        };
+        Graph graph=Graph.read(partial);assertEquals(demo().edges.length,graph.edges.length);
+    }
+    @Test(expected=EOFException.class) public void packDecoderRejectsTruncationDuringRefill()throws Exception{
+        byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("../app/src/androidTest/assets/demo.europack"));
+        InputStream partial=new ByteArrayInputStream(Arrays.copyOf(bytes,bytes.length-1)){
+            public synchronized int read(byte[] b,int off,int len){return super.read(b,off,Math.min(len,7));}
+        };
+        Graph.read(partial);
+    }
+    @Test public void packDecoderReadsOriginalV1WithoutViaWaySection()throws Exception{
+        byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("../app/src/androidTest/assets/demo.europack"));
+        Graph graph=Graph.read(new ByteArrayInputStream(Arrays.copyOf(bytes,bytes.length-4)));
+        assertEquals(demo().nodes.length,graph.nodes.length);assertEquals(demo().edges.length,graph.edges.length);
+        assertTrue(graph.viaWayTurns.isEmpty());
+    }
+    @Test public void graphConstructorPreservesNodeTurnRestrictionsWithoutViaWays(){
+        Graph original=graph(new Graph.Edge[]{road(0,1,10,0),road(1,2,20,0)});
+        Graph graph=new Graph(original.name,original.attribution,original.date,original.demo,original.nodes,original.edges,
+            List.of(new Graph.Turn(1,10,20,false)));
+        assertFalse(graph.turnAllowed(graph.edges[0],graph.edges[1]));assertTrue(graph.viaWayTurns.isEmpty());
+    }
+    @Test public void packDecoderRejectsPartialViaWayCount()throws Exception{
+        byte[] bytes=java.nio.file.Files.readAllBytes(java.nio.file.Paths.get("../app/src/androidTest/assets/demo.europack"));
+        for(int missing=1;missing<=3;missing++){
+            try{
+                Graph.read(new ByteArrayInputStream(Arrays.copyOf(bytes,bytes.length-missing)));
+                fail("Accepted partial via-way count with "+missing+" missing bytes");
+            }catch(EOFException expected){}
+        }
     }
 }

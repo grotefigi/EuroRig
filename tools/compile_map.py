@@ -111,7 +111,7 @@ def compile_osm(path, name=None):
         raise ValueError('Extract too large: maximum 250,000 road nodes for this prototype')
     ordered = sorted(used)
     index = {n: i for i, n in enumerate(ordered)}
-    turns, excluded = [], set()
+    turns, excluded, via_way_turns = [], set(), []
     way_ids = {w[0] for w in ways}
     for tags, members in relations:
         exceptions = set(tags.get('except', '').split(';'))
@@ -124,15 +124,26 @@ def compile_osm(path, name=None):
         relevant = restriction or any(k.startswith(('restriction:hgv', 'restriction:motor_vehicle', 'restriction:conditional')) for k in tags)
         if not relevant:
             continue
-        valid = (len(froms) == len(tos) == len(vias) == 1 and vias[0].get('type') == 'node'
-                 and froms[0].get('type') == tos[0].get('type') == 'way'
-                 and int(vias[0]['ref']) in index and int(froms[0]['ref']) in way_ids and int(tos[0]['ref']) in way_ids
-                 and restriction in ('no_left_turn', 'no_right_turn', 'no_straight_on', 'only_left_turn', 'only_right_turn', 'only_straight_on')
-                 and not any('conditional' in k for k in tags))
-        if valid:
-            turns.append((index[int(vias[0]['ref'])], int(froms[0]['ref']), int(tos[0]['ref']), restriction.startswith('only_')))
+        # Check for via-way turn relation (via role = 'via')
+        valid_via = (len(froms) == len(tos) == len(vias) == 1 and vias[0].get('type') == 'way'
+                     and froms[0].get('type') == tos[0].get('type') == 'way'
+                     and int(vias[0]['ref']) in way_ids and int(froms[0]['ref']) in way_ids and int(tos[0]['ref']) in way_ids
+                     and restriction in ('no_left_turn', 'no_right_turn', 'no_straight_on', 'only_left_turn', 'only_right_turn', 'only_straight_on')
+                     and not any('conditional' in k for k in tags))
+        if valid_via:
+            # This is a via-way turn restriction
+            via_way_turns.append((int(vias[0]['ref']), int(froms[0]['ref']), int(tos[0]['ref']), restriction.startswith('only_'), restriction))
         else:
-            excluded.update(int(m['ref']) for m in members if m.get('type') == 'way')
+            # Node-based turn restriction
+            valid = (len(froms) == len(tos) == len(vias) == 1 and vias[0].get('type') == 'node'
+                     and froms[0].get('type') == tos[0].get('type') == 'way'
+                     and int(vias[0]['ref']) in index and int(froms[0]['ref']) in way_ids and int(tos[0]['ref']) in way_ids
+                     and restriction in ('no_left_turn', 'no_right_turn', 'no_straight_on', 'only_left_turn', 'only_right_turn', 'only_straight_on')
+                     and not any('conditional' in k for k in tags))
+            if valid:
+                turns.append((index[int(vias[0]['ref'])], int(froms[0]['ref']), int(tos[0]['ref']), restriction.startswith('only_')))
+            else:
+                excluded.update(int(m['ref']) for m in members if m.get('type') == 'way')
     edges = []
     for way, refs, tags in ways:
         kind = tags.get('highway', 'ferry')
@@ -168,6 +179,7 @@ def compile_osm(path, name=None):
     return {'name': name or Path(path).stem, 'attribution': '© OpenStreetMap contributors · ODbL 1.0',
             'date': 'Source freshness unverified; compiled ' + datetime.date.today().isoformat(), 'demo': False,
             'nodes': [nodes[n][:3] for n in ordered], 'edges': edges, 'turns': turns,
+            'via_way_turns': via_way_turns,
             'excluded_ways': len(excluded)}
 
 
@@ -194,6 +206,11 @@ def write_pack(data, path):
     output.extend(struct.pack('>i', len(data['turns'])))
     for turn in data['turns']:
         output.extend(struct.pack('>iqq?', *turn))
+    # Write via-way turn restrictions
+    output.extend(struct.pack('>i', len(data.get('via_way_turns', []))))
+    for via, from_w, to_w, only, type_ in data.get('via_way_turns', []):
+        output.extend(struct.pack('>qqq?', via, from_w, to_w, only))
+        text(type_)
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_bytes(output)
