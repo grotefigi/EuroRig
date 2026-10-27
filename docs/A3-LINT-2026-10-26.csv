@@ -1,0 +1,86 @@
+id,severity,path,line,message,disposition,package
+ApplySharedPref,Warning,app/src/main/java/org/eurorig/app/Store.java,169,"Consider using `apply()` instead; `commit` writes its data to persistent storage immediately, whereas `apply` will handle it in the background",retain synchronous durability,D4
+ApplySharedPref,Warning,app/src/main/java/org/eurorig/app/Store.java,170,"Consider using `apply()` instead; `commit` writes its data to persistent storage immediately, whereas `apply` will handle it in the background",retain synchronous durability,D4
+ApplySharedPref,Warning,app/src/main/java/org/eurorig/app/Store.java,171,"Consider using `apply()` instead; `commit` writes its data to persistent storage immediately, whereas `apply` will handle it in the background",retain synchronous durability,D4
+AndroidGradlePluginVersion,Warning,gradle/wrapper/gradle-wrapper.properties,3,A newer version of Gradle than 9.6.0 is available: 9.8.2,retain tested version,A3
+GradleDependency,Warning,app/build.gradle,4,A newer version of `compileSdk` than 36 is available: 37,retain tested compile SDK 36; newer compile SDK advisory,A3
+NewerVersionAvailable,Warning,app/build.gradle,24,A newer version of io.github.rallista:valhalla-mobile than 0.6.3 is available: 0.6.4,retain tested version,A3
+NewerVersionAvailable,Warning,app/build.gradle,25,A newer version of org.maplibre.gl:android-sdk than 11.5.0 is available: 13.7.1,retain tested version,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/DisplayDatabase.java,63,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/DisplayDatabase.java,189,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/DisplayDatabase.java,244,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/DisplayDatabase.java,263,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/MainActivity.java,779,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,149,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,158,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,172,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,204,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,237,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,260,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,281,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,294,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,327,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,337,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,369,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,374,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,384,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,389,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,407,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,413,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,439,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,468,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,538,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,541,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,550,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,555,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,559,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,566,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,569,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,602,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,608,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,611,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,613,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,620,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,625,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,628,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,635,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,641,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,651,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,660,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,663,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/NativeRouter.java,707,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/RegionPackages.java,29,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/RoadMapView.java,285,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/RoadMapView.java,331,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/RoadMapView.java,350,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/RoadMapView.java,521,Using 'Log' instead of 'Timber',retain platform logging,A3
+LogNotTimber,Warning,app/src/main/java/org/eurorig/app/RouteNavigation.java,49,Using 'Log' instead of 'Timber',retain platform logging,A3
+UnusedResources,Warning,app/src/main/res/values/strings.xml,5,The resource `R.string.acquiring_gps` appears to be unused,optional cleanup,A3
+UnusedResources,Warning,app/src/main/res/values/strings.xml,15,The resource `R.string.search_minimum` appears to be unused,optional cleanup,A3
+UnusedResources,Warning,app/src/main/res/values/strings.xml,16,The resource `R.string.select_coordinate` appears to be unused,optional cleanup,A3
+UnusedResources,Warning,app/src/main/res/values/strings.xml,17,The resource `R.string.coordinate_format` appears to be unused,optional cleanup,A3
+UnusedResources,Warning,app/src/main/res/values/strings.xml,18,The resource `R.string.search_working` appears to be unused,optional cleanup,A3
+UnusedResources,Warning,app/src/main/res/values/strings.xml,19,The resource `R.string.search_failed` appears to be unused,optional cleanup,A3
+UnusedResources,Warning,app/src/main/res/values/strings.xml,20,The resource `R.string.coordinate_outside` appears to be unused,optional cleanup,A3
+UnusedResources,Warning,app/src/main/res/values/strings.xml,21,The resource `R.string.gps_improving` appears to be unused,optional cleanup,A3
+UnusedResources,Warning,app/src/main/res/values/strings.xml,22,The resource `R.string.dark_mode` appears to be unused,optional cleanup,A3
+ViewConstructor,Warning,app/src/main/java/org/eurorig/app/InterfacePages.java,102,"Custom view `CountryFlag` is missing constructor used by tools: `(Context)` or `(Context,AttributeSet)` or `(Context,AttributeSet,int)`",programmatic construction only,A3
+ViewConstructor,Warning,app/src/main/java/org/eurorig/app/MapControlMenu.java,12,"Custom view `MapControlMenu` is missing constructor used by tools: `(Context)` or `(Context,AttributeSet)` or `(Context,AttributeSet,int)`",programmatic construction only,A3
+ViewConstructor,Warning,app/src/main/java/org/eurorig/app/RecenterControl.java,8,"Custom view `RecenterControl` is missing constructor used by tools: `(Context)` or `(Context,AttributeSet)` or `(Context,AttributeSet,int)`",programmatic construction only,A3
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/InterfacePages.java,42,Do not concatenate text displayed with `setText`. Use resource string with placeholders.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/InterfacePages.java,61,Do not concatenate text displayed with `setText`. Use resource string with placeholders.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/InterfacePages.java,75,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/JourneyUi.java,133,Do not concatenate text displayed with `setText`. Use resource string with placeholders.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/JourneyUi.java,133,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/JourneyUi.java,141,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/JourneyUi.java,141,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/JourneyUi.java,141,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/JourneyUi.java,141,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/JourneyUi.java,141,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/MainActivity.java,182,Do not concatenate text displayed with `setText`. Use resource string with placeholders.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/MainActivity.java,182,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/MainActivity.java,182,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/MainActivity.java,217,Do not concatenate text displayed with `setText`. Use resource string with placeholders.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/MainActivity.java,217,Do not concatenate text displayed with `setText`. Use resource string with placeholders.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/MainActivity.java,217,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6
+SetTextI18n,Warning,app/src/main/java/org/eurorig/app/MainActivity.java,439,String literal in `setText` can not be translated. Use Android resources instead.,localization remains open,D6

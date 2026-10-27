@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_invalid_saved">Saved truck profile is invalid. Review and save the vehicle profile before planning or starting guidance.</string>
+    <string name="profile_weight_unsupported">Offline routing supports loaded gross weights up to 100 tonnes. Your entered weight is preserved; this profile cannot be routed.</string>
+    <string name="profile_mass_exceeds_permitted">Loaded gross mass exceeds the permitted maximum mass (%.1f t).</string>
+</resources>

@@ -1,0 +1,428 @@
+{
+  "schema_version": 1,
+  "project": "EuroRig",
+  "source_checkpoint": "5101f9dd9c7e11791df55362282419b278888f05",
+  "methodology": "Equal-weight accepted roadmap packages. Submissions and partial work do not count as product completion.",
+  "packages": [
+    {
+      "id": "A1",
+      "title": "Preserved baseline and evidence",
+      "priority": "P0",
+      "requires": "none",
+      "acceptance": "Preserve approved source, recovered maps, signatures and profile/settings snapshots. Every test receipt identifies commit, APK/map hashes, device/OS and truck inputs. Restore/recovery remains possible.",
+      "deepseek_batch": "DS01"
+    },
+    {
+      "id": "A2",
+      "title": "Current native failure inventory",
+      "priority": "P0",
+      "requires": "A1",
+      "acceptance": "Run current native profile/ADR, navigation, GPS, interface, parking and import suites. Reproduce the historical ADR-C case first. Record individual outcomes and isolated reproductions; an incomplete suite cannot be called passing.",
+      "deepseek_batch": "DS01"
+    },
+    {
+      "id": "A3",
+      "title": "Reproducible build and CI",
+      "priority": "P0",
+      "requires": "A1",
+      "acceptance": "Prove a fresh-checkout Windows/CI build without hidden fixtures or skipped tooling tests. Reconcile compile-SDK and CI provisioning; classify lint warnings and fix correctness/platform issues. Keep source/dependency versions explicit.",
+      "deepseek_batch": "DS01"
+    },
+    {
+      "id": "A4",
+      "title": "Isolated approved-interface QA build",
+      "priority": "P0",
+      "requires": "A1",
+      "acceptance": "Create a clearly labeled isolated QA build of the approved interface with separate IDs/storage. Verify UI identity. Preserve original EuroRig/Eurowag data; physical devices never run data-clearing smoke scripts.",
+      "deepseek_batch": "DS01"
+    },
+    {
+      "id": "B1",
+      "title": "Truck and ADR capability matrix",
+      "priority": "P0",
+      "requires": "A2",
+      "acceptance": "Create the complete standard-truck/ADR capability matrix: rigid, tractor/semitrailer, drawbar, trailer configuration, total dimensions, loaded/permitted mass, axle loads/counts and cargo/tunnel inputs. Map each field to engine enforcement, added audit or explicit unsupported status. Test boundary/equality/contradictory inputs; close the 200 t/100 t mismatch without inventing support.",
+      "deepseek_batch": "DS02"
+    },
+    {
+      "id": "B2",
+      "title": "Verified ADR detours",
+      "priority": "P0",
+      "requires": "A2, B1",
+      "acceptance": "Resolve any reproduced ADR legal-detour failures. Keep prohibited edges excluded; independently verify the expected corridor. Cover expensive legal approaches, endpoint changes and every routing preference. Find a verified legal detour or establish why the expectation is invalid; never relax a hard restriction for a pass.",
+      "deepseek_batch": "DS02"
+    },
+    {
+      "id": "B3",
+      "title": "Turns, dimensions and hard restrictions",
+      "priority": "P0",
+      "requires": "B1",
+      "acceptance": "Verify imported/native/audited node and via-way turns, no/only rules, multiple via ways, direction, access hierarchy, dimensions, gross/axle loads and trailers. Use actual path-history fixtures and conflicting/unknown cases. All preferences, alternatives and reroutes enforce identical hard rules.",
+      "deepseek_batch": "DS02"
+    },
+    {
+      "id": "B4",
+      "title": "Destination-bound delivery access",
+      "priority": "P0",
+      "requires": "B1, B3",
+      "acceptance": "Verify private/delivery/final-approach permissions through stops, expiry, revocation, profile changes and reroutes. Intermediate stops never grant trip-wide permission. Routing and restricted-road paint agree; stale authorization cannot remain valid during GPS loss.",
+      "deepseek_batch": "DS02"
+    },
+    {
+      "id": "B5",
+      "title": "Bulk restriction sources and coverage",
+      "priority": "P0",
+      "requires": "A1, B1",
+      "acceptance": "Build the reusable bulk-source pipeline described in section 7: one shared rule model, adapters by source format, country configuration, dated provenance, exact road/zone matching and an exception queue. Audit national and municipal coverage automatically. Maintain the RO/MD source register; proposals, expired notices and ambiguous matches are not current restrictions. Manual city-by-city compilation is not the delivery strategy.",
+      "deepseek_batch": "DS03"
+    },
+    {
+      "id": "B6",
+      "title": "Conditional rules and timezones",
+      "priority": "P0",
+      "requires": "B3, B5",
+      "acceptance": "Add/verify timezone/admin support and scheduled/conditional restrictions, applicable holidays, access zones, exemptions and country/load rules. Validate dated authoritative fixtures. Unknown conditions remain explicit and conservative; missing data is never represented as proven clearance.",
+      "deepseek_batch": "DS03"
+    },
+    {
+      "id": "C1",
+      "title": "Coherent Romania–Moldova maps",
+      "priority": "P0",
+      "requires": "A1, B5",
+      "acceptance": "Verify/build a coherent RO–MD graph/display package with compatible tile identities/hierarchy and source manifests. Test border approaches in both directions for representative truck/ADR profiles. Do not concatenate independently built country TARs.",
+      "deepseek_batch": "DS04"
+    },
+    {
+      "id": "C2",
+      "title": "Import, update and rollback",
+      "priority": "P1",
+      "requires": "C1",
+      "acceptance": "Validate install, selection, download/resume, manual import, update and rollback. Cover low storage, interruption, corrupt/truncated entries, path/duplicate entries and schema/engine mismatch. Failed updates preserve a usable previous map after restart.",
+      "deepseek_batch": "DS04"
+    },
+    {
+      "id": "C3",
+      "title": "Search, entrances and coverage metadata",
+      "priority": "P1",
+      "requires": "C1, B5",
+      "acceptance": "Align search, map and restriction metadata. Show installed coverage/source dates and known limits. Test addresses, depots, POIs and precise coordinates in both countries; establish the actual truck entrance and disclose unusable/missing entrances.",
+      "deepseek_batch": "DS04"
+    },
+    {
+      "id": "C4",
+      "title": "Free distribution and manual import",
+      "priority": "P1",
+      "requires": "C1, A3",
+      "acceptance": "Establish free release hosting plus manual-import fallback, respecting licenses, hashes, artifact limits and update compatibility. Core navigation remains usable when hosting is unavailable. Document storage requirements and retention/rollback behavior.",
+      "deepseek_batch": "DS04"
+    },
+    {
+      "id": "D1",
+      "title": "GPS matching and valid starts",
+      "priority": "P0",
+      "requires": "B2, B3, B4, C1, A4",
+      "acceptance": "Verify accurate/fresh start fixes, endpoint correlation and sequence-based GPS matching at parallel roads, ramps, roundabouts and complex junctions. Keep exact-route audit matching distinct from live GPS matching. Replay noise, sparse fixes, stops and reverse travel against labeled paths; retain strict geometry/profile validation in fallbacks.",
+      "deepseek_batch": "DS05"
+    },
+    {
+      "id": "D2",
+      "title": "Reliable missed-turn rerouting",
+      "priority": "P0",
+      "requires": "D1",
+      "acceptance": "Make missed-turn rerouting stable, bounded and cancellable. Preserve truck, access, final destination and all unvisited stops. Test stale asynchronous results, repeat deviations and no lawful alternative. No car fallback, wrong-way recovery, reroute storm or silent stop loss.",
+      "deepseek_batch": "DS05"
+    },
+    {
+      "id": "D3",
+      "title": "GPS loss and Android lifecycle",
+      "priority": "P0",
+      "requires": "D1",
+      "acceptance": "Handle GPS loss/tunnels, coarse permission, stale/future/nonfinite fixes, provider disable/revocation, background/screen-off and battery restrictions. Show lost confidence; recover from valid fixes only. Do not fabricate location/progress or confuse route simulation with real GPS.",
+      "deepseek_batch": "DS05"
+    },
+    {
+      "id": "D4",
+      "title": "Confirmed trip restoration",
+      "priority": "P0",
+      "requires": "D2, B4",
+      "acceptance": "Persist minimal trip intent/stop progress. On kill/restart, restore, recheck map/profile/permissions, obtain a fresh fix and ask to resume. Test expired access and map/profile changes while stopped. No silent guidance restart.",
+      "deepseek_batch": "DS05"
+    },
+    {
+      "id": "D5",
+      "title": "Maneuvers and lane advice",
+      "priority": "P1",
+      "requires": "D1, C3",
+      "acceptance": "Verify maneuver timing, roundabout exits, current-road/speed information and recorded lane/signpost advice. Cover merges, close turns and truck-prohibited lanes. Missing lane evidence stays absent/limited rather than fabricated.",
+      "deepseek_batch": "DS06"
+    },
+    {
+      "id": "D6",
+      "title": "Romanian/English UI and offline speech",
+      "priority": "P1",
+      "requires": "D3, D5",
+      "acceptance": "Complete RO/EN UI resources, maneuver language and actual offline speech. Test street names/numbers, language switching, absent voice packs, mute, notification Stop and audio interruption. A configured TTS object alone does not prove audible guidance.",
+      "deepseek_batch": "DS06"
+    },
+    {
+      "id": "E1",
+      "title": "Ten ordered intermediate stops",
+      "priority": "P1",
+      "requires": "B4, D2, C3",
+      "acceptance": "Ten intermediate stops plus endpoints. Implement drag-and-drop order, visible numbering and accessible move-up/down actions. Preserve chosen order through editing, saving, rerouting and restart. Test 0/1/5/10 stops, duplicate/crossed locations, removal and cancellation. Never optimize order automatically.",
+      "deepseek_batch": "DS07"
+    },
+    {
+      "id": "E2",
+      "title": "Audited two-point alternatives",
+      "priority": "P1",
+      "requires": "B2, B3, B4, C1",
+      "acceptance": "Add native two-point alternative selection: primary plus up to two meaningful lawful alternatives where available. Shared road sections are allowed. Deduplicate; apply identical profile/permission audits; show distance/ETA/restrictions. Fewer valid alternatives are reported honestly.",
+      "deepseek_batch": "DS07"
+    },
+    {
+      "id": "E3",
+      "title": "Ordered multi-stop alternatives",
+      "priority": "P1",
+      "requires": "E1, E2, D2",
+      "acceptance": "Prove ordered multi-stop alternatives against the pinned engine. If native multipoint alternatives are unsupported, generate bounded leg candidates and audit the whole joined trip. Preserve every stop/order/permission; avoid exponential combinations. Test leg joins, shared approaches and single-lawful-route cases.",
+      "deepseek_batch": "DS07"
+    },
+    {
+      "id": "E4",
+      "title": "Static truck parking",
+      "priority": "P1",
+      "requires": "C3, B5, D2",
+      "acceptance": "Build usable static RO–MD truck-parking coverage from licensed free sources. Record truck entrances, carriageway/direction, access/size evidence, amenities and dates. Rank by truck-drivable detour. Test wrong-carriageway and unreachable sites; unknown ADR acceptance/capacity stays unknown.",
+      "deepseek_batch": "DS08"
+    },
+    {
+      "id": "E5",
+      "title": "Optional parking occupancy",
+      "priority": "P2",
+      "requires": "E4",
+      "acceptance": "Integrate occupancy only for verified covered sites. Validate measurement timestamps, stale/offline cache, invalid counts and outage. Unknown availability never becomes a live vacancy claim. The existing NDW adapter retains its actual geographic scope.",
+      "deepseek_batch": "DS08"
+    },
+    {
+      "id": "E6",
+      "title": "Optional toll estimates",
+      "priority": "P2",
+      "requires": "B1, C1, B5",
+      "acceptance": "Research verified free toll/vignette/bridge/ferry sources. Covered estimates record category, period, currency, tariff date and exclusions; independent examples reproduce totals. Uncovered charges or missing inputs show unavailable/incomplete, never fabricated zero cost. No payment flow is needed.",
+      "deepseek_batch": "DS08"
+    },
+    {
+      "id": "E7",
+      "title": "Optional live traffic",
+      "priority": "P2",
+      "requires": "C1, B5, D2",
+      "acceptance": "Assess free traffic/closure feed rights, freshness, coverage and road matching. Test stale/bad data and outages. Any traffic-driven reroute receives the full truck audit. Offline navigation never waits for the feed.",
+      "deepseek_batch": "DS08"
+    },
+    {
+      "id": "F1",
+      "title": "Independent comparison corpus",
+      "priority": "P0",
+      "requires": "A4, B1, C1",
+      "acceptance": "Define public-coordinate scenarios and identical input sheets: app/map versions, truck/load/ADR, exact endpoints/stops, preferences and traffic state. Unsupported or mismatched reference options are not scored as equivalent tests.",
+      "deepseek_batch": "DS09"
+    },
+    {
+      "id": "F2",
+      "title": "Authorized Eurowag comparison",
+      "priority": "P1",
+      "requires": "F1, B2, B3, B4, B5, B6, E1, E2, E3, E4",
+      "acceptance": "Compare through authorized Eurowag UI. Record route/refusal, principal roads, endpoint snaps, restrictions, stop order, parking entrance and ETA assumptions. Investigate safety differences against authoritative evidence. Do not copy proprietary code, maps, artwork, voices or restricted datasets.",
+      "deepseek_batch": "DS09"
+    },
+    {
+      "id": "F3",
+      "title": "Tablet qualification",
+      "priority": "P1",
+      "requires": "D1, D2, D3, D4, D5, D6, E1, E2, E3, E4",
+      "acceptance": "Run Tab S9 matrix across languages, themes, orientations, permission states, offline use, stops, alternatives, parking and lifecycle failure. Save actual assertions and APK/map/device receipts in private storage.",
+      "deepseek_batch": "DS10"
+    },
+    {
+      "id": "F4",
+      "title": "Physical Pixel qualification",
+      "priority": "P1",
+      "requires": "F3, Pixel availability",
+      "acceptance": "Repeat on the physical Pixel 8 Pro and its actual OS/ABI/page size. Test phone layouts, calls/audio interruption, screen-off/background and memory independently. Tablet/emulator results do not close this device gate.",
+      "deepseek_batch": "DS10"
+    },
+    {
+      "id": "F5",
+      "title": "Soak and performance evidence",
+      "priority": "P1",
+      "requires": "F2, F3; repeat after F4",
+      "acceptance": "Run tablet replay/soak first, then repeat on the Pixel after F4. Measure routing/rerouting, render frames, memory, battery and thermal state. Fix crashes, ANRs, route/stop loss and unbounded growth. Completion for both devices requires both sets of receipts; publish no universal FPS claim.",
+      "deepseek_batch": "DS10"
+    },
+    {
+      "id": "G1",
+      "title": "Private release candidate",
+      "priority": "P1",
+      "requires": "A1–A4, B1–B6, C1–C4, D1–D6, E1–E4, F1–F5",
+      "acceptance": "Produce private signed candidate, support/coverage matrix, limits, evidence, installation/storage and rollback instructions. Test fresh install and upgrades retaining maps/profiles. Keep signing keys private and recoverable.",
+      "deepseek_batch": "DS11"
+    },
+    {
+      "id": "G2",
+      "title": "Maintenance and data updates",
+      "priority": "P1",
+      "requires": "G1",
+      "acceptance": "Establish source/map/dependency review, regression reruns, feed expiry and issue reproduction. Trace every restriction report to APK, map, truck and source record. No new location telemetry by default.",
+      "deepseek_batch": "DS11"
+    },
+    {
+      "id": "G3",
+      "title": "Broader European coverage",
+      "priority": "P3",
+      "requires": "G1, per-country source/device evidence",
+      "acceptance": "Expand Europe country by country, excluding Russia. Each needs licensing/provenance, coherent border maps, country/load fixtures and comparison tests. Choose country order and Turkey/Caucasus coverage later with the owner.",
+      "deepseek_batch": "DS11"
+    },
+    {
+      "id": "G4",
+      "title": "Later public distribution",
+      "priority": "P3",
+      "requires": "G2, wider validation capacity",
+      "acceptance": "Prepare public distribution, update/signing/security/support, contribution and licensing policies. Keep the app free. Wider Android/API support requires separate evidence; API 26 renderer problems are a later public-scope gate.",
+      "deepseek_batch": "DS11"
+    },
+    {
+      "id": "G5",
+      "title": "Later permit-dependent loads",
+      "priority": "P3",
+      "requires": "B1, B5, verified permit data",
+      "acceptance": "Add permit-dependent abnormal loads, specialized trailer/axle/swept-path models and extended freight/ferry cases through a separate capability matrix. A declaration never creates clearance or replaces an individual permit.",
+      "deepseek_batch": "DS11"
+    }
+  ],
+  "batches": [
+    {
+      "id": "DS01",
+      "title": "Baseline and CI evidence",
+      "packages": [
+        "A1",
+        "A2",
+        "A3",
+        "A4"
+      ],
+      "deliverable": "Reconcile source/build/CI/test/fixture versions; index existing receipts and all current lint records. Separate completed QA isolation from missing checks. Required outputs: `baseline.json`, exact lint occurrence multiset/counts, CI provisioning diff, source references, unresolved-check index."
+    },
+    {
+      "id": "DS02",
+      "title": "Truck/ADR/access evidence",
+      "packages": [
+        "B1",
+        "B2",
+        "B3",
+        "B4"
+      ],
+      "deliverable": "Extend the reviewed 14-field source index into UI/storage/native/audit/test trace rows. Inventory truck/ADR/access/turn fixtures and contradictory or unsupported inputs. Required outputs: Per-field exact paths/lines/snippets/units, fixture-to-assertion map, capability questions, model/native discrepancy evidence. Do not decide legal support."
+    },
+    {
+      "id": "DS03",
+      "title": "Bulk-source discovery and normalization",
+      "packages": [
+        "B5",
+        "B6",
+        "G2",
+        "G3"
+      ],
+      "deliverable": "Collect bulk authority-source candidates by country/region and group reusable formats. Parse available licensed/public samples, index restrictions and update metadata, and identify exact matching keys. Prioritize RO/MD; do not research every city manually. Required outputs: `sources.jsonl`, source snapshots/hashes where permitted, schema samples, adapter-format groups, unresolved rights/currentness/location fields, source-change candidates. No accepted legal rules or map joins."
+    },
+    {
+      "id": "DS04",
+      "title": "Map/import fixture preparation",
+      "packages": [
+        "C1",
+        "C2",
+        "C3",
+        "C4"
+      ],
+      "deliverable": "Inventory public/synthetic map manifests, package schemas, source dates and build/import failure cases. Prepare compatible corruption/truncation/duplicate-entry candidates in the sandbox. Required outputs: Package/source matrix, fixture generator candidates, expected structural failures with source references, download/import test matrix. No large map rebuild without an explicit bounded recipe."
+    },
+    {
+      "id": "DS05",
+      "title": "GPS/recovery replay preparation",
+      "packages": [
+        "D1",
+        "D2",
+        "D3",
+        "D4"
+      ],
+      "deliverable": "Prepare public/synthetic GPS/recovery replay inputs and classify sanitized logs supplied outside private storage. Enumerate stale callbacks, GPS gaps, restart and authorization-expiry cases. Required outputs: Replay JSONL/schema, origin/provenance per point, case matrix, error index. Expected live-route/legality outcomes stay unknown without an independent Codex oracle."
+    },
+    {
+      "id": "DS06",
+      "title": "RO/EN and maneuver drafts",
+      "packages": [
+        "D5",
+        "D6"
+      ],
+      "deliverable": "Finish exact UI/resource inventories and RO translation drafts; index maneuver/lane/TTS cases. Reuse the corrected 89-entry candidate resources. Required outputs: Translation/key/source map, preserved placeholder contracts, candidate XML, terminology/safety ambiguities, speech/pronunciation test inputs. Compile with actual Android tools if available; do not wire production UI."
+    },
+    {
+      "id": "DS07",
+      "title": "Stop/alternative scenarios",
+      "packages": [
+        "E1",
+        "E2",
+        "E3"
+      ],
+      "deliverable": "Prepare ordered-stop and route-alternative combinations: 0/1/5/10 intermediate stops, duplicate/crossed locations, removals, cancellation, leg joins and a single lawful-route case. Required outputs: Deduplicated scenario records and expected structural invariants. Preserve chosen order; no automatic optimization or invented shortest-path/legal oracle."
+    },
+    {
+      "id": "DS08",
+      "title": "Parking/toll/traffic sources",
+      "packages": [
+        "E4",
+        "E5",
+        "E6",
+        "E7"
+      ],
+      "deliverable": "Collect free parking/occupancy/toll/traffic source leads and sample schemas, dates, units, currencies, geographic scope and outage states. Required outputs: Separate static/dynamic source registers, exact publisher references, licensing/freshness gaps, candidate records with unknown fields explicit. No tariff/legal inference or claim that traffic feeds cover permanent HGV rules."
+    },
+    {
+      "id": "DS09",
+      "title": "Comparison corpus preparation",
+      "packages": [
+        "F1",
+        "F2"
+      ],
+      "deliverable": "Consolidate exact public/synthetic comparison points, profiles, ordered stops and per-country switches. Reuse reviewed W06 endpoints; keep unprovided option values unknown. Required outputs: Scenario schema/validator, point provenance, comparison input sheets, missing-oracle list. Count scenarios separately from mode/profile parameterizations. No unperformed Eurowag comparison pass."
+    },
+    {
+      "id": "DS10",
+      "title": "Device/log matrix preparation",
+      "packages": [
+        "F3",
+        "F4",
+        "F5"
+      ],
+      "deliverable": "Prepare test matrices and machine-readable result summaries for available tablet/emulator and later Pixel tests. Analyze only provided nonprivate logs. Required outputs: Case/receipt index, actual timing/count summaries, failures vs warnings/skips/missing evidence, hardware prerequisites. Pixel and road tests remain unperformed without actual receipts."
+    },
+    {
+      "id": "DS11",
+      "title": "Release/expansion preparation",
+      "packages": [
+        "G1",
+        "G2",
+        "G3",
+        "G4",
+        "G5"
+      ],
+      "deliverable": "Inventory notices, artifact manifests, source update/check requirements, release instructions and future country/permit-load data needs. Required outputs: Release-preparation checklist, notice/source inventory, compatibility questions and expansion/source-format matrix. No signing, publication, security approval or new scope decision."
+    },
+    {
+      "id": "DS12",
+      "title": "Reverse-engineering archive analysis",
+      "packages": [],
+      "deliverable": "Read the pinned EurowagNav archive and classify existing findings as current, superseded, unverified or missing artifacts. Extract behavior/interface questions and public feed leads in bulk. Required outputs: Technology/behavior matrix with exact evidence references, reproduction inputs and priority questions. Existing destination authorization is not new work. Do not execute extraction/probe scripts or infer deployed behavior from symbols alone."
+    }
+  ]
+}

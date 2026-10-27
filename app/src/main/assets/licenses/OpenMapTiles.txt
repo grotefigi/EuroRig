@@ -1,0 +1,11 @@
+OpenMapTiles schema: https://openmaptiles.org/schema/
+Schema attribution: © OpenMapTiles; CC-BY 4.0.
+OpenMapTiles source implementation: BSD 3-Clause.
+Map data: © OpenStreetMap contributors, ODbL 1.0.
+https://www.openstreetmap.org/copyright
+
+EuroRig's cartographic style is original EuroRig code. Map detail is imported
+from a separate offline OpenMapTiles vector file; it is not bundled in the APK.
+Buildings and boundaries use recorded geometry. Heights are approximate display
+heights from the tile data, with a default extrusion where no height is supplied.
+These visual layers are not truck restriction evidence.

@@ -6,14 +6,17 @@ import java.nio.file.*;
 import java.security.*;
 import java.util.*;
 import java.util.function.BooleanSupplier;
+import java.util.function.ToLongFunction;
 import java.util.regex.*;
 
 /** Resumable map transport. Routing has no reference to this class. */
 public final class DownloadClient {
     public interface Progress {void update(long bytes,long total);}
     private final boolean allowLocal;
+    private final ToLongFunction<File> usableSpace;
     private volatile HttpURLConnection active;
-    public DownloadClient(boolean allowLocal){this.allowLocal=allowLocal;}
+    public DownloadClient(boolean allowLocal){this(allowLocal,File::getUsableSpace);}
+    DownloadClient(boolean allowLocal,ToLongFunction<File> usableSpace){this.allowLocal=allowLocal;this.usableSpace=Objects.requireNonNull(usableSpace);}
     public void cancel(){HttpURLConnection connection=active;if(connection!=null)connection.disconnect();}
     public URL checked(String address)throws IOException{
         URL url=new URL(address);String host=url.getHost();
@@ -50,14 +53,14 @@ public final class DownloadClient {
         long offset=partial.exists()?partial.length():0;
         if(offset==bytes&&digest(partial).equalsIgnoreCase(sha256)){Files.move(partial.toPath(),target.toPath(),StandardCopyOption.ATOMIC_MOVE,StandardCopyOption.REPLACE_EXISTING);return target;}
         if(offset>=bytes){Files.delete(partial.toPath());offset=0;}
-        if(directory.getUsableSpace()<Math.multiplyExact(bytes,2)-offset+200L*1024*1024)throw new IOException("Not enough free space for download and installation");
+        if(usableSpace.applyAsLong(directory)<Math.multiplyExact(bytes,2)-offset+200L*1024*1024)throw new IOException("Not enough free space for download and installation");
         if(cancelled.getAsBoolean())throw new InterruptedIOException("Map download paused");
         HttpURLConnection c=open(url,offset);
         try{
             int code=c.getResponseCode();
             if(offset>0&&code==206){
                 Matcher range=Pattern.compile("bytes (\\d+)-(\\d+)/(\\d+)").matcher(Objects.toString(c.getHeaderField("Content-Range"),""));
-                if(!range.matches()||Long.parseLong(range.group(1))!=offset||Long.parseLong(range.group(3))!=bytes)throw new IOException("Server returned an invalid resume range");
+                if(!range.matches()||Long.parseLong(range.group(1))!=offset||Long.parseLong(range.group(2))!=bytes-1||Long.parseLong(range.group(3))!=bytes)throw new IOException("Server returned an invalid resume range");
             }else if(code==200)offset=0;
             else throw new IOException("Map download HTTP "+code);
             long received=offset;

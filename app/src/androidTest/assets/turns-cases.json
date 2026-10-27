@@ -1,0 +1,326 @@
+{
+  "schema": 1,
+  "source": "fixture.osm",
+  "cases": [
+    {
+      "id": "node-no-forward-detour",
+      "start": {
+        "lat": 46,
+        "lon": 26
+      },
+      "end": {
+        "lat": 46,
+        "lon": 26.008
+      },
+      "expected_source_way_ids": [
+        101,
+        103
+      ],
+      "restriction_relation_id": 990001,
+      "expected_restriction_behavior": "detour",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "node-no-reverse-control",
+      "start": {
+        "lat": 46,
+        "lon": 26.008
+      },
+      "end": {
+        "lat": 46,
+        "lon": 26
+      },
+      "expected_source_way_ids": [
+        102,
+        101
+      ],
+      "restriction_relation_id": 990001,
+      "expected_restriction_behavior": "direct reverse control",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "node-no-detour-reverse-control",
+      "start": {
+        "lat": 46.004,
+        "lon": 26.004
+      },
+      "end": {
+        "lat": 46,
+        "lon": 26
+      },
+      "expected_source_way_ids": [
+        103,
+        101
+      ],
+      "restriction_relation_id": 990001,
+      "expected_restriction_behavior": "reverse detour entry control",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "node-only-forward",
+      "start": {
+        "lat": 46.02,
+        "lon": 26
+      },
+      "end": {
+        "lat": 46.02,
+        "lon": 26.008
+      },
+      "expected_source_way_ids": [
+        201,
+        202
+      ],
+      "restriction_relation_id": 990002,
+      "expected_restriction_behavior": "only designated turn",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "node-only-branch-avoidance",
+      "start": {
+        "lat": 46.02,
+        "lon": 26
+      },
+      "end": {
+        "lat": 46.024,
+        "lon": 26.004
+      },
+      "expected_source_way_ids": [
+        201,
+        202,
+        203
+      ],
+      "restriction_relation_id": 990002,
+      "expected_restriction_behavior": "reach branch by avoiding prohibited transition",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "node-only-reverse-control",
+      "start": {
+        "lat": 46.02,
+        "lon": 26.008
+      },
+      "end": {
+        "lat": 46.02,
+        "lon": 26
+      },
+      "expected_source_way_ids": [
+        202,
+        201
+      ],
+      "restriction_relation_id": 990002,
+      "expected_restriction_behavior": "direct reverse control",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "via-no-forward-detour",
+      "start": {
+        "lat": 46.04,
+        "lon": 26
+      },
+      "end": {
+        "lat": 46.04,
+        "lon": 26.012
+      },
+      "expected_source_way_ids": [
+        301,
+        302,
+        304
+      ],
+      "restriction_relation_id": 990003,
+      "expected_restriction_behavior": "detour after full via-way chain",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "via-no-alternate-entry-control",
+      "start": {
+        "lat": 46.036,
+        "lon": 26.004
+      },
+      "end": {
+        "lat": 46.04,
+        "lon": 26.012
+      },
+      "expected_source_way_ids": [
+        305,
+        302,
+        303
+      ],
+      "restriction_relation_id": 990003,
+      "expected_restriction_behavior": "restriction not entered",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "via-no-reverse-control",
+      "start": {
+        "lat": 46.04,
+        "lon": 26.012
+      },
+      "end": {
+        "lat": 46.04,
+        "lon": 26
+      },
+      "expected_source_way_ids": [
+        303,
+        302,
+        301
+      ],
+      "restriction_relation_id": 990003,
+      "expected_restriction_behavior": "reverse chain control",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "via-only-forward",
+      "start": {
+        "lat": 46.06,
+        "lon": 26
+      },
+      "end": {
+        "lat": 46.06,
+        "lon": 26.012
+      },
+      "expected_source_way_ids": [
+        401,
+        402,
+        403
+      ],
+      "restriction_relation_id": 990004,
+      "expected_restriction_behavior": "only designated via-way turn",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "via-only-branch-avoidance",
+      "start": {
+        "lat": 46.06,
+        "lon": 26
+      },
+      "end": {
+        "lat": 46.064,
+        "lon": 26.008
+      },
+      "expected_source_way_ids": [
+        401,
+        402,
+        403,
+        404
+      ],
+      "restriction_relation_id": 990004,
+      "expected_restriction_behavior": "reach branch by avoiding prohibited transition",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "via-only-alternate-entry-control",
+      "start": {
+        "lat": 46.056,
+        "lon": 26.004
+      },
+      "end": {
+        "lat": 46.06,
+        "lon": 26.012
+      },
+      "expected_source_way_ids": [
+        405,
+        402,
+        403
+      ],
+      "restriction_relation_id": 990004,
+      "expected_restriction_behavior": "restriction not entered",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "via-only-reverse-control",
+      "start": {
+        "lat": 46.06,
+        "lon": 26.012
+      },
+      "end": {
+        "lat": 46.06,
+        "lon": 26
+      },
+      "expected_source_way_ids": [
+        403,
+        402,
+        401
+      ],
+      "restriction_relation_id": 990004,
+      "expected_restriction_behavior": "reverse chain control",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "multi-via-no-forward-detour",
+      "start": {
+        "lat": 46.08,
+        "lon": 26
+      },
+      "end": {
+        "lat": 46.08,
+        "lon": 26.016
+      },
+      "expected_source_way_ids": [
+        501,
+        502,
+        503,
+        505
+      ],
+      "restriction_relation_id": 990005,
+      "expected_restriction_behavior": "detour after ordered multi-via chain",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "multi-via-no-alternate-entry-control",
+      "start": {
+        "lat": 46.076,
+        "lon": 26.008
+      },
+      "end": {
+        "lat": 46.08,
+        "lon": 26.016
+      },
+      "expected_source_way_ids": [
+        506,
+        503,
+        504
+      ],
+      "restriction_relation_id": 990005,
+      "expected_restriction_behavior": "restriction not entered",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    },
+    {
+      "id": "multi-via-no-reverse-control",
+      "start": {
+        "lat": 46.08,
+        "lon": 26.016
+      },
+      "end": {
+        "lat": 46.08,
+        "lon": 26
+      },
+      "expected_source_way_ids": [
+        504,
+        503,
+        502,
+        501
+      ],
+      "restriction_relation_id": 990005,
+      "expected_restriction_behavior": "reverse chain control",
+      "oracle": "source graph topology; route geometry must match these way sequences",
+      "synthetic_only": true
+    }
+  ],
+  "fixture_revision": 2,
+  "oracle_notes": "Alternate-entry branches 305/405/506 are one-way toward the junction; source-authored direction removes dead-end turnaround ambiguity in revision 1."
+}

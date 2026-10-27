@@ -34,6 +34,7 @@ public class DownloadTest {
     }
     private File download(DownloadClient client)throws IOException{return client.download(url,hash,payload.length,directory.toFile(),"romania",()->false,(a,b)->{});}
     private Path partial(){return directory.resolve("romania-"+hash+".eurorig.part");}
+    private Path target(){return directory.resolve("romania-"+hash+".eurorig");}
     @Test public void countryVerifiedBeforeAtomicPromotion()throws Exception{
         File result=download(new DownloadClient(true));assertArrayEquals(payload,Files.readAllBytes(result.toPath()));assertFalse(Files.exists(partial()));
         requestedOffset.set(-1);assertEquals(result,download(new DownloadClient(true)));assertEquals(-1,requestedOffset.get());
@@ -63,5 +64,23 @@ public class DownloadTest {
         Files.write(partial(),Arrays.copyOf(payload,1000));url=url.replace("/map","/bad");
         try{download(new DownloadClient(true));fail("bad range accepted");}catch(IOException expected){assertTrue(expected.getMessage().contains("resume range"));}
         assertEquals(1000,Files.size(partial()));
+    }
+    @Test public void wrongResumeEndPreservesPreviousPackageAndPartial()throws Exception{
+        server.createContext("/wrong-end",exchange->{
+            exchange.getResponseHeaders().set("Content-Range","bytes 1000-100000/"+payload.length);
+            exchange.sendResponseHeaders(206,payload.length-1000);
+            try(OutputStream output=exchange.getResponseBody()){output.write(payload,1000,payload.length-1000);}
+        });
+        byte[] prefix=Arrays.copyOf(payload,1000),previous="previous map".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        Files.write(partial(),prefix);Path previousMap=directory.resolve("previous-country.eurorig");Files.write(previousMap,previous);url=url.replace("/map","/wrong-end");
+        try{download(new DownloadClient(true));fail("wrong Content-Range end accepted");}catch(IOException expected){assertTrue(expected.getMessage().contains("resume range"));}
+        assertArrayEquals(prefix,Files.readAllBytes(partial()));assertArrayEquals(previous,Files.readAllBytes(previousMap));assertFalse(Files.exists(target()));
+    }
+    @Test public void lowStoragePreservesPreviousPackageAndPartialWithoutNetwork()throws Exception{
+        byte[] prefix=Arrays.copyOf(payload,1000),previous="previous map".getBytes(java.nio.charset.StandardCharsets.UTF_8);
+        Files.write(partial(),prefix);Path previousMap=directory.resolve("previous-country.eurorig");Files.write(previousMap,previous);requestedOffset.set(-1);
+        DownloadClient lowStorage=new DownloadClient(true,ignored->200L*1024*1024-1);
+        try{download(lowStorage);fail("low storage accepted");}catch(IOException expected){assertTrue(expected.getMessage().contains("free space"));}
+        assertArrayEquals(prefix,Files.readAllBytes(partial()));assertArrayEquals(previous,Files.readAllBytes(previousMap));assertFalse(Files.exists(target()));assertEquals(-1,requestedOffset.get());
     }
 }

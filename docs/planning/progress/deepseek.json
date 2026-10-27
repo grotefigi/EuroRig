@@ -1,0 +1,253 @@
+{
+  "lane": "deepseek",
+  "updated_at": "2026-10-25T18:49:43.162470+00:00",
+  "current": "Round 2: submitted 8/8 (100%); blocked 0; all batches done, final handoff written; evidence: C:\\Users\\Administrator\\Desktop\\EuroRig-DeepSeek-Work\\runs\\ROUND2-20261025-195121\\FINAL_REPORT.md",
+  "items": {
+    "DS01": {
+      "status": "submitted",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS01/report.md",
+      "blocker": null
+    },
+    "DS02": {
+      "status": "submitted",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS02/report.md",
+      "blocker": null
+    },
+    "DS03": {
+      "status": "submitted",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS03/report.md",
+      "blocker": null
+    },
+    "DS04": {
+      "status": "submitted",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS04/report.md",
+      "blocker": null
+    },
+    "DS05": {
+      "status": "submitted",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS05/report.md",
+      "blocker": null
+    },
+    "DS06": {
+      "status": "submitted",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS06/report.md",
+      "blocker": null
+    },
+    "DS07": {
+      "status": "submitted",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS07/report.md",
+      "blocker": null
+    },
+    "DS08": {
+      "status": "blocked",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS08/report.md",
+      "blocker": "no licence/reuse statement reached on Digitraffic, NAPSPAN or DATEX II landing pages"
+    },
+    "DS09": {
+      "status": "blocked",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS09/report.md",
+      "blocker": "no independent route/legality oracle, and every country switch value is unprovided"
+    },
+    "DS10": {
+      "status": "blocked",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS10/report.md",
+      "blocker": "no tablet/emulator or Pixel execution receipt was supplied"
+    },
+    "DS11": {
+      "status": "submitted",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS11/report.md",
+      "blocker": null
+    },
+    "DS12": {
+      "status": "blocked",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS12/report.md",
+      "blocker": "Private repo 82c2cd0 not readable: no local copy, no gh CLI, no GitHub connector"
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-25T13:01:48.487833+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Ready for worker handoff; no submitted batches",
+      "evidence": "docs/planning/DEEPSEEK_WORK.md",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T13:22:16.372117+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Baseline captured (HEAD eb16cb5, 3 dirty inputs); starting DS02",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T13:22:16.470177+00:00",
+      "item": "DS02",
+      "status": "in_progress",
+      "summary": "Tracing truck/ADR/access/turn fields into UI, storage, native, audit and test rows",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T13:53:04.514796+00:00",
+      "item": "DS02",
+      "status": "submitted",
+      "summary": "Truck field trace 1061 rows, 10 contradictions, 83 fixture links; 5 fields fixtureless",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS02/report.md",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T13:53:04.601950+00:00",
+      "item": "DS03",
+      "status": "in_progress",
+      "summary": "Collecting authority source candidates RO/MD first",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T14:57:25.999458+00:00",
+      "item": "DS03",
+      "status": "submitted",
+      "summary": "RO authority inventory validated; MD absent, rights unknown",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS03/report.md",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T14:58:24.976413+00:00",
+      "item": "DS12",
+      "status": "blocked",
+      "summary": "Archive-side dispositions done from the reviewed doc; archive unreachable",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS12/report.md",
+      "blocker": "Private repo 82c2cd0 not readable: no local copy, no gh CLI, no GitHub connector"
+    },
+    {
+      "at": "2026-10-25T14:59:00.056497+00:00",
+      "item": "DS01",
+      "status": "submitted",
+      "summary": "Versions/CI/lint claims reconciled; no lint report XML exists to enumerate issue ids",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS01/report.md",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T14:59:37.002845+00:00",
+      "item": "DS04",
+      "status": "submitted",
+      "summary": "Package contract + 5 executed candidates; importer cases documented, unrun",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS04/report.md",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T15:02:07.085759+00:00",
+      "item": "DS05",
+      "status": "submitted",
+      "summary": "6 replay cases + validator (3 mutations caught); no oracle, no device replay",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS05/report.md",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T15:04:06.338399+00:00",
+      "item": "DS06",
+      "status": "submitted",
+      "summary": "89-key map, placeholders verified, aapt2 compile clean + 2 rejected mutations",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS06/report.md",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T15:04:37.708428+00:00",
+      "item": "DS07",
+      "status": "submitted",
+      "summary": "9 ordered-stop scenarios + invariants; 3 mutations caught; outcomes unknown",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS07/report.md",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T15:05:31.926795+00:00",
+      "item": "DS08",
+      "status": "blocked",
+      "summary": "6 leads, 3 fetched (hashed), 3 candidate records; rights text unreached",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS08/report.md",
+      "blocker": "no licence/reuse statement reached on Digitraffic, NAPSPAN or DATEX II landing pages"
+    },
+    {
+      "at": "2026-10-25T15:06:48.733111+00:00",
+      "item": "DS09",
+      "status": "blocked",
+      "summary": "10 scenarios / 40 parameterisations validated; all 12 switch cells null",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS09/report.md",
+      "blocker": "no independent route/legality oracle, and every country switch value is unprovided"
+    },
+    {
+      "at": "2026-10-25T15:07:46.047778+00:00",
+      "item": "DS10",
+      "status": "blocked",
+      "summary": "211 local + 205 pinned junit, 0 failures, lint 85 warnings; no device receipts",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS10/report.md",
+      "blocker": "no tablet/emulator or Pixel execution receipt was supplied"
+    },
+    {
+      "at": "2026-10-25T15:08:42.561990+00:00",
+      "item": "DS11",
+      "status": "submitted",
+      "summary": "Notice/artifact/update/expansion inventory + 6 questions; nothing signed or published",
+      "evidence": "C:/Users/Administrator/Desktop/EuroRig-DeepSeek-Work/runs/RUN-20261025-152124-deepseek/DS11/report.md",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T18:16:22.521354+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Round 2: submitted 2/8 (25%); blocked 0; R2-03 — Moldova national source inventory; evidence: C:\\Users\\Administrator\\Desktop\\EuroRig-DeepSeek-Work\\runs\\ROUND2-20261025-195121\\PROGRESS.json",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T18:19:42.113987+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Round 2: submitted 3/8 (37%); blocked 0; R2-04 — importer refusal fixtures; evidence: C:\\Users\\Administrator\\Desktop\\EuroRig-DeepSeek-Work\\runs\\ROUND2-20261025-195121\\PROGRESS.json",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T18:28:59.636187+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Round 2: submitted 4/8 (50%); blocked 0; R2-05 — resource wiring candidate; evidence: C:\\Users\\Administrator\\Desktop\\EuroRig-DeepSeek-Work\\runs\\ROUND2-20261025-195121\\R2-04\\..\\PROGRESS.json",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T18:32:07.344951+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Round 2: submitted 5/8 (62%); blocked 0; R2-06 — trip/profile test gaps; evidence: C:\\Users\\Administrator\\Desktop\\EuroRig-DeepSeek-Work\\runs\\ROUND2-20261025-195121\\R2-05\\..\\PROGRESS.json",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T18:35:48.489122+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Round 2: submitted 6/8 (75%); blocked 0; R2-07 — archive requirements trace; evidence: C:\\Users\\Administrator\\Desktop\\EuroRig-DeepSeek-Work\\runs\\ROUND2-20261025-195121\\R2-06\\..\\PROGRESS.json",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T18:37:33.418101+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Round 2: submitted 7/8 (87%); blocked 0; R2-08 — adversarial validation and final handoff; evidence: C:\\Users\\Administrator\\Desktop\\EuroRig-DeepSeek-Work\\runs\\ROUND2-20261025-195121\\R2-07\\..\\PROGRESS.json",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-25T18:49:43.162470+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Round 2: submitted 8/8 (100%); blocked 0; all batches done, final handoff written; evidence: C:\\Users\\Administrator\\Desktop\\EuroRig-DeepSeek-Work\\runs\\ROUND2-20261025-195121\\FINAL_REPORT.md",
+      "evidence": null,
+      "blocker": null
+    }
+  ]
+}

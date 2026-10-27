@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_settings_summary">Instrucțiuni offline și ieșire audio</string>
+    <string name="voice_bluetooth_title">Bluetooth</string>
+    <string name="voice_bluetooth_detail">Împerecheați sau alegeți ieșirea audio folosind Android</string>
+    <string name="voice_bluetooth_unavailable">Setările Bluetooth nu sunt disponibile pe acest dispozitiv.</string>
+</resources>

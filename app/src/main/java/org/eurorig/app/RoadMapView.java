@@ -1,324 +1,524 @@
 package org.eurorig.app;
-
 import android.content.Context;
-import android.graphics.*;
-import android.view.*;
-import org.eurorig.routing.*;
-
-/** Local vector view; country display geometry is independent of routing tiles. */
-final class RoadMapView extends View {
+import android.graphics.PointF;
+import android.view.ViewGroup;
+import android.widget.FrameLayout;
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.InputStream;
+import java.util.ArrayList;
+import java.util.List;
+import org.eurorig.routing.Graph;
+import org.eurorig.routing.Geo;
+import org.eurorig.routing.Truck;
+import org.eurorig.routing.MapCamera;
+import org.eurorig.routing.Router;
+import org.eurorig.routing.RouteSection;
+import org.maplibre.android.MapLibre;
+import org.maplibre.android.camera.CameraUpdateFactory;
+import org.maplibre.android.geometry.LatLng;
+import org.maplibre.android.geometry.LatLngBounds;
+import org.maplibre.android.maps.MapLibreMap;
+import org.maplibre.android.maps.MapView;
+import org.maplibre.android.maps.Style;
+import org.maplibre.android.style.layers.LineLayer;
+import org.maplibre.android.style.layers.PropertyFactory;
+import org.maplibre.android.style.sources.GeoJsonSource;
+import org.maplibre.geojson.Feature;
+import org.maplibre.geojson.FeatureCollection;
+import org.maplibre.geojson.LineString;
+import org.maplibre.geojson.Point;
+/**
+ * Map surface backed by MapLibre rendering local vector tiles.
+ *
+ * Replaces the previous Canvas renderer. The public/package API is unchanged so MainActivity keeps
+ * working: setGraph/updateGraph, fit/fitRoute, locate/showPoint, zoom, updatePosition, restoreCamera,
+ * pick and cameraChanged. Tiles come from an MBTiles file in app storage served on loopback by
+ * {@link MapTiles}; nothing leaves the device.
+ */
+final class RoadMapView extends FrameLayout {
     interface Pick { void picked(int node); }
-    private final Paint p=new Paint(Paint.ANTI_ALIAS_FLAG);
-    private final Path arrow=new Path();
-    private final ScaleGestureDetector scaleDetector;
-    private final GestureDetector gestures;
-    private final MapCamera camera=new MapCamera();
-    Runnable cameraChanged;
-    private double longitudeScale=1;
-    private RectF viewport;
-    private Graph graph;
-    private Graph visibleRoads;
-    private DisplayDatabase queriedDisplay;
-    private int queryGeneration;
-    private Bitmap background;
-    private Graph cachedGraph,cachedRoads;
-    private Truck cachedTruck;
-    private Router.Route cachedRoute;
+    /** One route source per classification, in the same order as RouteSection's constants. */
+    private static final String[] ROUTE_SOURCES={"route-plain","route-access","route-uncertain","route-prohibited"};
+    private static final String[] ROUTE_COLOURS={"#61A7F4","#B26A00","#5F6368","#EF9A94"};
+    private static MapTiles sharedTiles;
+    private final boolean night;
+    private final MapView view;
+    private final VehicleMarkerView vehicle;
+    private NativeMapLabels labels;
+    private final java.util.concurrent.ExecutorService baseWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
+    private volatile int baseGeneration;
+    private boolean disposed,started,restoring,baseLoading;
+    private Style paintedStyle;
     private Router.Route paintedRoute;
-    private float[] routeLines;
-    private int[] restrictedEdges;
-    private double routeLat,routeLon,routeCos;
-    private int cachedStart,cachedEnd;
-    private boolean cachedOriginChosen,cachedDestinationChosen;
-    private boolean cachedFollowing;
-    private double cachedLat,cachedLon,cachedPixels,cachedCos;
-    private Graph strokeGraph;private Truck strokeTruck;
-    private float[] casings;private float[][] strokes;
-    private double strokeLat,strokeLon,strokeCos;
-    private final int[] roadColors;
-    private final int landColor,casingColor,labelColor,attributionColor;
+    private List<Router.Route> paintedChoices;
+    private boolean paintedActive;
+    private org.eurorig.routing.Truck paintedTruck;
+    private int routePaintRevision;
+    private long accuracyFix=Long.MIN_VALUE;
+    private boolean accuracyShown;
+    private boolean paintedArrival;
+    private double savedBearing,baseSouth=90,baseNorth=-90,baseWest=180,baseEast=-180,basePixels;
+    private DisplayDatabase baseDatabase;
+    private Graph baseGraph;
+    private int[] padding={0,0,0,0};
+    private float[] viewport;
+    private MapLibreMap map;
+    private Style style;
+    private double overlaySouth=Double.NaN,overlayWest=Double.NaN,overlayNorth=Double.NaN,overlayEast=Double.NaN;
+    /** Route the overlay was last built for, so a new plan is never served from the old cache. */
+    private Router.Route overlayRoute;
+    private Truck overlayTruck;
+    private int overlayLevel;
+    private final java.util.concurrent.ExecutorService overlayWorker=java.util.concurrent.Executors.newSingleThreadExecutor();
+    private int overlayGeneration;
+    private android.widget.TextView[] relocationMarkers;
+    private double[][] relocationPoints;
+    private String relocationNote="";
+    private Graph graph;
+    private Router.Route route;
+    private boolean following;
+    private long manualZoomUntil;
+    private double latitude=45.9432, longitude=24.9668;
+    private double zoomLevel=6.5;
     Pick pick;
-    RoadMapView(Context c) {
-        super(c);setContentDescription("Offline road map. Tap a road to choose a route endpoint. Pinch to zoom, drag to pan.");
-        boolean dark=c.getSharedPreferences("settings",0).getBoolean("dark_mode",(getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)==android.content.res.Configuration.UI_MODE_NIGHT_YES);
-        landColor=dark?0xff162225:0xffe9ece4;casingColor=dark?0xff0b1416:0xffb7c1b7;labelColor=dark?0xffbcd0d0:0xff34464a;attributionColor=dark?0xffa0b4b7:0xff506266;
-        roadColors=dark?new int[]{0xff8cabad,0xffed7070,0xffdda74f,0xff364b50}:new int[]{0xff54696f,0xffe15a56,0xffe6a73c,0xff9eaea0};
-        scaleDetector=new ScaleGestureDetector(c,new ScaleGestureDetector.SimpleOnScaleGestureListener(){
-            public boolean onScale(ScaleGestureDetector d) { camera.zoom(d.getScaleFactor());invalidate();return true; }
-        });
-        gestures=new GestureDetector(c,new GestureDetector.SimpleOnGestureListener(){
-            public boolean onDown(MotionEvent e){return true;}
-            public boolean onScroll(MotionEvent a,MotionEvent b,float dx,float dy) {
-                float before=originY();camera.pan(dx,dy);camera.latitude=Math.max(-85,Math.min(85,camera.latitude+(before-originY())/camera.pixels));if(cameraChanged!=null)cameraChanged.run();invalidate();return true;
-            }
-            public boolean onSingleTapConfirmed(MotionEvent e) {
-                if(graph==null)return true;
-                int best=-1;double min=32*getResources().getDisplayMetrics().density,lat=0,lon=0;
-                String label="";
-                Graph points=Store.display!=null?visibleRoads:graph;if(points==null)return true;
-                for(Graph.Edge edge:points.edges){
-                    Graph.Node a=points.nodes[edge.from],b=points.nodes[edge.to];
-                    double ax=x(a.lon),ay=y(a.lat),dx=x(b.lon)-ax,dy=y(b.lat)-ay,length=dx*dx+dy*dy;
-                    double t=length==0?0:Math.max(0,Math.min(1,((e.getX()-ax)*dx+(e.getY()-ay)*dy)/length));
-                    double distance=Math.hypot(ax+t*dx-e.getX(),ay+t*dy-e.getY());
-                    if(distance<min){min=distance;best=edge.from;lat=a.lat+t*(b.lat-a.lat);lon=a.lon+t*(b.lon-a.lon);label=edge.name;}
+    /** Tap on a parking marker, with the site key the overlay drew. */
+    java.util.function.Consumer<String> parkingTap;
+    private ParkingOverlay parkingOverlay;
+    private List<ParkingOverlay.Row> parkingRows=java.util.Collections.emptyList();
+    Runnable cameraChanged,userGesture,userIdle;
+    private boolean gesturing;
+    private android.view.View searchPin;
+    private double searchLat,searchLon;
+    RoadMapView(Context context) {
+        super(context);
+        night=context.getSharedPreferences("settings",0).getBoolean("dark_mode",false);
+        setContentDescription("Offline road map. Tap a road to choose a route endpoint. Pinch to zoom, drag to pan.");
+        MapLibre.getInstance(context);
+        ensureTiles(context);
+        view=new MapView(context);
+        addView(view,new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.MATCH_PARENT));
+        // Let the EGL surface pace frames to Android vsync. The SDK cap adds Thread.sleep drift.
+        // requestHighRefresh still requests up to 120 Hz on the window and map surface.
+        view.onCreate(null);
+        vehicle=new VehicleMarkerView(context);addView(vehicle,new FrameLayout.LayoutParams(dp(88),dp(88)));vehicle.setVisibility(GONE);
+        view.getMapAsync(this::onMap);
+    }
+    static synchronized void resetTiles(){if(sharedTiles!=null)sharedTiles.close();sharedTiles=null;}
+    private static synchronized void ensureTiles(Context context) {
+        if (sharedTiles!=null) return;
+        File mbtiles=new File(context.getFilesDir(),"romania.mbtiles");
+        if (!mbtiles.exists()) return;
+        try { sharedTiles=new MapTiles(mbtiles); }
+        catch (Exception e) { sharedTiles=null; }
+    }
+    private void onMap(MapLibreMap ready) {
+        map=ready;if(disposed)return;requestHighRefresh(view);map.getUiSettings().setCompassEnabled(false);map.getUiSettings().setLogoEnabled(false);map.getUiSettings().setAttributionEnabled(false);applyViewport();
+        if (sharedTiles==null) ensureTiles(getContext());
+        String styleJson=readStyle();
+        if(sharedTiles==null)styleJson="{\"version\":8,\"name\":\"EuroRig local roads\",\"sources\":{},\"layers\":[{\"id\":\"bg\",\"type\":\"background\",\"paint\":{\"background-color\":\""+(night?"#000000":"#e7e4d5")+"\"}}]}";
+        if (styleJson==null) return;
+        styleJson=styleJson.replace("__TILE_URL__",
+                sharedTiles==null?"http://127.0.0.1:1/tiles/{z}/{x}/{y}.pbf"
+                        :sharedTiles.tileUrl());
+        map.addOnMapClickListener(point->{
+            if (parkingOverlay!=null&&parkingTap!=null) {
+                android.graphics.PointF screen=map.getProjection().toScreenLocation(point);
+                List<Feature> hits=map.queryRenderedFeatures(screen,ParkingOverlay.LAYER);
+                if(!hits.isEmpty()){
+                    String key=hits.get(0).getStringProperty("key");
+                    if(key!=null){parkingTap.accept(key);return true;}
                 }
-                if(best>=0&&pick!=null)pick.picked(Store.display==null?best:Store.coordinate(lat,lon,label));
-                else android.widget.Toast.makeText(getContext(),"Zoom in and tap a road, or search for a place",android.widget.Toast.LENGTH_SHORT).show();
-                performClick();return true;
             }
+            if (graph==null || pick==null) return false;
+            int node=Store.nativeRouter!=null?Store.coordinate(point.getLatitude(),point.getLongitude()):graph.nearest(point.getLatitude(),point.getLongitude(),400,Store.truck);
+            if (node<0) return false;
+            pick.picked(node);
+            return true;
+        });
+        map.addOnCameraMoveStartedListener(reason->{if(reason==1){following=false;gesturing=true;if(userGesture!=null)userGesture.run();if(cameraChanged!=null)cameraChanged.run();}});
+        map.addOnCameraMoveListener(this::positionVehicle);map.addOnCameraMoveListener(this::positionSearchPin);
+        map.addOnCameraMoveListener(this::positionRelocation);
+        map.addOnCameraIdleListener(()->{
+            if (map==null) return;
+            if(gesturing){gesturing=false;if(userIdle!=null)userIdle.run();}
+            LatLng target=map.getCameraPosition().target;
+            latitude=target.getLatitude();
+            longitude=target.getLongitude();
+            zoomLevel=map.getCameraPosition().zoom;
+            refreshRestrictions();
+            refreshBase();
+            positionVehicle();
+            positionRelocation();
+            if (cameraChanged!=null) cameraChanged.run();
+        });
+        map.setStyle(new Style.Builder().fromJson(styleJson),loaded->{
+            if(disposed)return;style=loaded;labels=new NativeMapLabels(style,night);parkingOverlay=new ParkingOverlay(style,night);applyParking();
+            applyViewport();preferencesChanged();drawRoute();if(restoring)applySavedCamera();else if(route!=null)fitRoute(route);else if(graph!=null)fit();refreshBase();positionVehicle();buildingMode();
         });
     }
-    public boolean performClick(){super.performClick();return true;}
-    @android.annotation.SuppressLint("ClickableViewAccessibility") // Gesture detector calls performClick on a confirmed single tap; search provides an accessible endpoint picker.
-    public boolean onTouchEvent(MotionEvent e){scaleDetector.onTouchEvent(e);if(!scaleDetector.isInProgress())gestures.onTouchEvent(e);return true;}
+    private void requestHighRefresh(android.view.View node){
+        if(android.os.Build.VERSION.SDK_INT>=30&&node instanceof android.view.SurfaceView){android.view.Surface surface=((android.view.SurfaceView)node).getHolder().getSurface();if(surface!=null&&surface.isValid())surface.setFrameRate(120,android.view.Surface.FRAME_RATE_COMPATIBILITY_DEFAULT);}
+        if(node instanceof android.view.ViewGroup){android.view.ViewGroup group=(android.view.ViewGroup)node;for(int i=0;i<group.getChildCount();i++)requestHighRefresh(group.getChildAt(i));}
+    }
+    private String readStyle() {
+        try (InputStream in=getContext().getAssets().open("style-offline.json")) {
+            ByteArrayOutputStream out=new ByteArrayOutputStream();
+            byte[] buffer=new byte[8192];
+            int n;
+            while ((n=in.read(buffer))!=-1) out.write(buffer,0,n);
+            return MapAppearance.style(out.toString("UTF-8"),night);
+        } catch (Exception e) {
+            return null;
+        }
+    }
     void setGraph(Graph graph) {
-        mapFailure=null;loadedLevel=-1;
-        this.graph=graph;camera.overview();
-        if(graph!=null&&Store.nativeRouter!=null){
-            Graph.Node a=graph.nodes[Store.start],b=graph.nodes[Store.end];
-            camera.latitude=(a.lat+b.lat)/2;camera.longitude=(a.lon+b.lon)/2;
-            camera.pixels=Math.min(Math.max(250,getWidth())/Math.max(.004,Math.abs(a.lon-b.lon)*Math.cos(Math.toRadians(camera.latitude))),Math.max(250,getHeight())/Math.max(.004,Math.abs(a.lat-b.lat)))*.75;
-            invalidate();
-        }else fit();
+        if(this.graph==graph){refreshBase();return;}
+        this.graph=graph;
+        this.route=null;baseGraph=null;baseLoading=false;baseGeneration++;
+        if (graph==null) return;
+        if (style!=null) {if(!restoring)fit();refreshBase();}
     }
-    void updateGraph(Graph graph){this.graph=graph;}
-    void setViewport(float left,float top,float right,float bottom){
-        if(right-left<48||bottom-top<48)return;
-        RectF next=new RectF(left,top,right,bottom);if(next.equals(viewport))return;viewport=next;cachedGraph=null;loadedLevel=-1;invalidate();
+    void updateGraph(Graph graph) {
+        if (graph!=null) this.graph=graph;
     }
-    private float originX(){return viewport==null?getWidth()/2f:viewport.centerX();}
-    private float originY(){return viewport==null?getHeight()/2f:camera.following()?viewport.top+viewport.height()*.68f:viewport.centerY();}
-    private float viewportWidth(){return viewport==null?getWidth():viewport.width();}
-    private float viewportHeight(){return viewport==null?getHeight():viewport.height();}
-    void fitRoute(Router.Route route){
-        camera.overview();
-        double minLat=90,maxLat=-90,minLon=180,maxLon=-180;
-        for(Graph.Node n:route.graph.nodes){minLat=Math.min(minLat,n.lat);maxLat=Math.max(maxLat,n.lat);minLon=Math.min(minLon,n.lon);maxLon=Math.max(maxLon,n.lon);}
-        camera.latitude=(minLat+maxLat)/2;camera.longitude=(minLon+maxLon)/2;
-        camera.pixels=Math.min(Math.max(100,viewportWidth())/Math.max(.001,(maxLon-minLon)*Math.cos(Math.toRadians(camera.latitude))),Math.max(100,viewportHeight())/Math.max(.001,maxLat-minLat))*.75;
-        invalidate();
+    /** Source changes only when the feed or its age changes, never per animation frame. */
+    void setParking(List<ParkingOverlay.Row> rows){
+        parkingRows=rows==null?java.util.Collections.emptyList():rows;
+        applyParking();
+    }
+    private void applyParking(){
+        if(parkingOverlay!=null)parkingOverlay.update(parkingRows);
+    }
+    void setViewport(float left,float top,float right,float bottom) {
+        viewport=new float[]{left,top,right,bottom};applyViewport();
+    }
+    private void applyViewport(){
+        if(map==null||viewport==null||getWidth()==0||getHeight()==0)return;
+        int l=Math.max(0,(int)viewport[0]),t=Math.max(0,(int)viewport[1]),r=Math.max(0,getWidth()-(int)viewport[2]),b=Math.max(0,getHeight()-(int)viewport[3]);
+        if(getWidth()-l-r<dp(100)){l=0;r=0;}if(getHeight()-t-b<dp(100)){t=dp(76);b=dp(12);}if(following)t+=(int)(Math.max(0,getHeight()-t-b)*.25);
+        int[] next={l,t,r,b};if(!java.util.Arrays.equals(padding,next)){padding=next;map.setPadding(l,t,r,b);}
     }
     void fit() {
-        camera.overview();        if(graph==null)return;
-        double minLat=90,maxLat=-90,minLon=180,maxLon=-180;
-        for(Graph.Node n:graph.nodes){minLat=Math.min(minLat,n.lat);maxLat=Math.max(maxLat,n.lat);minLon=Math.min(minLon,n.lon);maxLon=Math.max(maxLon,n.lon);}
-        if(Store.display!=null){double[] b=Store.display.bounds;minLat=b[0];minLon=b[1];maxLat=b[2];maxLon=b[3];}
-        camera.latitude=(minLat+maxLat)/2;camera.longitude=(minLon+maxLon)/2;
-        camera.pixels=Math.min(Math.max(100,viewportWidth())/Math.max(.001,(maxLon-minLon)*Math.cos(Math.toRadians(camera.latitude))),
-            Math.max(100,viewportHeight())/Math.max(.001,maxLat-minLat))*.75;invalidate();
+        if (graph==null || graph.nodes==null || graph.nodes.length==0 || map==null) return;
+        LatLngBounds.Builder builder=new LatLngBounds.Builder();
+        int step=Math.max(1,graph.nodes.length/800);
+        int added=0;
+        for (int i=0;i<graph.nodes.length;i+=step) {
+            Graph.Node node=graph.nodes[i];
+            if (node==null) continue;
+            builder.include(new LatLng(node.lat,node.lon));
+            added++;
+        }
+        if (added<2) return;
+        following=false;
+        try {
+            map.moveCamera(CameraUpdateFactory.newLatLngBounds(builder.build(),60));
+        } catch (Exception ignored) {
+            // degenerate bounds (all nodes on one line) leave the camera untouched
+        }
     }
-    void locate(double lat,double lon) { if(camera.recenter(lat,lon)){camera.pixels=120000*getResources().getDisplayMetrics().density;invalidate();} }
-    void showPoint(double lat,double lon){camera.overview();camera.latitude=lat;camera.longitude=lon;camera.pixels=70000;invalidate();}
-    void restoreCamera(RoadMapView old){camera.latitude=old.camera.latitude;camera.longitude=old.camera.longitude;camera.pixels=old.camera.pixels;if(old.following()){camera.recenter(old.camera.latitude,old.camera.longitude);camera.pixels=old.camera.pixels;}invalidate();}
-    boolean following(){return camera.following();}
-    void zoom(double factor){camera.zoom(factor);invalidate();}
-    void updatePosition(){camera.update(Store.lat,Store.lon);invalidate();}
-    protected void onSizeChanged(int w,int h,int ow,int oh){if(ow==0&&Store.nativeRouter==null)fit();}
-    protected void onDetachedFromWindow(){super.onDetachedFromWindow();queryGeneration++;if(background!=null){background.recycle();background=null;}visibleRoads=null;strokeGraph=null;strokes=null;casings=null;paintedRoute=null;routeLines=null;restrictedEdges=null;}
-    private float x(double lon){return (float)(originX()+(lon-camera.longitude)*longitudeScale*camera.pixels);}
-    private float y(double lat){return (float)(originY()-(lat-camera.latitude)*camera.pixels);}
-    protected void onDraw(Canvas c) {
-        if(graph==null){c.drawColor(landColor);return;}
-        requestRoads();
-        longitudeScale=Math.cos(Math.toRadians(camera.latitude));
-        float ratio=(float)(camera.pixels/cachedPixels);
-        float dx=(float)((cachedLon-camera.longitude)*longitudeScale*camera.pixels);
-        float dy=(float)((camera.latitude-cachedLat)*camera.pixels);
-        int marginX=Math.round(getWidth()*.25f),marginY=Math.round(getHeight()*.25f);
-        boolean covered=background!=null&&ratio>=1&&ratio<=1.8&&Math.abs(dx)<marginX&&Math.abs(dy)<marginY;
-        if(!covered||cachedGraph!=graph||cachedRoads!=visibleRoads||cachedTruck!=Store.truck||cachedRoute!=Store.route||cachedStart!=Store.start||cachedEnd!=Store.end||cachedOriginChosen!=Store.originChosen||cachedDestinationChosen!=Store.destinationChosen||cachedFollowing!=camera.following()){
-            int width=getWidth()+marginX*2,height=getHeight()+marginY*2;
-            if(background==null||background.getWidth()!=width||background.getHeight()!=height){
-                if(background!=null)background.recycle();background=Bitmap.createBitmap(Math.max(1,width),Math.max(1,height),Bitmap.Config.ARGB_8888);
+    void showRoute(Router.Route route){this.route=route;drawRoute();}
+    void fitRoute(Router.Route fitted) {
+        route=fitted;
+        drawRoute();
+        if (fitted==null) return;
+        LatLngBounds.Builder builder=new LatLngBounds.Builder();
+        int added=0;
+        for (Graph.Edge edge:fitted.edges) {
+            Graph.Node a=fitted.graph.nodes[edge.from];
+            builder.include(new LatLng(a.lat,a.lon));
+            added++;
+        }
+        if(!fitted.edges.isEmpty()){Graph.Edge last=fitted.edges.get(fitted.edges.size()-1);Graph.Node end=fitted.graph.nodes[last.to];builder.include(new LatLng(end.lat,end.lon));added++;}
+        if (added<2||map==null) return;
+        following=false;
+        try {
+            map.animateCamera(CameraUpdateFactory.newLatLngBounds(builder.build(),90),900);
+        } catch (Exception ignored) {
+            // same degenerate-bounds guard as fit()
+        }
+    }
+    private void drawRoute() {
+        if (style==null) return;
+        boolean arrival=Store.arrived&&Store.progressRoute==route;
+        boolean active=Store.navigating||Store.simulating;
+        if(paintedStyle==style&&paintedRoute==route&&paintedTruck==Store.truck&&paintedChoices==Store.routeChoices&&paintedActive==active
+                &&paintedArrival==arrival)return;
+        paintedStyle=style;paintedRoute=route;paintedTruck=Store.truck;paintedChoices=Store.routeChoices;paintedActive=active;
+        paintedArrival=arrival;routePaintRevision++;
+        // Keep the chosen route geometry on the GPU for the trip. GPS/simulator ticks move
+        // the marker and remaining-distance UI, rather than rebuilding a whole country trip.
+        // One colour per classification the audit itself assigned to these edges, so the painted
+        // route and the routing decision cannot disagree. Sections keep their own start and end:
+        // a restricted stretch is never joined to the next one by a straight line across a gap.
+        List<RouteSection> sections=route==null||(Store.arrived&&Store.progressRoute==route)?java.util.Collections.<RouteSection>emptyList()
+                :RouteSection.of(route.edges,Store.truck);
+        List<Feature>[] features=new List[]{new ArrayList<>(),new ArrayList<>(),new ArrayList<>(),new ArrayList<>()};
+        List<Feature> casing=new ArrayList<>();
+        for (RouteSection section:sections) {
+            List<Point> line=new ArrayList<>();
+            for (int i=section.start;i<section.end&&i<route.edges.size();i++) {
+                Graph.Edge edge=route.edges.get(i);
+                Graph.Node a=route.graph.nodes[edge.from],b=route.graph.nodes[edge.to];
+                if (line.isEmpty()) line.add(Point.fromLngLat(a.lon,a.lat));
+                else {
+                    Point last=line.get(line.size()-1);
+                    if (last.latitude()!=a.lat||last.longitude()!=a.lon) line.add(Point.fromLngLat(a.lon,a.lat));
+                }
+                line.add(Point.fromLngLat(b.lon,b.lat));
             }
-            // Bounded overscan avoids redraws on swipe frames; cache replacement still runs on the UI thread.
-            Canvas buffer=new Canvas(background);buffer.translate(marginX,marginY);drawStatic(buffer);
-            cachedLat=camera.latitude;cachedLon=camera.longitude;cachedPixels=camera.pixels;cachedCos=longitudeScale;
-            cachedGraph=graph;cachedRoads=visibleRoads;cachedTruck=Store.truck;cachedRoute=Store.route;cachedStart=Store.start;cachedEnd=Store.end;
-            cachedOriginChosen=Store.originChosen;cachedDestinationChosen=Store.destinationChosen;
-            cachedFollowing=camera.following();
-            ratio=1;dx=0;dy=0;
+            if (line.size()<2) continue;
+            LineString geometry=LineString.fromLngLats(line);
+            features[section.cls].add(Feature.fromGeometry(geometry));
+            casing.add(Feature.fromGeometry(geometry));
         }
-        c.drawColor(landColor);c.save();c.translate(originX()+dx,originY()+dy);
-        c.scale((float)(ratio*longitudeScale/cachedCos),ratio);c.drawBitmap(background,-marginX-originX(),-marginY-originY(),null);c.restore();
-        drawRoute(c);
-        marker(c,Store.start,Color.rgb(111,199,226),"A");marker(c,Store.end,Color.rgb(196,241,109),"B");
-        if(Double.isFinite(Store.lat)){
-            float a=x(Store.lon),b=y(Store.lat),density=getResources().getDisplayMetrics().density;
-            boolean fresh=Store.fixTime>0&&android.os.SystemClock.elapsedRealtime()-Store.fixTime<15000;
-            if(fresh){
-                p.setColor(0x302474e8);c.drawCircle(a,b,27*density,p);
-                c.save();c.rotate(Double.isFinite(Store.bearing)?(float)Store.bearing:0,a,b);
-                arrow.reset();arrow.moveTo(a,b-25*density);arrow.lineTo(a-14*density,b+15*density);
-                arrow.lineTo(a,b+8*density);arrow.lineTo(a+14*density,b+15*density);arrow.close();
-                p.setColor(Color.WHITE);p.setStyle(Paint.Style.STROKE);p.setStrokeJoin(Paint.Join.ROUND);p.setStrokeWidth(4*density);c.drawPath(arrow,p);p.setStyle(Paint.Style.FILL);p.setColor(0xff2494ff);c.drawPath(arrow,p);
-                arrow.reset();arrow.moveTo(a,b-25*density);arrow.lineTo(a-14*density,b+15*density);arrow.lineTo(a,b+8*density);arrow.close();p.setColor(0xff1552ac);c.drawPath(arrow,p);c.restore();
-            }else{p.setColor(0xff9eaeb2);c.drawCircle(a,b,12*density,p);p.setColor(Color.WHITE);c.drawCircle(a,b,4*density,p);}
-        }
-        p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(11*getResources().getDisplayMetrics().scaledDensity);
-        p.setColor(labelColor);c.drawText("N ↑",12*getResources().getDisplayMetrics().density,25*getResources().getDisplayMetrics().density,p);
-        if(mapFailure!=null){p.setColor(0xffa12222);p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);c.drawText("Map could not load. Reload country in Maps.",12,65,p);}
-        drawAttribution(c);
+        List<Feature> alternatives=new ArrayList<>();
+        if(route!=null&&!Store.navigating&&!Store.simulating&&Store.routeChoices.contains(route))for(Router.Route choice:Store.routeChoices)if(choice!=route){List<Point> points=new ArrayList<>();for(Graph.Node point:choice.graph.nodes)points.add(Point.fromLngLat(point.lon,point.lat));if(points.size()>1)alternatives.add(Feature.fromGeometry(LineString.fromLngLats(points)));}
+        applyRouteLayer("route-alternative-casing",alternatives,"#252936",11f,null);
+        applyRouteLayer("route-alternatives",alternatives,"#C4C1DB",7f,"route-alternative-casing-line");
+        applyRouteLayer("route-casing",casing,"#172536",11f,null);
+        for (int cls=0;cls<features.length;cls++)
+            applyRouteLayer(ROUTE_SOURCES[cls],features[cls],ROUTE_COLOURS[cls],7f,"route-casing-line");
+        int[] counts=new int[4];double[] metres=new double[4];
+        for (RouteSection section:sections){counts[section.cls]++;metres[section.cls]+=section.metres;}
+        android.util.Log.i("Route",String.format(java.util.Locale.ROOT,
+                "sections plain %d/%.0fm access %d/%.0fm unverified %d/%.0fm prohibited %d/%.0fm",
+                counts[0],metres[0],counts[1],metres[1],counts[2],metres[2],counts[3],metres[3]));
     }
-    private boolean loadingRoads;
-    private double loadedSouth,loadedWest,loadedNorth,loadedEast;
-    private int loadedLevel=-1;
-    private Truck loadedTruck;
-    private String mapFailure;
-    private void requestRoads(){
+    /** Drop the painted route: the vehicle profile or the plan changed. */
+    void clearRoute() { if (route==null) { clearRelocation(); return; } route=null; clearRelocation(); drawRoute(); }
+    /** Replace or create one route source and its line layer, keeping the stacking order. */
+    private void applyRouteLayer(String name,List<Feature> features,String colour,float width,String below) {
+        FeatureCollection collection=FeatureCollection.fromFeatures(features.toArray(new Feature[0]));
+        GeoJsonSource existing=style.getSourceAs(name);
+        if (existing!=null) { existing.setGeoJson(collection); return; }
+        if (features.isEmpty()) return;
+        style.addSource(new GeoJsonSource(name,collection));
+        LineLayer layer=new LineLayer(name+"-line",name).withProperties(
+                PropertyFactory.lineColor(colour),PropertyFactory.lineWidth(width),
+                PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND));
+        if (below!=null&&style.getLayer(below)!=null) style.addLayerAbove(layer,below);
+        else style.addLayer(layer);
+    }
+    /**
+     * Recorded restrictions in view. Segment geometry comes from the same normalised records the
+     * router audits; there is no second parser and no invented value. The database read and the
+     * geometry build run off the UI thread so camera idle never stalls the map.
+     */
+    private void refreshRestrictions() {
+        if (map==null || style==null) return;
+        final Router.Route current=Store.route;
+        // At regional scales only major roads are drawn; at street scales every recorded
+        // road class is queried. Never truncate a city to an arbitrary feature count.
+        final int maxLevel=zoomLevel>=14?Integer.MAX_VALUE:zoomLevel>=13?5:zoomLevel>=11?3:zoomLevel>=8?2:1;
+        org.maplibre.android.geometry.LatLngBounds bounds;
+        try { bounds=map.getProjection().getVisibleRegion().latLngBounds; } catch (RuntimeException notReady) { return; }
+        if (bounds==null) return;
+        final double south=bounds.getLatSouth(),north=bounds.getLatNorth(),west=bounds.getLonWest(),east=bounds.getLonEast();
+        if (current==overlayRoute && overlayTruck==Store.truck && overlayLevel==maxLevel && Math.abs(south-overlaySouth)<0.0008 && Math.abs(north-overlayNorth)<0.0008
+                && Math.abs(west-overlayWest)<0.0008 && Math.abs(east-overlayEast)<0.0008) { return; }
         final DisplayDatabase display=Store.display;
-        if(display==null){visibleRoads=null;queriedDisplay=null;loadedLevel=-1;return;}
-        if(queriedDisplay!=display){visibleRoads=null;loadedLevel=-1;queriedDisplay=display;mapFailure=null;queryGeneration++;}
-        double scale=Math.cos(Math.toRadians(camera.latitude));
-        double halfLat=Math.max(originY(),getHeight()-originY())/camera.pixels,halfLon=Math.max(originX(),getWidth()-originX())/camera.pixels/scale;
-        double south=camera.latitude-halfLat,north=camera.latitude+halfLat,west=camera.longitude-halfLon,east=camera.longitude+halfLon;
-        int level=DisplayDatabase.level(camera.pixels);
-        if(level==loadedLevel&&loadedTruck==Store.truck&&south>=loadedSouth&&north<=loadedNorth&&west>=loadedWest&&east<=loadedEast)return;
-        if(loadingRoads||mapFailure!=null||getWidth()==0||getHeight()==0)return;
-        // At most one pending query. The next draw requests the latest camera, not every swipe frame.
-        loadingRoads=true;
-        final int generation=queryGeneration;
-        final Truck requestedTruck=Store.truck;
-        final double s=south-halfLat*.5,n=north+halfLat*.5,w=west-halfLon*.5,e=east+halfLon*.5,resolution=camera.pixels;
-        Store.mapWorker.execute(()->{
-            try{
-                Graph roads=display.visible(s,w,n,e,resolution);
-                post(()->{
-                    loadingRoads=false;
-                    if(generation==queryGeneration&&Store.display==display&&Store.truck==requestedTruck){visibleRoads=roads;loadedSouth=s;loadedWest=w;loadedNorth=n;loadedEast=e;loadedLevel=level;loadedTruck=requestedTruck;}
-                    invalidate();
-                });
-            }catch(RuntimeException failure){post(()->{loadingRoads=false;if(generation==queryGeneration)mapFailure=failure.getMessage();invalidate();});}
+        if (display==null) { ++overlayGeneration;applyBlockedRoads(FeatureCollection.fromFeatures(new Feature[0]));overlayTruck=null;return; }
+        final Truck truck=Store.truck;
+        final int token=++overlayGeneration;
+        overlayWorker.execute(()->{
+            if(token!=overlayGeneration||disposed)return;
+            long started=System.nanoTime();
+            java.util.List<DisplayDatabase.MappedRestriction> found;
+            try { found=display.restrictionsInView(south,west,north,east,-1,maxLevel); }
+            catch (RuntimeException failed) {
+                android.util.Log.i("Overlay","query failed: "+failed);
+                return; // Preserve the previous view until a subsequent read succeeds.
+            }
+            long queried=System.nanoTime();
+            java.util.List<Feature> blocked=new java.util.ArrayList<>();
+            for (DisplayDatabase.MappedRestriction item:found) {
+                if(!item.blockedFor(truck))continue;
+                java.util.List<Point> prohibited=new java.util.ArrayList<>(item.shape.size());
+                for(Graph.Node node:item.shape)prohibited.add(Point.fromLngLat(node.lon,node.lat));
+                if(prohibited.size()>1){Feature feature=Feature.fromGeometry(LineString.fromLngLats(prohibited));feature.addStringProperty("way",Long.toString(item.way));blocked.add(feature);}
+            }
+            final FeatureCollection collection=FeatureCollection.fromFeatures(blocked.toArray(new Feature[0]));
+            final int foundCount=found.size(),blockedCount=blocked.size();
+            long built=System.nanoTime();
+            post(()->{
+                if (token!=overlayGeneration) return;
+                overlaySouth=south;overlayWest=west;overlayNorth=north;overlayEast=east;overlayRoute=current;
+                overlayTruck=truck;overlayLevel=maxLevel;
+                applyBlockedRoads(collection);
+                android.util.Log.i("Overlay",String.format(java.util.Locale.ROOT,
+                        "zoom %.1f recorded %d blocked %d query %d ms build %d ms",
+                        zoomLevel,foundCount,blockedCount,(queried-started)/1000000,(built-queried)/1000000));
+            });
         });
     }
-    private void drawStatic(Canvas c){
-        c.drawColor(landColor);if(graph==null)return;
-        longitudeScale=Math.cos(Math.toRadians(camera.latitude));
-        double minLat=camera.latitude-getHeight()/2.0/camera.pixels,maxLat=camera.latitude+getHeight()/2.0/camera.pixels;
-        double minLon=camera.longitude-getWidth()/2.0/camera.pixels/longitudeScale,maxLon=camera.longitude+getWidth()/2.0/camera.pixels/longitudeScale;
-        p.setStrokeCap(Paint.Cap.ROUND);
-        Graph roads=Store.display==null?graph:visibleRoads;
-        if(roads!=null)drawRoadStrokes(c,roads);
-        java.util.ArrayList<RectF> signBounds=new java.util.ArrayList<>();
-        if(roads!=null&&camera.pixels>=18000){
-            java.util.HashSet<Long> signedWays=new java.util.HashSet<>();java.util.HashSet<Long> signCells=new java.util.HashSet<>();
-            for(Graph.Edge edge:roads.edges){
-                if(signedWays.contains(edge.way))continue;
-                String label=restrictionLabel(edge);if(label==null)continue;
-                if((label.equals("Access")||label.equals("Check"))&&camera.pixels<120000)continue;
-                Graph.Node a=roads.nodes[edge.from],b=roads.nodes[edge.to];float sx=(x(a.lon)+x(b.lon))/2,sy=(y(a.lat)+y(b.lat))/2;
-                if(sx<30||sx>getWidth()-30||sy<50||sy>getHeight()-35)continue;
-                long cell=((long)(sx/90)<<32)|(long)(sy/65);
-                if(signCells.contains(cell))continue;
-                if(!placeSign(c,sx,sy,label,(edge.flags&Graph.UNCERTAIN)!=0?0xffe6a73c:restricted(edge)?0xffe15a56:0xffcaac6a,signBounds))continue;
-                signedWays.add(edge.way);signCells.add(cell);
-                if(signedWays.size()>=60)break;
-            }
+    /** Light red is restricted access; dark red is reserved for a future live traffic source. */
+    private void applyBlockedRoads(FeatureCollection collection) {
+        if(style==null)return;
+        GeoJsonSource source=style.getSourceAs("restriction-blocked");
+        if(source!=null){source.setGeoJson(collection);return;}
+        style.addSource(new GeoJsonSource("restriction-blocked",collection));
+        LineLayer line=new LineLayer("restriction-blocked-line","restriction-blocked").withProperties(
+                PropertyFactory.lineColor(night?"#D68C87":"#EF9A94"),PropertyFactory.lineWidth(org.maplibre.android.style.expressions.Expression.interpolate(org.maplibre.android.style.expressions.Expression.linear(),org.maplibre.android.style.expressions.Expression.zoom(),org.maplibre.android.style.expressions.Expression.stop(9,1.2),org.maplibre.android.style.expressions.Expression.stop(12,2.5),org.maplibre.android.style.expressions.Expression.stop(15,5),org.maplibre.android.style.expressions.Expression.stop(18,12))),
+                PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),
+                PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND));
+        addRestrictionLayer(line);
+        // One small original sprite, repeated by the GPU along the actual road geometry.
+        // No TextViews, per-frame projections, network glyphs or per-road bitmaps.
+        android.graphics.Bitmap image=android.graphics.Bitmap.createBitmap(24,24,android.graphics.Bitmap.Config.ARGB_8888);
+        image.setDensity(android.util.DisplayMetrics.DENSITY_DEFAULT);
+        android.graphics.Canvas canvas=new android.graphics.Canvas(image);
+        android.graphics.Paint paint=new android.graphics.Paint(android.graphics.Paint.ANTI_ALIAS_FLAG);
+        paint.setStrokeCap(android.graphics.Paint.Cap.ROUND);paint.setColor(night?0xFFFFD3CF:0xFFB64D48);paint.setStrokeWidth(3.5f);
+        canvas.drawLine(6,6,18,18,paint);canvas.drawLine(18,6,6,18,paint);
+        style.addImage("blocked-road-cross",image);
+        org.maplibre.android.style.layers.SymbolLayer crosses=new org.maplibre.android.style.layers.SymbolLayer("restriction-blocked-crosses","restriction-blocked").withProperties(
+                PropertyFactory.iconImage("blocked-road-cross"),PropertyFactory.iconSize(.5f),
+                PropertyFactory.symbolPlacement(org.maplibre.android.style.layers.Property.SYMBOL_PLACEMENT_LINE),
+                PropertyFactory.symbolSpacing(44f),PropertyFactory.iconAllowOverlap(true),PropertyFactory.iconIgnorePlacement(true),
+                PropertyFactory.iconPitchAlignment(org.maplibre.android.style.layers.Property.ICON_PITCH_ALIGNMENT_MAP),
+                PropertyFactory.iconRotationAlignment(org.maplibre.android.style.layers.Property.ICON_ROTATION_ALIGNMENT_MAP));
+        crosses.setMinZoom(13f);addRestrictionLayer(crosses);
+    }
+    private void addRestrictionLayer(org.maplibre.android.style.layers.Layer layer){
+        if(style.getLayer("route-casing-line")!=null)style.addLayerBelow(layer,"route-casing-line");else style.addLayer(layer);
+    }
+    /**
+     * The requested point and the navigable endpoint it was moved to. The distance between them is
+     * unverified for this truck, so it is never drawn as part of the route.
+     */
+    void showRelocation(boolean origin,double[] from,double[] to,double metres) {
+        clearRelocation();
+        if (from==null||to==null||map==null) return;
+        android.widget.TextView marker=label(origin?"requested start":"requested finish",0xFF757575,true);
+        addView(marker,wrap());
+        android.widget.TextView moved=label("route "+(origin?"starts":"ends")+" here",0xFF0073FF,false);
+        addView(moved,wrap());
+        relocationMarkers=new android.widget.TextView[]{marker,moved};
+        relocationPoints=new double[][]{from,to};
+        relocationNote=String.format(java.util.Locale.ROOT,"requested point %.0f m from the navigable %s%s; that gap is not verified for this truck",
+                metres,origin?"start":"destination","");
+        post(this::positionRelocation);
+    }
+    private android.widget.TextView label(String text,int colour,boolean outline) {
+        android.widget.TextView view=new android.widget.TextView(getContext());
+        view.setText(text);
+        view.setTextSize(android.util.TypedValue.COMPLEX_UNIT_SP,9f);
+        view.setSingleLine(true);
+        view.setTextColor(outline?(night?0xFFE5D8C2:0xFF616161):colour);
+        view.setPadding(dp(5),dp(1),dp(5),dp(1));
+        android.graphics.drawable.GradientDrawable background=new android.graphics.drawable.GradientDrawable();
+        background.setCornerRadius(dp(3));
+        background.setColor(night?0xFF000000:0xF2FFFFFF);
+        background.setStroke(dp(1),colour);
+        view.setBackground(background);
+        return view;
+    }
+    private android.widget.FrameLayout.LayoutParams wrap() {
+        return new android.widget.FrameLayout.LayoutParams(
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT,
+                android.view.ViewGroup.LayoutParams.WRAP_CONTENT);
+    }
+    void clearRelocation() {
+        if (relocationMarkers!=null) for (android.widget.TextView marker:relocationMarkers) removeView(marker);
+        relocationMarkers=null;relocationPoints=null;relocationNote="";
+    }
+    private void positionRelocation() {
+        if (map==null||relocationMarkers==null||relocationPoints==null) return;
+        for (int i=0;i<relocationMarkers.length;i++) {
+            android.graphics.PointF screen=map.getProjection().toScreenLocation(
+                    new LatLng(relocationPoints[i][0],relocationPoints[i][1]));
+            android.widget.TextView marker=relocationMarkers[i];
+            if (marker.getWidth()==0) continue;
+            // Both labels sit left of the point and never under the map controls.
+            float left=Math.max(dp(6),screen.x-marker.getWidth()-dp(8));
+            float top=i==0?screen.y-marker.getHeight()-dp(2):screen.y+dp(2);
+            top=Math.max(dp(4),Math.min(top,getHeight()-marker.getHeight()-dp(4)));
+            marker.setX(left);marker.setY(top);
         }
-        p.setTypeface(Typeface.create("sans-serif-medium",Typeface.NORMAL));p.setTextSize(12*getResources().getDisplayMetrics().scaledDensity);
-        java.util.ArrayList<RectF> occupied=new java.util.ArrayList<>();
-        java.util.HashSet<String> labels=new java.util.HashSet<>();
-        if(roads!=null)for(Graph.Node n:roads.nodes) if(!n.label.isEmpty()){
-            float nx=x(n.lon),ny=y(n.lat);if(nx<0||nx>getWidth()||ny<0||ny>getHeight())continue;
-            String label=n.label;
-            if(label.startsWith("! ")){if(camera.pixels>=120000||!label.equals("! Access"))placeSign(c,nx,ny,label.substring(2),0xffe6a73c,signBounds);continue;}
-            if(Store.nativeRouter!=null&&(Character.isDigit(label.charAt(0))||occupied.size()>=24||labels.contains(label)))continue;
-            if(label.length()>30)label=label.substring(0,28)+"…";
-            RectF bounds=new RectF(nx+4,ny-p.getTextSize()-15,nx+p.measureText(label)+16,ny+2);
-            if(Store.nativeRouter!=null){boolean overlap=false;for(RectF other:occupied)if(RectF.intersects(other,bounds)){overlap=true;break;}for(RectF other:signBounds)if(RectF.intersects(other,bounds)){overlap=true;break;}if(overlap)continue;occupied.add(bounds);labels.add(n.label);}
-            p.setColor(labelColor);c.drawCircle(nx,ny,3,p);c.drawText(label,nx+8,ny-9,p);
-        }
-        p.setColor(attributionColor);p.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
     }
-    private void drawRoute(Canvas c){
-        Router.Route route=Store.route;if(route==null||route.edges.isEmpty())return;
-        if(paintedRoute!=route){
-            Graph.Node origin=route.graph.nodes[route.edges.get(0).from];routeLat=origin.lat;routeLon=origin.lon;routeCos=Math.cos(Math.toRadians(routeLat));
-            routeLines=new float[route.edges.size()*4];java.util.ArrayList<Integer> restricted=new java.util.ArrayList<>();
-            for(int i=0;i<route.edges.size();i++){
-                Graph.Edge edge=route.edges.get(i);Graph.Node a=route.graph.nodes[edge.from],b=route.graph.nodes[edge.to];int offset=i*4;
-                routeLines[offset]=(float)((a.lon-routeLon)*routeCos*100000);routeLines[offset+1]=(float)((routeLat-a.lat)*100000);routeLines[offset+2]=(float)((b.lon-routeLon)*routeCos*100000);routeLines[offset+3]=(float)((routeLat-b.lat)*100000);
-                if((edge.flags&Graph.BLOCKED)!=0)restricted.add(i);
-            }
-            restrictedEdges=new int[restricted.size()];for(int i=0;i<restrictedEdges.length;i++)restrictedEdges[i]=restricted.get(i);paintedRoute=route;
-        }
-        double travelled=Store.progressRoute==route?(Store.arrived?route.metres:Math.max(0,Math.min(route.metres,Store.travelled))):0;
-        if(travelled>=route.metres)return;
-        int found=java.util.Arrays.binarySearch(route.cumulative,travelled),first=found>=0?found:-found-2;
-        first=Math.max(0,Math.min(route.edges.size()-1,first));int offset=first*4;
-        double metres=route.cumulative[first+1]-route.cumulative[first],fraction=metres<=0?0:(travelled-route.cumulative[first])/metres;
-        float startX=(float)(routeLines[offset]+fraction*(routeLines[offset+2]-routeLines[offset])),startY=(float)(routeLines[offset+1]+fraction*(routeLines[offset+3]-routeLines[offset+1]));
-        c.save();c.translate(x(routeLon),y(routeLat));float scale=(float)(camera.pixels/100000);c.scale((float)(scale*longitudeScale/routeCos),scale);
-        p.setStrokeCap(Paint.Cap.ROUND);p.setStrokeWidth(5*getResources().getDisplayMetrics().density/scale);p.setColor(0xff2474e8);
-        c.drawLine(startX,startY,routeLines[offset+2],routeLines[offset+3],p);int following=offset+4;if(following<routeLines.length)c.drawLines(routeLines,following,routeLines.length-following,p);
-        p.setColor(0xffca7900);for(int edge:restrictedEdges)if(edge>=first){int at=edge*4;c.drawLine(edge==first?startX:routeLines[at],edge==first?startY:routeLines[at+1],routeLines[at+2],routeLines[at+3],p);}
-        c.restore();
+    /** Force the overlay to re-read after the truck profile changes. */
+    void invalidateRestrictions() {
+        overlaySouth=overlayWest=overlayNorth=overlayEast=Double.NaN;
+        refreshRestrictions();
     }
-    private void drawAttribution(Canvas c){
-        p.setTypeface(Typeface.DEFAULT);p.setColor(attributionColor);p.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
-        float creditX=viewport==null?12:viewport.left+8,creditY=viewport==null?getHeight()-14:viewport.bottom-8;
-        if(!graph.demo&&viewportWidth()<240*getResources().getDisplayMetrics().density){p.setTextSize(9*getResources().getDisplayMetrics().scaledDensity);c.drawText("© OpenStreetMap",creditX,creditY-14*getResources().getDisplayMetrics().density,p);c.drawText("contributors · ODbL 1.0",creditX,creditY,p);}
-        else c.drawText(graph.demo?"FICTIONAL TRAINING MAP":graph.attribution,creditX,creditY,p);
+    private int dp(int value) { return Math.round(value*getResources().getDisplayMetrics().density); }
+    boolean following() { return following; }
+    boolean ready(){return map!=null&&style!=null;}
+    void locate(double lat,double lon) {
+        following=true;manualZoomUntil=0;
+        applyViewport();
+        if(map!=null)map.animateCamera(CameraUpdateFactory.newCameraPosition(new org.maplibre.android.camera.CameraPosition.Builder(map.getCameraPosition()).target(new LatLng(lat,lon)).zoom(15.5).padding(padding[0],padding[1],padding[2],padding[3]).tilt(perspective()?50:0).build()),700);
     }
-    private int strokeGroup(Graph.Edge edge){
-        boolean walking=edge.kind.equals("footway")||edge.kind.equals("path")||edge.kind.equals("cycleway")||edge.kind.equals("pedestrian");
-        int color=walking?3:(edge.flags&Graph.UNCERTAIN)!=0?2:restricted(edge)?1:0;
-        return color*2+(edge.kind.startsWith("motorway")?1:0);
+    void searchPoint(double lat,double lon){
+        clearSearchPoint();searchLat=lat;searchLon=lon;
+        searchPin=new PlacePinView(getContext());addView(searchPin,new FrameLayout.LayoutParams(dp(56),dp(72)));showPoint(lat,lon);post(this::positionSearchPin);
     }
-    private void drawRoadStrokes(Canvas canvas,Graph roads){
-        if(strokeGraph!=roads||strokeTruck!=Store.truck){
-            strokeLat=camera.latitude;strokeLon=camera.longitude;strokeCos=Math.cos(Math.toRadians(strokeLat));
-            int[] sizes=new int[8];for(Graph.Edge edge:roads.edges)sizes[strokeGroup(edge)]+=4;
-            strokes=new float[8][];for(int i=0;i<8;i++)strokes[i]=new float[sizes[i]];
-            casings=new float[roads.edges.length*4];int[] offsets=new int[8];int offset=0;
-            for(Graph.Edge edge:roads.edges){
-                Graph.Node a=roads.nodes[edge.from],b=roads.nodes[edge.to];int group=strokeGroup(edge),index=offsets[group];
-                strokes[group][index]=casings[offset++]=(float)((a.lon-strokeLon)*strokeCos*100000);
-                strokes[group][index+1]=casings[offset++]=(float)((strokeLat-a.lat)*100000);
-                strokes[group][index+2]=casings[offset++]=(float)((b.lon-strokeLon)*strokeCos*100000);
-                strokes[group][index+3]=casings[offset++]=(float)((strokeLat-b.lat)*100000);offsets[group]+=4;
-            }
-            strokeGraph=roads;strokeTruck=Store.truck;
-        }
-        canvas.save();canvas.translate(x(strokeLon),y(strokeLat));
-        float scale=(float)(camera.pixels/100000);canvas.scale((float)(scale*longitudeScale/strokeCos),scale);
-        p.setStrokeWidth(9/scale);p.setColor(casingColor);canvas.drawLines(casings,p);
-        for(int group=0;group<8;group++)if(strokes[group].length>0){
-            p.setStrokeWidth((group/2==3?2:group%2==1?6:4)/scale);p.setColor(roadColors[group/2]);canvas.drawLines(strokes[group],p);
-        }
-        canvas.restore();
+    void clearSearchPoint(){if(searchPin!=null)removeView(searchPin);searchPin=null;}
+    private void positionSearchPin(){if(searchPin==null||map==null)return;PointF p=map.getProjection().toScreenLocation(new LatLng(searchLat,searchLon));searchPin.setX(p.x-searchPin.getWidth()/2f);searchPin.setY(p.y-searchPin.getHeight()+dp(4));}
+    void showPoint(double lat,double lon) {
+        following=false;
+        if (map!=null) map.animateCamera(CameraUpdateFactory.newLatLngZoom(new LatLng(lat,lon),15.0),700);
     }
-    private boolean restricted(Graph.Edge edge){
-        Truck t=Store.truck;
-        return (edge.flags&Graph.BLOCKED)!=0||(edge.height>0&&t.height>edge.height)||(edge.width>0&&t.width>edge.width)||
-            (edge.length>0&&t.length>edge.length)||(edge.weight>0&&t.weight>edge.weight)||(edge.axle>0&&t.axleWeight>edge.axle)||(t.hazmat&&(edge.flags&Graph.HAZMAT)!=0);
+    void zoom(double factor) {
+        if (map==null) return;
+        manualZoomUntil=android.os.SystemClock.elapsedRealtime()+10000;
+        map.animateCamera(CameraUpdateFactory.zoomBy(factor),300);
     }
-    private String restrictionLabel(Graph.Edge edge){
-        java.util.Locale locale=java.util.Locale.getDefault();
-        if(edge.height>0)return String.format(locale,"H %.1f m",edge.height);
-        if(edge.width>0)return String.format(locale,"W %.1f m",edge.width);
-        if(edge.weight>0)return String.format(locale,"%.1f t",edge.weight);
-        if(edge.axle>0)return String.format(locale,"Axle %.1f t",edge.axle);
-        if(edge.length>0)return String.format(locale,"L %.1f m",edge.length);
-        if((edge.flags&Graph.UNCERTAIN)!=0)return "Check";
-        if((edge.flags&Graph.BLOCKED)!=0&&!edge.kind.equals("footway")&&!edge.kind.equals("path")&&!edge.kind.equals("cycleway")&&!edge.kind.equals("pedestrian"))return "Access";
-        return null;
+    void updatePosition() {
+        positionVehicle();if(map==null||!freshPosition()||!Double.isFinite(Store.lat)||!Double.isFinite(Store.lon))return;
+        drawRoute();if(!following)return;
+        double bearing=!NavigationSettings.get(getContext()).northUp&&Double.isFinite(Store.bearing)?Store.bearing:0;
+        org.maplibre.android.camera.CameraPosition current=map.getCameraPosition();
+        double tilt=perspective()?50:0;
+        double zoom=current.zoom;if(NavigationSettings.get(getContext()).autozoom&&(Store.navigating||Store.simulating)&&Store.progressRoute==route&&android.os.SystemClock.elapsedRealtime()>=manualZoomUntil)zoom=org.eurorig.routing.NavigationCamera.zoom(route,Store.travelled,Store.speed);
+        if(Math.abs(current.target.getLatitude()-Store.lat)<1e-9
+                &&Math.abs(current.target.getLongitude()-Store.lon)<1e-9
+                &&Math.abs(current.bearing-bearing)<.001&&Math.abs(current.tilt-tilt)<.001&&Math.abs(current.zoom-zoom)<.01)return;
+        map.easeCamera(CameraUpdateFactory.newCameraPosition(new org.maplibre.android.camera.CameraPosition.Builder(current).padding(padding[0],padding[1],padding[2],padding[3]).target(new LatLng(Store.lat,Store.lon)).zoom(zoom).bearing(bearing).tilt(tilt).build()),Store.simulating?200:500,false);
     }
-    private boolean placeSign(Canvas canvas,float x,float y,String label,int color,java.util.List<RectF> occupied){
-        float density=getResources().getDisplayMetrics().density;
-        p.setTypeface(Typeface.DEFAULT_BOLD);p.setTextSize(10*getResources().getDisplayMetrics().scaledDensity);
-        float half=p.measureText(label)/2+8*density,radius=p.getTextSize()/2+6*density;
-        RectF bounds=new RectF(x-half-12*density,y-radius-12*density,x+half+12*density,y+radius+12*density);
-        for(RectF other:occupied)if(RectF.intersects(bounds,other))return false;occupied.add(bounds);
-        p.setColor(color);canvas.drawRoundRect(x-half-2*density,y-radius-2*density,x+half+2*density,y+radius+2*density,8*density,8*density,p);
-        p.setColor(Color.WHITE);canvas.drawRoundRect(x-half,y-radius,x+half,y+radius,6*density,6*density,p);
-        p.setColor(0xff24353a);canvas.drawText(label,x-half+8*density,y+p.getTextSize()/3,p);return true;
+    void restoreCamera(RoadMapView old) {
+        if(old==null)return;restoring=old.map!=null&&old.style!=null;latitude=old.latitude;longitude=old.longitude;zoomLevel=old.zoomLevel;following=old.following;savedBearing=old.savedBearing;
+        if(old.map!=null){org.maplibre.android.camera.CameraPosition p=old.map.getCameraPosition();latitude=p.target.getLatitude();longitude=p.target.getLongitude();zoomLevel=p.zoom;savedBearing=p.bearing;}
+        if(map!=null)applySavedCamera();
     }
-    private void marker(Canvas c,int index,int color,String label){
-        if(index<0||index>=graph.nodes.length)return;
-        if((label.equals("A")&&!Store.originChosen)||(label.equals("B")&&!Store.destinationChosen))return;
-        float density=getResources().getDisplayMetrics().density,a=x(graph.nodes[index].lon),b=y(graph.nodes[index].lat);p.setColor(Color.WHITE);c.drawCircle(a,b,16*density,p);p.setColor(color);c.drawCircle(a,b,14*density,p);
-        p.setColor(Color.rgb(16,25,28));p.setTextSize(14*density);c.drawText(label,a-5*density,b+5*density,p);
+    private boolean perspective(){return getContext().getSharedPreferences("settings",0).getBoolean("map_3d",true);}
+    void startMap(){if(disposed||started)return;view.onStart();view.onResume();started=true;}
+    void pauseMap(){if(!started)return;view.onPause();view.onStop();started=false;}
+    void dispose(){if(disposed)return;disposed=true;overlayGeneration++;baseGeneration++;overlayWorker.shutdownNow();baseWorker.shutdownNow();pauseMap();view.onDestroy();}
+    void preferencesChanged(){if(map==null)return;org.maplibre.android.camera.CameraPosition current=map.getCameraPosition();double bearing=NavigationSettings.get(getContext()).northUp?0:(following&&Double.isFinite(Store.bearing)?Store.bearing:current.bearing);map.moveCamera(CameraUpdateFactory.newCameraPosition(new org.maplibre.android.camera.CameraPosition.Builder(current).padding(padding[0],padding[1],padding[2],padding[3]).tilt(perspective()?50:0).bearing(bearing).build()));positionVehicle();buildingMode();}
+    private void buildingMode(){if(style==null)return;boolean three=NavigationSettings.get(getContext()).buildings;for(String id:new String[]{"buildings-flat","buildings-3d"}){org.maplibre.android.style.layers.Layer layer=style.getLayer(id);if(layer!=null)layer.setProperties(PropertyFactory.visibility(three==id.equals("buildings-3d")?org.maplibre.android.style.layers.Property.VISIBLE:org.maplibre.android.style.layers.Property.NONE));}}
+    private boolean freshPosition(){long age=android.os.SystemClock.elapsedRealtime()-Store.fixTime;return Store.simulating||Store.fixTime>0&&age>=0&&age<15000;}
+    private void positionVehicle(){if(disposed||map==null)return;boolean fresh=freshPosition();positionAccuracy(fresh);if(!fresh||!Double.isFinite(Store.lat)||!Double.isFinite(Store.lon)){vehicle.setVisibility(GONE);return;}PointF p=map.getProjection().toScreenLocation(new LatLng(Store.lat,Store.lon));float half=dp(44);vehicle.setX(p.x-half);vehicle.setY(p.y-half);vehicle.setVisibility(VISIBLE);vehicle.setContentDescription(Store.simulating?"Simulated truck position":String.format(java.util.Locale.getDefault(),"Current location, accuracy plus or minus %.0f metres",Store.fixAccuracy));double direction=Double.isFinite(Store.bearing)?Store.bearing:map.getCameraPosition().bearing;vehicle.style(getContext().getSharedPreferences("settings",0).getBoolean("marker_3d",false),(float)(direction-map.getCameraPosition().bearing));}
+    /** Accuracy geometry shares the native map transform, without a per-frame source update. */
+    private void positionAccuracy(boolean fresh){
+        if(style==null)return;boolean show=fresh&&!Store.simulating&&Float.isFinite(Store.fixAccuracy)&&Store.fixAccuracy>0&&Double.isFinite(Store.lat)&&Double.isFinite(Store.lon);
+        GeoJsonSource source=style.getSourceAs("location-accuracy");
+        if(!show){if(source!=null&&accuracyShown)source.setGeoJson(FeatureCollection.fromFeatures(new Feature[0]));accuracyShown=false;return;}
+        if(source!=null&&accuracyShown&&accuracyFix==Store.fixTime)return;
+        List<Point> ring=new ArrayList<>();double radius=Math.min(5000,Store.fixAccuracy),cos=Math.max(.01,Math.cos(Math.toRadians(Store.lat)));
+        for(int i=0;i<=64;i++){double angle=2*Math.PI*i/64;ring.add(Point.fromLngLat(Store.lon+Math.cos(angle)*radius/(111320*cos),Store.lat+Math.sin(angle)*radius/111320));}
+        FeatureCollection data=FeatureCollection.fromFeatures(new Feature[]{Feature.fromGeometry(org.maplibre.geojson.Polygon.fromLngLats(java.util.Collections.singletonList(ring)))});
+        if(source==null){source=new GeoJsonSource("location-accuracy",data);style.addSource(source);org.maplibre.android.style.layers.FillLayer fill=new org.maplibre.android.style.layers.FillLayer("location-accuracy-fill","location-accuracy").withProperties(PropertyFactory.fillColor(night?"#E89045":"#9C3708"),PropertyFactory.fillOpacity(.13f),PropertyFactory.fillOutlineColor(night?"#E89045":"#9C3708"));if(style.getLayer("route-casing-line")!=null)style.addLayerBelow(fill,"route-casing-line");else style.addLayer(fill);}else source.setGeoJson(data);
+        accuracyFix=Store.fixTime;accuracyShown=true;
     }
+
+    private void applySavedCamera(){if(map==null)return;map.moveCamera(CameraUpdateFactory.newCameraPosition(new org.maplibre.android.camera.CameraPosition.Builder().padding(padding[0],padding[1],padding[2],padding[3]).target(new LatLng(latitude,longitude)).zoom(zoomLevel).tilt(perspective()?50:0).bearing(savedBearing).build()));}
+    private void refreshBase(){
+        if(map==null||style==null||graph==null||disposed||baseLoading)return;
+        org.maplibre.android.geometry.LatLngBounds bounds=map.getProjection().getVisibleRegion().latLngBounds;
+        double south=bounds.getLatSouth(),north=bounds.getLatNorth(),west=bounds.getLonWest(),east=bounds.getLonEast();
+        if(!Double.isFinite(south)||south>=north||west>=east)return;
+        double pixels=256*Math.pow(2,map.getCameraPosition().zoom)/360;
+        if(baseDatabase==Store.display&&baseGraph==graph&&pixels/basePixels>.7&&pixels/basePixels<1.4&&south>=baseSouth&&north<=baseNorth&&west>=baseWest&&east<=baseEast)return;
+        double dy=(north-south)*.2,dx=(east-west)*.2;final double s=Math.max(-85,south-dy),n=Math.min(85,north+dy),w=Math.max(-180,west-dx),e=Math.min(180,east+dx);final DisplayDatabase db=Store.display;final Graph source=graph;final int token=++baseGeneration;baseLoading=true;
+        baseWorker.execute(()->{try{if(disposed||token!=baseGeneration)return;boolean detailed=sharedTiles!=null&&sharedTiles.covers((s+n)/2,(w+e)/2);Graph visible=db!=null?(detailed?db.cartographicLabels(s,w,n,e,pixels):db.visible(s,w,n,e,pixels)):source;if(disposed||token!=baseGeneration)return;List<Feature>[] collections=new List[]{new ArrayList<>(),new ArrayList<>(),new ArrayList<>()};ArrayList<Graph.Node> names=new ArrayList<>();java.util.HashSet<String> seenNames=new java.util.HashSet<>();List<Point> shape=new ArrayList<>();long lastWay=Long.MIN_VALUE;int lastEnd=-1,lastKind=0;
+            for(Graph.Edge edge:visible.edges){if(!org.eurorig.routing.TruckMap.visible(edge.kind,java.util.Collections.emptyMap())&&db==null)continue;Graph.Node a=visible.nodes[edge.from],b=visible.nodes[edge.to];int kind=edge.kind.contains("motorway")||edge.kind.contains("trunk")?0:edge.kind.contains("primary")||edge.kind.contains("secondary")?1:2;if(edge.way!=lastWay||edge.from!=lastEnd||kind!=lastKind){if(shape.size()>1)collections[lastKind].add(Feature.fromGeometry(LineString.fromLngLats(shape)));shape=new ArrayList<>();shape.add(Point.fromLngLat(a.lon,a.lat));}shape.add(Point.fromLngLat(b.lon,b.lat));lastWay=edge.way;lastEnd=edge.to;lastKind=kind;}
+            if(shape.size()>1)collections[lastKind].add(Feature.fromGeometry(LineString.fromLngLats(shape)));
+            for(Graph.Node node:visible.nodes)if(names.size()<100&&!node.label.isEmpty()&&!node.label.startsWith("!")&&seenNames.add(node.label))names.add(node);
+            post(()->{if(disposed||token!=baseGeneration)return;baseLoading=false;if(db!=Store.display){refreshBase();return;}baseDatabase=db;baseGraph=source;baseSouth=s;baseNorth=n;baseWest=w;baseEast=e;basePixels=pixels;for(int i=0;i<3;i++)applyBaseLayer("local-roads-"+i,collections[i],i,!detailed);if(labels!=null)labels.update(names);refreshBase();});
+        }catch(RuntimeException failure){post(()->{if(!disposed&&token==baseGeneration){baseLoading=false;baseGraph=null;android.util.Log.w("EuroRigMap","Local map query failed",failure);}});}});
+    }
+    private void applyBaseLayer(String id,List<Feature> features,int kind,boolean visible){if(style==null)return;FeatureCollection data=FeatureCollection.fromFeatures(features.toArray(new Feature[0]));GeoJsonSource source=style.getSourceAs(id);if(source!=null){source.setGeoJson(data);style.getLayer(id+"-line").setProperties(PropertyFactory.visibility(visible?org.maplibre.android.style.layers.Property.VISIBLE:org.maplibre.android.style.layers.Property.NONE));return;}style.addSource(new GeoJsonSource(id,data));LineLayer layer=new LineLayer(id+"-line",id).withProperties(PropertyFactory.visibility(visible?org.maplibre.android.style.layers.Property.VISIBLE:org.maplibre.android.style.layers.Property.NONE),PropertyFactory.lineColor((night?(kind==0?"#D28751":kind==1?"#C7A672":"#817A70"):(kind==0?"#c39b65":kind==1?"#d3bb91":"#fffaf1"))),PropertyFactory.lineWidth(kind==0?5f:kind==1?3.5f:2f),PropertyFactory.lineCap(org.maplibre.android.style.layers.Property.LINE_CAP_ROUND),PropertyFactory.lineJoin(org.maplibre.android.style.layers.Property.LINE_JOIN_ROUND));if(style.getLayer("route-casing-line")!=null)style.addLayerBelow(layer,"route-casing-line");else style.addLayer(layer);}
 }

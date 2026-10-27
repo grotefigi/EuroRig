@@ -13,10 +13,27 @@ import java.util.zip.*;
 /** Transactional, streaming native-region installation. Never extracts caller paths. */
 final class RegionPackages {
     private static final long MAX_TILES=128L*1024*1024*1024, MAX_DISPLAY=128L*1024*1024;
+    static final class InstalledRegion {
+        final String id,name,date;
+        final boolean active;
+        InstalledRegion(String id,String name,String date,boolean active){this.id=id;this.name=name;this.date=date;this.active=active;}
+        @Override public String toString(){return name+" · "+date+(active?" · Current":" · Installed");}
+    }
+    /**
+     * Removes partial installations only. A complete region that is not currently selected is kept:
+     * previously every other region was deleted here, so switching country destroyed the map the
+     * driver already had and forced a full re-download.
+     */
     static void cleanupStale(Context c){
-        String selected=c.getSharedPreferences("settings",0).getString("region","");
-        File[] folders=new File(c.getFilesDir(),"regions").listFiles();if(folders==null)return;
-        for(File folder:folders)if(folder.getName().matches("[0-9a-f-]{36}")&&!folder.getName().equals(selected))cleanup(folder);
+        String active=c.getSharedPreferences("settings",0).getString("region","");
+        org.eurorig.routing.RegionRetention.Plan plan=
+                org.eurorig.routing.RegionRetention.plan(new File(c.getFilesDir(),"regions"),active);
+        for(File folder:plan.delete)cleanup(folder);
+        // Partial installations keep their bytes: rename so they are ignored, never erase them.
+        for(File folder:plan.quarantine){
+            File target=org.eurorig.routing.RegionRetention.quarantineName(folder);
+            if(!folder.renameTo(target))android.util.Log.w("Region","Could not quarantine "+folder.getName());
+        }
     }
     static Graph install(Context c,InputStream source) throws IOException {
         File dir=create(c);Set<String> seen=new HashSet<>();
@@ -32,6 +49,28 @@ final class RegionPackages {
             if(seen.size()!=3||!seen.contains("manifest.json")||!seen.contains("routing.tar"))throw new IOException("A region needs a manifest, routing tiles and one display map");
             return activate(c,dir);
         }catch(IOException|RuntimeException|LinkageError e){cleanup(dir);throw e;}
+    }
+    static List<InstalledRegion> installed(Context c){
+        File root=new File(c.getFilesDir(),"regions");File[] folders=root.listFiles();ArrayList<InstalledRegion> result=new ArrayList<>();
+        if(folders==null)return result;
+        String active=c.getSharedPreferences("settings",0).getString("region","");
+        for(File folder:folders){
+            if(!folder.isDirectory()||!folder.getName().matches("[0-9a-f-]{36}")||!org.eurorig.routing.RegionRetention.complete(folder))continue;
+            try{
+                File manifestFile=new File(folder,"manifest.json");if(manifestFile.length()>65536)continue;
+                JSONObject manifest=new JSONObject(new String(Files.readAllBytes(manifestFile.toPath()),StandardCharsets.UTF_8));
+                result.add(new InstalledRegion(folder.getName(),manifest.optString("name","Installed map"),manifest.optString("routing_date","unknown"),folder.getName().equals(active)));
+            }catch(IOException|JSONException|RuntimeException invalid){android.util.Log.w("Region","Skipping unreadable installed map metadata",invalid);}
+        }
+        result.sort(Comparator.comparing((InstalledRegion region)->!region.active).thenComparing(region->region.name,String.CASE_INSENSITIVE_ORDER).thenComparing(region->region.date));
+        return result;
+    }
+    static Graph select(Context c,String id)throws IOException{
+        if(id==null||!id.matches("[0-9a-f-]{36}"))throw new IOException("Invalid installed map selection");
+        File root=new File(c.getFilesDir(),"regions").getCanonicalFile();
+        File directory=new File(root,id).getCanonicalFile();
+        if(!directory.getParentFile().equals(root)||!org.eurorig.routing.RegionRetention.complete(directory))throw new IOException("Installed map is incomplete or unavailable");
+        return activate(c,directory);
     }
     private static File create(Context c) throws IOException{
         File folder=new File(c.getFilesDir(),"regions/"+UUID.randomUUID());
@@ -70,7 +109,12 @@ final class RegionPackages {
             if(!c.getSharedPreferences("settings",0).edit().putBoolean("native",true).putString("region",dir.getName()).commit())throw new IOException("Could not save region selection");
             if(Store.nativeRouter!=null)Store.nativeRouter.close();Store.nativeRouter=candidate;candidate=null;
             if(Store.display!=null)Store.display.close();Store.display=candidateDisplay;candidateDisplay=null;
-            if(old.matches("[0-9a-f-]{36}"))cleanup(new File(c.getFilesDir(),"regions/"+old));
+            // The previously selected region is always kept: a driver switching country must not lose
+            // the map already installed. Only a folder that never held any data is removed.
+            if(old.matches("[0-9a-f-]{36}")&&!old.equals(dir.getName())){
+                File previous=new File(c.getFilesDir(),"regions/"+old);
+                if(org.eurorig.routing.RegionRetention.empty(previous))cleanup(previous);
+            }
             return graph;
         }catch(JSONException|NoSuchAlgorithmException e){throw new IOException("Invalid region manifest",e);}
         finally {if(candidate!=null)candidate.close();if(candidateDisplay!=null)candidateDisplay.close();}

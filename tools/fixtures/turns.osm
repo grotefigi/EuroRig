@@ -1,0 +1,368 @@
+<?xml version='1.0' encoding='utf-8'?>
+<osm version="0.6" generator="EuroRig original synthetic B3 fixture">
+  <node id="100001" version="1" lat="46.0000000" lon="26.0000000">
+    <tag k="name" v="Synthetic A1" />
+  </node>
+  <node id="100002" version="1" lat="46.0000000" lon="26.0040000">
+    <tag k="name" v="Synthetic B1" />
+  </node>
+  <node id="100003" version="1" lat="46.0000000" lon="26.0080000">
+    <tag k="name" v="Synthetic C1" />
+  </node>
+  <node id="100004" version="1" lat="46.0040000" lon="26.0040000">
+    <tag k="name" v="Synthetic D1" />
+  </node>
+  <node id="100005" version="1" lat="46.0040000" lon="26.0080000">
+    <tag k="name" v="Synthetic E1" />
+  </node>
+  <node id="100006" version="1" lat="46.0200000" lon="26.0000000">
+    <tag k="name" v="Synthetic A2" />
+  </node>
+  <node id="100007" version="1" lat="46.0200000" lon="26.0040000">
+    <tag k="name" v="Synthetic B2" />
+  </node>
+  <node id="100008" version="1" lat="46.0200000" lon="26.0080000">
+    <tag k="name" v="Synthetic C2" />
+  </node>
+  <node id="100009" version="1" lat="46.0240000" lon="26.0040000">
+    <tag k="name" v="Synthetic D2" />
+  </node>
+  <node id="100010" version="1" lat="46.0240000" lon="26.0080000">
+    <tag k="name" v="Synthetic E2" />
+  </node>
+  <node id="100011" version="1" lat="46.0400000" lon="26.0000000">
+    <tag k="name" v="Synthetic A3" />
+  </node>
+  <node id="100012" version="1" lat="46.0400000" lon="26.0040000">
+    <tag k="name" v="Synthetic B3" />
+  </node>
+  <node id="100013" version="1" lat="46.0400000" lon="26.0080000">
+    <tag k="name" v="Synthetic C3" />
+  </node>
+  <node id="100014" version="1" lat="46.0400000" lon="26.0120000">
+    <tag k="name" v="Synthetic D3" />
+  </node>
+  <node id="100015" version="1" lat="46.0440000" lon="26.0080000">
+    <tag k="name" v="Synthetic E3" />
+  </node>
+  <node id="100016" version="1" lat="46.0440000" lon="26.0120000">
+    <tag k="name" v="Synthetic F3" />
+  </node>
+  <node id="100017" version="1" lat="46.0360000" lon="26.0040000">
+    <tag k="name" v="Synthetic G3" />
+  </node>
+  <node id="100018" version="1" lat="46.0600000" lon="26.0000000">
+    <tag k="name" v="Synthetic A4" />
+  </node>
+  <node id="100019" version="1" lat="46.0600000" lon="26.0040000">
+    <tag k="name" v="Synthetic B4" />
+  </node>
+  <node id="100020" version="1" lat="46.0600000" lon="26.0080000">
+    <tag k="name" v="Synthetic C4" />
+  </node>
+  <node id="100021" version="1" lat="46.0600000" lon="26.0120000">
+    <tag k="name" v="Synthetic D4" />
+  </node>
+  <node id="100022" version="1" lat="46.0640000" lon="26.0080000">
+    <tag k="name" v="Synthetic E4" />
+  </node>
+  <node id="100023" version="1" lat="46.0640000" lon="26.0120000">
+    <tag k="name" v="Synthetic F4" />
+  </node>
+  <node id="100024" version="1" lat="46.0560000" lon="26.0040000">
+    <tag k="name" v="Synthetic G4" />
+  </node>
+  <node id="100025" version="1" lat="46.0800000" lon="26.0000000">
+    <tag k="name" v="Synthetic A5" />
+  </node>
+  <node id="100026" version="1" lat="46.0800000" lon="26.0040000">
+    <tag k="name" v="Synthetic B5" />
+  </node>
+  <node id="100027" version="1" lat="46.0800000" lon="26.0080000">
+    <tag k="name" v="Synthetic C5" />
+  </node>
+  <node id="100028" version="1" lat="46.0800000" lon="26.0120000">
+    <tag k="name" v="Synthetic D5" />
+  </node>
+  <node id="100029" version="1" lat="46.0800000" lon="26.0160000">
+    <tag k="name" v="Synthetic E5" />
+  </node>
+  <node id="100030" version="1" lat="46.0840000" lon="26.0120000">
+    <tag k="name" v="Synthetic X5" />
+  </node>
+  <node id="100031" version="1" lat="46.0840000" lon="26.0160000">
+    <tag k="name" v="Synthetic Y5" />
+  </node>
+  <node id="100032" version="1" lat="46.0760000" lon="26.0080000">
+    <tag k="name" v="Synthetic Z5" />
+  </node>
+  <way id="101" version="1">
+    <nd ref="100001" />
+    <nd ref="100002" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 1 A-B" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="102" version="1">
+    <nd ref="100002" />
+    <nd ref="100003" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 1 B-C" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="103" version="1">
+    <nd ref="100002" />
+    <nd ref="100004" />
+    <nd ref="100005" />
+    <nd ref="100003" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 1 B-D-E-C" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="201" version="1">
+    <nd ref="100006" />
+    <nd ref="100007" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 2 A-B" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="202" version="1">
+    <nd ref="100007" />
+    <nd ref="100008" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 2 B-C" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="203" version="1">
+    <nd ref="100007" />
+    <nd ref="100009" />
+    <nd ref="100010" />
+    <nd ref="100008" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 2 B-D-E-C" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="301" version="1">
+    <nd ref="100011" />
+    <nd ref="100012" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 3 A-B" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="302" version="1">
+    <nd ref="100012" />
+    <nd ref="100013" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 3 B-C" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="303" version="1">
+    <nd ref="100013" />
+    <nd ref="100014" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 3 C-D" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="304" version="1">
+    <nd ref="100013" />
+    <nd ref="100015" />
+    <nd ref="100016" />
+    <nd ref="100014" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 3 C-E-F-D" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="305" version="1">
+    <nd ref="100017" />
+    <nd ref="100012" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 3 G-B" />
+    <tag k="surface" v="asphalt" />
+    <tag k="oneway" v="yes" />
+  </way>
+  <way id="401" version="1">
+    <nd ref="100018" />
+    <nd ref="100019" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 4 A-B" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="402" version="1">
+    <nd ref="100019" />
+    <nd ref="100020" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 4 B-C" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="403" version="1">
+    <nd ref="100020" />
+    <nd ref="100021" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 4 C-D" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="404" version="1">
+    <nd ref="100020" />
+    <nd ref="100022" />
+    <nd ref="100023" />
+    <nd ref="100021" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 4 C-E-F-D" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="405" version="1">
+    <nd ref="100024" />
+    <nd ref="100019" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 4 G-B" />
+    <tag k="surface" v="asphalt" />
+    <tag k="oneway" v="yes" />
+  </way>
+  <way id="501" version="1">
+    <nd ref="100025" />
+    <nd ref="100026" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 5 A-B" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="502" version="1">
+    <nd ref="100026" />
+    <nd ref="100027" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 5 B-C" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="503" version="1">
+    <nd ref="100027" />
+    <nd ref="100028" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 5 C-D" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="504" version="1">
+    <nd ref="100028" />
+    <nd ref="100029" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 5 D-E" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="505" version="1">
+    <nd ref="100028" />
+    <nd ref="100030" />
+    <nd ref="100031" />
+    <nd ref="100029" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 5 D-X-Y-E bypass" />
+    <tag k="surface" v="asphalt" />
+  </way>
+  <way id="506" version="1">
+    <nd ref="100032" />
+    <nd ref="100027" />
+    <tag k="highway" v="residential" />
+    <tag k="maxheight" v="10 m" />
+    <tag k="maxweight" v="100 t" />
+    <tag k="maxwidth" v="10 m" />
+    <tag k="name" v="Island 5 Z-C alternate entry" />
+    <tag k="surface" v="asphalt" />
+    <tag k="oneway" v="yes" />
+  </way>
+  <relation id="990001" version="1">
+    <member type="way" ref="101" role="from" />
+    <member type="node" ref="100002" role="via" />
+    <member type="way" ref="102" role="to" />
+    <tag k="restriction:hgv" v="no_straight_on" />
+    <tag k="type" v="restriction" />
+  </relation>
+  <relation id="990002" version="1">
+    <member type="way" ref="201" role="from" />
+    <member type="node" ref="100007" role="via" />
+    <member type="way" ref="202" role="to" />
+    <tag k="restriction:hgv" v="only_straight_on" />
+    <tag k="type" v="restriction" />
+  </relation>
+  <relation id="990003" version="1">
+    <member type="way" ref="301" role="from" />
+    <member type="way" ref="302" role="via" />
+    <member type="way" ref="303" role="to" />
+    <tag k="restriction:hgv" v="no_straight_on" />
+    <tag k="type" v="restriction" />
+  </relation>
+  <relation id="990004" version="1">
+    <member type="way" ref="401" role="from" />
+    <member type="way" ref="402" role="via" />
+    <member type="way" ref="403" role="to" />
+    <tag k="restriction:hgv" v="only_straight_on" />
+    <tag k="type" v="restriction" />
+  </relation>
+  <relation id="990005" version="1">
+    <member type="way" ref="501" role="from" />
+    <member type="way" ref="502" role="via" />
+    <member type="way" ref="503" role="via" />
+    <member type="way" ref="504" role="to" />
+    <tag k="restriction:hgv" v="no_straight_on" />
+    <tag k="type" v="restriction" />
+  </relation>
+</osm>

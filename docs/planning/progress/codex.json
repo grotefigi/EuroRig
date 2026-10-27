@@ -1,0 +1,594 @@
+{
+  "lane": "codex",
+  "updated_at": "2026-10-27T13:19:15.977932+00:00",
+  "current": "Claude handover: seven packages accepted with prerequisites; C1/C2/C4/D5/D6/E1 have passing technical evidence but remain partial until dependencies close. E2 has local checks and remains partial. Resume B4, the earliest open safety package, subject to the 40-minute no-progress rule.",
+  "items": {
+    "A1": {
+      "status": "complete",
+      "evidence": "docs/A1-PRESERVATION-2026-10-25.md; tested archival source commit 7aa7c24cbef9edd6ad7e96e19f0147838a5e2e1c; 336 exact source files and the pinned approved checkpoint restored; four bound passing Tab S9 suites; APK signatures, live maps, private truck/prefs inputs and raw logs preserved; isolated byte-identical preference restore; independent review found no A1 gap. Historical unbound reports preserved and excluded from acceptance.",
+      "blocker": null
+    },
+    "A2": {
+      "status": "complete",
+      "evidence": "docs/A2-NATIVE-INVENTORY-2026-10-26.md; complete six-suite run against A1 source 7aa7c24c; exact APK/map/input/log bindings and restored prefs verified; four corrupt controls rejected; independent acceptance review.",
+      "blocker": null
+    },
+    "A3": {
+      "status": "complete",
+      "evidence": "docs/A3-BUILD-2026-10-26.md; docs/A3-LINT-2026-10-26.csv; exact candidate b4065659; GitHub run 40288872499 both jobs success; 212 local routing tests and 135 tooling tests without skips; both APKs; genuine SDK36; independent source/hash/triage review.",
+      "blocker": null
+    },
+    "A4": {
+      "status": "complete",
+      "evidence": "docs/UI-ROUTING-2026-10-25.md; current tablet QA identity/storage and recipe verified",
+      "blocker": null
+    },
+    "B1": {
+      "status": "complete",
+      "evidence": "docs/TRUCK-CAPABILITIES.md; docs/B1-VERIFICATION-2026-10-26.md; source03bc36ca; 215 routing tests; five bound native suites PASS; immutable APKs/fresh fixture provenance; original inputs restored; independent review.",
+      "blocker": null
+    },
+    "B2": {
+      "status": "complete",
+      "evidence": "docs/B2-ADR-DETOURS-2026-10-26.md; sourcedeb197f9; exact corridor oracle, reverse/shifted/slow/no-corridor controls; report SHA bound to source/receipt; native fixture review; no hard rule relaxed.",
+      "blocker": null
+    },
+    "B3": {
+      "status": "complete",
+      "evidence": "docs/B3-TURN-AUDIT-2026-10-26.md; source3ae570f1;230JVM/140tooling tests;four bound native suites;128 source routes+8joined detours;72ADR regressions;5root+1leaf gates met;independent safety/evidence review;explicit unsupported/search limits.",
+      "blocker": null
+    },
+    "B4": {
+      "status": "partial",
+      "evidence": ".unlazy/b4-current/GATES.md; current authorization state, expiry, revocation, reroute, stop/profile change, GPS-gap, and route/paint behavior under review. No acceptance claim yet.",
+      "blocker": null
+    },
+    "B5": {
+      "status": "partial",
+      "evidence": "tools/apply_authority_rules.py; tools/test_apply_authority_rules.py; tools/package_region.py; docs/RESTRICTION-SOURCE-INTAKE.md. Revalidated batches now apply numeric limits and unconditional HGV bans to a separate display map and retain per-way provenance plus reviewed package attribution. Tampering, expired review, uncertain-access conflicts, partial multiway writes, output overwrite and injected I/O failures are covered. All 102 tooling tests pass; independent final review found no remaining concrete issue. Real country restrictions were not imported because approved rights/currentness and exact matches remain unresolved.",
+      "blocker": null
+    },
+    "B6": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "C1": {
+      "status": "partial",
+      "evidence": "analysis/private/c1-prerequisite/c1-source-audit-current.json; analysis/private/c1-prerequisite/c1-border-routes-current.json. Candidate SHA-256 757d671b31f681043d2c8b07f25579b90151ce4ec806c483d99aba416bf2f374; ZIP CRC, format 2/Valhalla 0.6.3, payload hashes, 715 unique graph tiles, source timestamps, bounds and OSM attribution verified. On dedicated API36 Preview, four native cross-border routes passed in both directions for standard 40 t and ADR load-mask/tunnel profile (23.231–23.278 km); isolated QA files cleaned, active settings/map untouched. No legal/redistribution approval claimed. Technical checks passed; full package acceptance remains open because B5 are not accepted.",
+      "blocker": null
+    },
+    "C2": {
+      "status": "partial",
+      "evidence": "API36 evidence: DownloadTest 9/9; full Romania package install/route/rollback/restart and actual 16 MiB transfer resume; failed-update process-death preservation; 11 malformed package refusal/retention cases covering duplicate/path traversal/truncation/schema/engine/hash; real-filesystem low-storage refusal preserving partial and prior package; 1,314,609,938-byte Romania-Moldova candidate import, rollback/reselect and production Android DocumentsUI request-202 import, with original settings/endpoints/maps restored. C1 technical prerequisite evidence passed: analysis/private/c1-prerequisite/c1-source-audit-current.json and c1-border-routes-current.json. No legal/redistribution approval claimed. Technical checks passed; full package acceptance remains open because C1 (and B5) are not accepted.",
+      "blocker": null
+    },
+    "C3": {
+      "status": "blocked",
+      "evidence": "Installed-map search and warning tests passed. A candidate terminal truck entrance and current permit conditions remain unverified; source and correspondence evidence is retained privately. Last source/contact check was 26 October 2026 and must be refreshed.",
+      "blocker": "Obtain current authoritative evidence for the actual terminal truck entrance and applicable permit conditions; until then the candidate remains unverified."
+    },
+    "C4": {
+      "status": "partial",
+      "evidence": "tools/make_catalog.py and tools/test_make_catalog.py now validate ZIP CRC, format/engine, source/licence/attribution, inner routing/display hashes, size and HTTPS hosting; nine focused catalogue/package tests pass. analysis/private/c2-g4-current/c4-distribution-current.json binds a generated private RO-MD candidate catalogue (1,314,609,938 bytes, exact SHA, ODbL-1.0 attribution with U+00A9, valid inner payload hashes, below GitHub 2 GiB asset limit), existing public Romania asset exact-size/hash install/rollback, actual Android DocumentsUI manual import, storage/rollback instructions, and offline routing with network unavailable. GitHub current release limits checked against official docs. No candidate was published; G4 retains publication/security and public-readiness gates. Technical checks passed; full package acceptance remains open because C1 (and B5) are not accepted.",
+      "blocker": null
+    },
+    "D1": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D2": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D3": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D4": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "D5": {
+      "status": "partial",
+      "evidence": "analysis/private/d5-current/receipt.md and .unlazy/d5-current/GATES.md (4/4 gates); analysis/private/d6-current/receipt.md and .unlazy/d6-current/GATES.md (7/7 gates; 4 automated gates rerun after D5); API36 and Tab S9 evidence retained. Technical checks passed; full package acceptance remains open because D1 and C3 are not accepted.",
+      "blocker": null
+    },
+    "D6": {
+      "status": "partial",
+      "evidence": "analysis/private/d6-current/receipt.md; .unlazy/d6-current/GATES.md all 7 gates met; Preview build/lint and API36 tests pass; Tab S9 offline EN/RO TTS and non-silent speaker-route capture recorded, media volume preserved. Technical checks passed; full package acceptance remains open because D3 and D5 are not accepted.",
+      "blocker": null
+    },
+    "E1": {
+      "status": "partial",
+      "evidence": "analysis/private/e1-current/receipt.md; .unlazy/e1-current/GATES.md (5/5). Tab S9 UI/routing/editor 0/1/5/10, duplicate/crossed-stop, exact join/refusal, and process-death reroute gates pass. D5 (4/4) and D6 (7/7) automated regressions reverified after NativeRouter changes. Technical checks passed; full package acceptance remains open because B4, D2 and C3 are not accepted.",
+      "blocker": null
+    },
+    "E2": {
+      "status": "partial",
+      "evidence": "Two-point candidates use the same native truck/access audit, are deduplicated and capped at three, and show ETA, distance and restriction status. Local E2 gates 4/4 passed, including physical Preview tests and independent safety review. Full acceptance remains open: B4 and C1 prerequisites are incomplete and an independently specified native single-lawful-route case is still needed.",
+      "blocker": null
+    },
+    "E3": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "E4": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "E5": {
+      "status": "partial",
+      "evidence": "Feed timestamp/count/freshness/cache/offline behavior retains unavailable state; public NDW test table with eight sites is explicitly non-operational, 60-second refresh executed, no counts exposed. Receipt: analysis/private/c2-g4-current/build-result.json.",
+      "blocker": null
+    },
+    "E6": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "E7": {
+      "status": "partial",
+      "evidence": null,
+      "blocker": null
+    },
+    "F1": {
+      "status": "partial",
+      "evidence": "Four public-coordinate A3 scenarios rerun on the current Preview candidate after install -r on physical Tab S9: 4 routes, 0 refusals. Current private bindings: analysis/private/c2-g4-current/f1-matched-inputs.csv and f1-eurorig-receipt-final.json.",
+      "blocker": null
+    },
+    "F2": {
+      "status": "blocked",
+      "evidence": "Authorized Eurowag app inventory and private observation are recorded in analysis/private/c2-g4-current; no route output collected.",
+      "blocker": "The reference app contains an existing private route and mismatched or unverified settings. Establish an isolated QA context or a verified, reversible restoration method before running comparisons."
+    },
+    "F3": {
+      "status": "partial",
+      "evidence": "Physical Tab S9 qualification is bound to analysis/private/c2-g4-current/f3-current-physical-matrix.json. Current Preview app/test APK hashes verified on device; denied/coarse/precise permission matrix, coarse pause/resume, no-default-network offline route, RO-MD city/address/fuel/coordinate search, two distinct audited alternatives, NDW test-feed cache/60-second refresh/English offline speech, EN/RO maneuver request payloads, UI themes/orientation/stop editing, and force-stop ten-stop persistence were exercised. Permission flags, settings/endpoints and all four active map file hashes match the baseline. uiRoutingOnly and process-death reroute both refuse safely at 14.49 m disconnected legs; full app translation and Romanian offline TTS remain open. Independent reviewer cleared the route-state restoration test defect.",
+      "blocker": null
+    },
+    "F4": {
+      "status": "blocked",
+      "evidence": "Current adb inventory has Tab S9 and API 36 emulator; no Pixel 8 Pro. Candidate app and instrumentation APKs built with SHA receipts at analysis/private/c2-g4-current/build-result.json.",
+      "blocker": "Pixel 8 Pro is not connected/available for physical qualification; emulator and tablet cannot close this gate."
+    },
+    "F5": {
+      "status": "partial",
+      "evidence": "Preview native replay on physical Tab S9: 12 synthetic route traces, 6,840 matched fixes, 24 audited reroutes; route P50/P95 514/690 ms, reroute P50/P95 418/467 ms, sampled PSS 95/155/112 MB. Two 120-second render runs: ~119.6–119.9 callbacks/s, p95 frame 10.35–10.48 ms, battery snapshots and thermal status 0. Receipt: analysis/private/c2-g4-current/f5-final-receipt.json.",
+      "blocker": null
+    },
+    "G1": {
+      "status": "partial",
+      "evidence": "Current Preview install -r on dedicated API36 emulator and physical Tab S9 retained saved vehicle-profile/settings, endpoints and installed map files with identical before/after hashes. Physical evidence is bound in e1-tab-process-restart-receipt.json; emulator retention in g1-emulator-upgrade-retention.json; candidate APK hashes in final-candidate-receipt.json.",
+      "blocker": null
+    },
+    "G2": {
+      "status": "partial",
+      "evidence": "docs/MAINTENANCE.md documents source/dependency review and issue reproduction; current candidate APK hashes, C2 real-package result and G1 upgrade-retention checks are bound in analysis/private/c2-g4-current/final-candidate-receipt.json. Tooling runner previously passed 144 tests, exit 0; Android build/routing test and APK assembly passed.",
+      "blocker": null
+    },
+    "G3": {
+      "status": "pending",
+      "evidence": null,
+      "blocker": null
+    },
+    "G4": {
+      "status": "partial",
+      "evidence": "README/CONTRIBUTING plus docs/DISTRIBUTION.md cover free app, licensing, privacy, compatibility, support, manual install, hashes and no public-readiness claim.",
+      "blocker": null
+    },
+    "G5": {
+      "status": "pending",
+      "evidence": null,
+      "blocker": null
+    }
+  },
+  "history": [
+    {
+      "at": "2026-10-26T16:54:20.145951+02:00",
+      "item": null,
+      "status": null,
+      "summary": "C2 full Romania catalog package installed, routed, rolled back and reselected on dedicated API36 emulator. G1 install -r preserved vehicle-profile settings, endpoints and all 12 map files by SHA-256. Saved-default endpoint restart probe safely refused a private-road destination; endpoint-specific restart routing remains open. C3/C4/D6/E1/E5/F1-F5/G1/G2/G4 evidence and open gates are recorded in analysis/private/c2-g4-current/ and .unlazy/c2-g4-current/GATES.md; E1 14.49m refusal remains explicit; F2/F4 blocked.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T16:55:23.759494+02:00",
+      "item": null,
+      "status": null,
+      "summary": "C2 real Romania package install/rollback/route checks passed on dedicated API36 emulator; install -r preserved vehicle-profile settings, endpoints and all 12 map files. Saved-default restart route safely refused a private-road endpoint; endpoint-specific successful restart routing remains open. C3/C4/D6/E1/E5/F1-F5/G1/G2/G4 evidence and blockers are recorded; E1 14.49m refusal remains explicit; F2/F4 blocked. Evidence: analysis/private/c2-g4-current/ and .unlazy/c2-g4-current/GATES.md.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T17:00:31.265511+02:00",
+      "item": "C2",
+      "status": "partial",
+      "summary": "C2",
+      "evidence": "Verified exact 407,495,153-byte catalog Romania package on dedicated API36 emulator; installed and routed it, preserved 3 pre-existing complete maps plus the prior map, rolled back/routed prior map, reselected/routed Romania, then force-stopped and reopened/routed the persisted package at verified coordinates. Receipt: analysis/private/c2-g4-current/c2-romania-package-receipt.json; restart: real-romania-restart-probe.json.",
+      "blocker": "Full RO-MD package/update, interrupted real-package resume and production low-storage qualification remain."
+    },
+    {
+      "at": "2026-10-26T17:00:31.35365+02:00",
+      "item": "G1",
+      "status": "partial",
+      "summary": "G1",
+      "evidence": "Current Preview install -r on dedicated API36 emulator retained saved vehicle-profile/settings, endpoints and all 20 installed map files (tree digest and count unchanged). Current Preview APK/test APK hashes are in final-candidate-receipt.json; comparison: g1-emulator-upgrade-retention.json.",
+      "blocker": "No approved release signing key/procedure; fresh-install and production full-package upgrade matrix remain."
+    },
+    {
+      "at": "2026-10-26T17:00:31.436045+02:00",
+      "item": null,
+      "status": null,
+      "summary": "C2 current Romania catalog package import/rollback/reselect and endpoint-specific process-restart route passed on dedicated API36 emulator. Three pre-existing complete maps retained. G1 current Preview install -r preserved vehicle-profile/settings, endpoints and all 20 map files by hash. C3/C4/D6/E1/E5/F1-F5/G1/G2/G4 evidence and open conditions recorded in analysis/private/c2-g4-current/ and .unlazy/c2-g4-current/GATES.md; E1 14.49m refusal remains explicit; F2/F4 blocked.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T17:00:55.65641+02:00",
+      "item": null,
+      "status": null,
+      "summary": "Current Preview candidate rebuilt with Zulu JDK21/API36; routing test task up-to-date from last 232-pass run, both Preview APKs assembled and hashes match installed emulator packages. Latest full Romania catalog import/route/rollback/reselect and force-stop/reopen route passed; install -r retained profile settings, endpoints and all 20 map files. C2 open: full RO-MD package, real-package interrupted resume and production low-storage. Remaining stage gates and exact blockers in .unlazy/c2-g4-current/GATES.md; E1 safe 14.49m refusal; F2/F4 blocked.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T17:02:19.530856+02:00",
+      "item": null,
+      "status": null,
+      "summary": "Continuing C2-G4 assignment from authoritative checkout. Revalidating connected devices and E1 lifecycle code before targeted restart/order work; preserve emulator and physical-device app data. Current candidate receipts and open gates remain under analysis/private/c2-g4-current/ and .unlazy/c2-g4-current/GATES.md.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T17:06:12.288492+02:00",
+      "item": "E1",
+      "status": "partial",
+      "summary": "E1",
+      "evidence": "Physical Tab S9 two-invocation process-death test: ten selected stops and their edited order reloaded after force-stop; route calculation retained the order and safely refused a 14.49 m disconnected-leg join. Original settings/endpoints and all 4 installed map files matched baseline hashes; temporary recovery files removed. Receipt: analysis/private/c2-g4-current/e1-tab-process-restart-receipt.json.",
+      "blocker": "Sol must decide whether disconnected 14.49 m joins remain hard refusals or define a reviewed snap-join rule; the ten-stop itinerary still cannot complete with this map output."
+    },
+    {
+      "at": "2026-10-26T17:06:12.378081+02:00",
+      "item": "G1",
+      "status": "partial",
+      "summary": "G1",
+      "evidence": "Current Preview install -r on dedicated API36 emulator and physical Tab S9 retained saved vehicle-profile/settings, endpoints and installed map files with identical before/after hashes. Physical evidence is bound in e1-tab-process-restart-receipt.json; emulator retention in g1-emulator-upgrade-retention.json; candidate APK hashes in final-candidate-receipt.json.",
+      "blocker": "No approved release signing key/procedure; fresh-install and production full-package upgrade matrix remain."
+    },
+    {
+      "at": "2026-10-26T17:06:19.679702+02:00",
+      "item": null,
+      "status": null,
+      "summary": "E1 physical process-death handoff added: ten-stop order survived force-stop, safe 14.49m refusal persisted, original prefs and all map files restored by hash. Continuing with F3 physical permission-state cases on the isolated Preview app; preserve existing app data and restore initial permission states.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T17:14:16.687813+02:00",
+      "item": "F3",
+      "status": "partial",
+      "summary": "F3",
+      "evidence": "Physical Tab S9 permission-state matrix on current Preview: denied, coarse-only and precise-granted cases passed. Denied state keeps manual offline routing; coarse-only callback is labelled approximate and recenter preserves manual origin; precise callback permits explicit GPS route origin. All callbacks used injected Location objects and do not claim live GPS. Original fine/coarse denial flags, settings/endpoints and four map files matched baseline hashes after tests. Receipt: analysis/private/c2-g4-current/f3-location-permission-matrix.json.",
+      "blocker": "Current-candidate physical lifecycle/theme/orientation/search/stops/alternatives/parking matrix still needs binding; full language/audio, offline network-loss and crash/foreground lifecycle cases remain."
+    },
+    {
+      "at": "2026-10-26T17:14:16.80669+02:00",
+      "item": null,
+      "status": null,
+      "summary": "F3 in progress. Physical Tab S9 denied/coarse-only/precise-granted permission matrix passed on current Preview; both location permissions and all private settings/maps restored by hash. I am staying on F3 to bind theme/orientation, offline use, stops, alternatives, parking and lifecycle cases to the current candidate before moving stages.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T17:36:03.381284+02:00",
+      "item": "F3",
+      "status": "partial",
+      "summary": "F3 remains the only active roadmap stage. Physical matrix evidence is collected; keep F3 partial until the ten-stop disconnected-leg outcome and remaining language/audio limits are resolved or explicitly accepted. Do not start another stage.",
+      "evidence": "Physical Tab S9 qualification is bound to analysis/private/c2-g4-current/f3-current-physical-matrix.json. Current Preview app/test APK hashes verified on device; denied/coarse/precise permission matrix, coarse pause/resume, no-default-network offline route, RO-MD city/address/fuel/coordinate search, two distinct audited alternatives, NDW test-feed cache/60-second refresh/English offline speech, EN/RO maneuver request payloads, UI themes/orientation/stop editing, and force-stop ten-stop persistence were exercised. Permission flags, settings/endpoints and all four active map file hashes match the baseline. uiRoutingOnly and process-death reroute both refuse safely at 14.49 m disconnected legs; full app translation and Romanian offline TTS remain open. Independent reviewer cleared the route-state restoration test defect.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T17:43:30.89909+02:00",
+      "item": null,
+      "status": null,
+      "summary": "C2 only: verify existing transactional install, update/resume, rollback and failure-preservation work; do not start later assigned stages until C2 is accepted or has a documented blocker.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T18:03:56.415629+02:00",
+      "item": "C2",
+      "status": "partial",
+      "summary": "C2",
+      "evidence": "analysis/private/c2-g4-current/c2-real-package-current.json; c2-real-package-resume-verified.json; c2-failed-update-process-death-current.json; c2-import-current-verified.json; DownloadTest (9 tests, 0 failures/errors/skips); Preview Android instrumentation APK build passed. Dedicated API36 settings/endpoints hashes and five installed region directories remain unchanged after QA.",
+      "blocker": "No approved/licensed full Romania-Moldova package/PBF is present in the approved project roots, so the required RO-MD update acceptance cannot run. Production low-storage emulator qualification remains unverified: c2LowStorageOnly instrumentation invocations fell through to the generic first-launch path; routing DownloadTest covers injected low-storage refusal and preservation. C2 only; do not start C3 until C2 is accepted or fully documented as blocked."
+    },
+    {
+      "at": "2026-10-26T18:06:39.938171+02:00",
+      "item": "C2",
+      "status": "partial",
+      "summary": "C2",
+      "evidence": "analysis/private/c2-g4-current/c2-real-package-current.json; c2-real-package-resume-verified.json; c2-failed-update-process-death-current.json; c2-import-current-verified.json; c2-low-storage-current.json. Full 407,495,153-byte Romania archive install/route/rollback/reselect/restart and resumed production transfer passed; 11 importer refusals and corrupt-update process-death preservation passed; production low-storage refused at measured 5,948,497,920 free vs 6,485,368,832 required, preserving partial/prior package; DownloadTest 9/9, no skips. Preview instrumentation APK SHA-bound. Settings/endpoints and five region directories unchanged. OPEN: approved licensed full RO-MD package/update acceptance.",
+      "blocker": "Approved licensed full Romania-Moldova package/PBF is not present in approved project roots; cannot run the required RO-MD update acceptance without it. C2 only; do not start C3 until C2 is accepted or fully documented blocked."
+    },
+    {
+      "at": "2026-10-26T18:07:35.88294+02:00",
+      "item": "C2",
+      "status": "partial",
+      "summary": "C2",
+      "evidence": "analysis/private/c2-g4-current/c2-real-package-current.json; c2-real-package-resume-verified.json; c2-failed-update-process-death-current.json; c2-import-current-verified.json; c2-low-storage-current.json. DownloadTest interruption/pause preservation and resume tests pass (9/9); 407,495,153-byte Romania archive install/route/rollback/reselect/restart and resumed production transfer pass; 11 importer refusals and failed-update process-death preservation pass. Production low-storage refused at 5,948,497,920 free vs 6,485,368,832 required, preserving partial/prior package. Preview app/test hashes bound; settings/endpoints and five region directories unchanged. OPEN: approved licensed full RO-MD package/update acceptance.",
+      "blocker": "Approved licensed full Romania-Moldova package/PBF is not present in approved project roots; cannot run the required RO-MD update acceptance without it. C2 only; do not start C3 until C2 is accepted or fully documented blocked."
+    },
+    {
+      "at": "2026-10-26T18:07:50.772693+02:00",
+      "item": null,
+      "status": null,
+      "summary": "C2 only: all independent install, import, actual-package resume, failure-recovery and low-storage checks are evidenced. Waiting on the approved/licensed full RO-MD package to run its update acceptance. Do not start C3.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T18:15:19.289262+02:00",
+      "item": "C2",
+      "status": "partial",
+      "summary": "C2",
+      "evidence": "analysis/private/c2-g4-current/c2-real-package-current.json; c2-real-package-resume-verified.json; c2-failed-update-process-death-current.json; c2-import-current-verified.json; c2-low-storage-current.json; c2-romd-package-lifecycle-current.json. DownloadTest passed 9/9 (pause/interruption/resume, process-death complete partial and low-storage preservation); full 407,495,153-byte Romania archive install/route/rollback/restart/resume passed; 11 refusal cases and failed-update process-death preservation passed. A 1,314,609,938-byte ODbL-identified Romania-Moldova candidate had valid ZIP CRC/payload hashes and passed Preview API36 import, route, previous-map retention, rollback and reselect. Production low-storage preflight passed with measured free/required bytes. App settings/endpoints and all five live region folders unchanged. OPEN: roadmap C1 is partial and is an explicit C2 prerequisite; C1 border/ADR/source-manifest acceptance remains unproven. Candidate attribution has U+FFFD, so no release-ready claim.",
+      "blocker": "C2 prerequisite C1 is still partial under ROADMAP.md. Independent C2 package lifecycle checks are complete; acceptance cannot pass until coherent RO-MD border/ADR/source-manifest evidence is accepted. The candidate manifest attribution has U+FFFD and needs correction/review before release use."
+    },
+    {
+      "at": "2026-10-26T18:15:21.590708+02:00",
+      "item": null,
+      "status": null,
+      "summary": "C2 only: independent transaction, corruption, interruption/resume, failed-update restart and low-storage checks are evidenced, including an ODbL-identified RO-MD package candidate. C2 acceptance awaits C1 prerequisite acceptance; do not start C3.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T18:22:24.30092+02:00",
+      "item": "C2",
+      "status": "partial",
+      "summary": "C2",
+      "evidence": "analysis/private/c2-g4-current/c2-real-package-current.json; c2-real-package-resume-verified.json; c2-failed-update-process-death-current.json; c2-import-current-verified.json; c2-low-storage-current.json; c2-romd-package-lifecycle-current.json; c2-manual-import-current.json. DownloadTest passed 9/9; full Romania package install/route/rollback/restart/resume passed; 11 importer refusal cases and corrupt-update process-death preservation passed; low-storage preflight passed. The ODbL-identified 1,314,609,938-byte Romania-Moldova candidate validated and passed API36 install/rollback plus MainActivity request-202 document-result import/offline route. The original settings/endpoints and five map directories were restored by hash. OPEN: ROADMAP C1 is partial and explicitly precedes C2; C1 border/ADR/source-manifest acceptance remains unproven. Package attribution has U+FFFD; no release-ready claim. The Android DocumentsUI picker itself was not run.",
+      "blocker": "C2 acceptance remains dependent on C1, which is partial in docs/planning/progress/codex.json; coherent RO-MD border/ADR/source-manifest acceptance is not established. The candidate manifest attribution contains U+FFFD and requires correction/review before release use."
+    },
+    {
+      "at": "2026-10-26T18:22:24.394333+02:00",
+      "item": null,
+      "status": null,
+      "summary": "C2 only: transaction, resume, importer, failed-update restart and low-storage checks pass on a Romania-Moldova package candidate. C2 awaits its explicit C1 prerequisite acceptance; do not start C3.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T18:29:16.77348+02:00",
+      "item": "C2",
+      "status": "partial",
+      "summary": "C2 only: transaction, resume, corruption, low-storage, rollback and production Android DocumentsUI import evidence are recorded; emulator restored. C2 awaits its explicit C1 prerequisite acceptance. Do not start C3.",
+      "evidence": "analysis/private/c2-g4-current/c2-real-package-current.json; c2-real-package-resume-verified.json; c2-failed-update-process-death-current.json; c2-import-current-verified.json; c2-low-storage-current.json; c2-romd-package-lifecycle-current.json; c2-manual-import-current.json; c2-manual-import-picker-current.json/.txt and c2-picker-*.xml. DownloadTest passed 9/9; real archive installation/resume/rollback/restart passed; 11 importer refusal cases and failed-update process-death preservation passed; low-storage preflight passed. Dedicated API36 Android DocumentsUI request-202 picker imported the 1,314,609,938-byte RO-MD candidate from Downloads; committed map UUID d7e61c19-025f-4d99-93a5-b96a69c75e7c. Emulator settings/endpoints hashes and original five maps restored; temporary package/backups removed, no app-data clear. Direct source ZIP and installed manifest checks confirm © OpenStreetMap contributors; prior U+FFFD warning corrected. OPEN: ROADMAP C1 is partial and explicitly precedes C2; C1 border/ADR/source-manifest acceptance remains unrecorded.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T18:49:37.129993+02:00",
+      "item": "C1",
+      "status": "in_progress",
+      "summary": "C1 prerequisite to current C2: package/source/tile audit passed; cross-border heavy-truck and ADR route tests pending. Do not start C3.",
+      "evidence": "analysis/private/c1-prerequisite/audit_candidate.py; analysis/private/c1-prerequisite/c1-source-audit-current.json. Candidate SHA-256 757d671b31f681043d2c8b07f25579b90151ce4ec806c483d99aba416bf2f374; ZIP CRC pass; format 2/Valhalla 0.6.3; 715 unique graph tile paths across levels 0/1/2 with no duplicates; display metadata names Romania and Moldova PBF sources with matching 2026-10-17T20:20:51Z timestamps and RO–MD bounds. UTF-8-safe codepoint check shows © OSM attribution, no U+FFFD. C1 border truck/ADR routes remain to be verified.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T18:49:37.29398+02:00",
+      "item": "C2",
+      "status": "partial",
+      "summary": "C1 prerequisite to current C2: package/source/tile audit passed; cross-border heavy-truck and ADR route tests pending. Do not start C3.",
+      "evidence": "analysis/private/c2-g4-current/c2-real-package-current.json; c2-real-package-resume-verified.json; c2-failed-update-process-death-current.json; c2-import-current-verified.json; c2-low-storage-current.json; c2-romd-package-lifecycle-current.json; c2-manual-import-picker-current.json/.txt and c2-picker-*.xml. DownloadTest 9/9; archive install/update retention, rollback/reselect/restart; actual DocumentsUI request-202 import passed; 11 malformed-import refusal cases; low-storage and failed-update process-death preservation passed. Picker emulator restored to original settings/endpoints/map folders. C2 awaits C1 prerequisite acceptance; C1 border/ADR route evidence is being completed before C2 can be accepted.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T20:01:31.982959+02:00",
+      "item": "C1",
+      "status": "complete",
+      "summary": "C2: C1 technical prerequisite complete with source/tile audit and four native RO–MD heavy-truck/ADR border routes. Finish C2 acceptance now; do not start C3 until C2 is accepted.",
+      "evidence": "analysis/private/c1-prerequisite/c1-source-audit-current.json; analysis/private/c1-prerequisite/c1-border-routes-current.json. Candidate SHA-256 757d671b31f681043d2c8b07f25579b90151ce4ec806c483d99aba416bf2f374; ZIP CRC, format 2/Valhalla 0.6.3, payload hashes, 715 unique graph tiles, source timestamps, bounds and OSM attribution verified. On dedicated API36 Preview, four native cross-border routes passed in both directions for standard 40 t and ADR load-mask/tunnel profile (23.231–23.278 km); isolated QA files cleaned, active settings/map untouched. No legal/redistribution approval claimed.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T20:01:32.137363+02:00",
+      "item": "C2",
+      "status": "complete",
+      "summary": "C2 accepted: transactional import, download/resume, manual selection, update/rollback, low storage, malformed package rejection and failed-update restart behavior evidenced; C1 technical prerequisite passed. Begin C3 only.",
+      "evidence": "API36 evidence: DownloadTest 9/9; full Romania package install/route/rollback/restart and actual 16 MiB transfer resume; failed-update process-death preservation; 11 malformed package refusal/retention cases covering duplicate/path traversal/truncation/schema/engine/hash; real-filesystem low-storage refusal preserving partial and prior package; 1,314,609,938-byte Romania-Moldova candidate import, rollback/reselect and production Android DocumentsUI request-202 import, with original settings/endpoints/maps restored. C1 technical prerequisite evidence passed: analysis/private/c1-prerequisite/c1-source-audit-current.json and c1-border-routes-current.json. No legal/redistribution approval claimed.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T20:07:18.30594+02:00",
+      "item": "C3",
+      "status": "blocked",
+      "summary": "C3 implementation and offline search/coverage evidence are complete; stage is blocked only on a current licensed source and independently reviewed actual freight-truck entrance/legal access record. C4 is the next stage after this explicit blocker.",
+      "evidence": "analysis/private/c2-g4-current/c3-search-current.json; analysis/private/c1-prerequisite/c3-depot-inventory.json. Current Preview API36 search instrumentation passes for Romanian/Moldovan cities, indexed addresses, logistics-facility records, Romanian and Moldovan post-depot POIs, fuel POIs and exact coordinate preservation. MainActivity displays installed bounds, both source dates and explicit entrance/legal-coverage limits. Candidate/map and APK hashes are bound in the receipt. No entrance or legal access claim.",
+      "blocker": "The licensed OSM Main Gate IN candidate was last edited in 2021; the relevant DP World container-truck procedure is dated 2023-10. Its exact binding to the installed map and current operating conditions are unverified. Keep the warning; C3 cannot be accepted until current operator review and installed-map binding are available."
+    },
+    {
+      "at": "2026-10-26T20:08:05.776112+02:00",
+      "item": "C4",
+      "status": "in_progress",
+      "summary": "C4 only: harden catalogue generation so published catalogues cannot omit package attribution/licence or contain mismatched/corrupt inner payloads. Verify the actual release asset and document hosting limits, manual import, offline use and approval boundaries.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T20:10:28.098035+02:00",
+      "item": "C4",
+      "status": "complete",
+      "summary": "C4 preparation complete: catalogue generation enforces source/licence/hash/compatibility and hosting limits; public Romania asset, RO-MD candidate, manual import, storage/rollback and offline fallback evidence are bound. Next stage in order: D6.",
+      "evidence": "tools/make_catalog.py and tools/test_make_catalog.py now validate ZIP CRC, format/engine, source/licence/attribution, inner routing/display hashes, size and HTTPS hosting; nine focused catalogue/package tests pass. analysis/private/c2-g4-current/c4-distribution-current.json binds a generated private RO-MD candidate catalogue (1,314,609,938 bytes, exact SHA, ODbL-1.0 attribution with U+00A9, valid inner payload hashes, below GitHub 2 GiB asset limit), existing public Romania asset exact-size/hash install/rollback, actual Android DocumentsUI manual import, storage/rollback instructions, and offline routing with network unavailable. GitHub current release limits checked against official docs. No candidate was published; G4 retains publication/security and public-readiness gates.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T20:10:58.421445+02:00",
+      "item": "D6",
+      "status": "in_progress",
+      "summary": "D6 only: reuse current localization inputs, implement the smallest complete supported RO/EN language path, and verify real offline voice availability plus mute/Stop/interruption behavior on the dedicated API36 emulator.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-26T21:25:41+02:00",
+      "item": "C3",
+      "status": "blocked",
+      "summary": "C3 resumed as the only active stage per the finish-one-stage instruction. Search/coverage evidence remains; the required licensed, independently reviewed truck entrance/destination-access source is still missing.",
+      "evidence": "routing/src/test/java/org/eurorig/routing/DestinationAuthorisationTest.java; routing/build/test-results/test/TEST-org.eurorig.routing.DestinationAuthorisationTest.xml (AutoSwarm/Hermes run: 10 tests, 0 failures). Parent re-run hit a local Gradle/JDK loopback error before test discovery.",
+      "blocker": "No current, licensed and independently reviewed freight-truck entrance or destination-access source is bound to the installed Romania-Moldova map."
+    },
+    {
+      "at": "2026-10-26T21:42:12+02:00",
+      "item": "C3",
+      "status": "blocked",
+      "summary": "C3 remains the only active stage. A licensed Main Gate candidate was found, but its current operating conditions and exact binding to the installed map remain unverified.",
+      "evidence": "analysis/private/c2-g4-current/c3-entrance-source-review.json; OSM node/4817361173 is ODbL-licensed and tagged Main Gate IN/access=permit, last edited 2021-11-24; DP World container-truck instructions are revision 7 dated 2023-10.",
+      "blocker": "Current operator review and installed-map binding are still required before C3 acceptance."
+    },
+    {
+      "at": "2026-10-26T21:52:52+02:00",
+      "item": "C3",
+      "status": "blocked",
+      "summary": "C3 remains the only active stage. Exact OSM node and restriction metadata are verified in the installed map; operator guidance still does not link this coordinate to the current terminal Main Gate or confirm current truck permits.",
+      "evidence": "Installed package SHA-256 757d671b31f681043d2c8b07f25579b90151ce4ec806c483d99aba416bf2f374; display DB SHA-256 8ffe21db72b6e4cf64a1cce4e53a971edab8e4d3a1489f503a5d195971a77b5f; exact OSM node ID encoding confirmed by tools/compile_display.py:67. Current Port Authority Gate 10 Bis post does not bind this point; DPW container procedure is Rev 7 / 2023-10. API36 details assertions pass with a negative control. node_rules row preserves access=permit, barrier=lift_gate and motor_vehicle=no (flags=1). DP World guide distinguishes Port Gate 10B from the terminal Main Gate; it supplies no coordinates for OSM node/4817361173. The live guidance page does not establish linked procedure freshness.",
+      "blocker": "Current DP World/operator evidence must identify coordinate 44.0957476, 28.6615439 / OSM node 4817361173 as the current terminal truck entrance and confirm current truck/permit conditions. The map binding is verified; current gate identity/access are not."
+    },
+    {
+      "at": "2026-10-26T23:20:53+02:00",
+      "item": "C3",
+      "status": "blocked",
+      "summary": "C3 technical search and disclosure checks were reviewed; entrance and permit evidence remains unverified.",
+      "evidence": "Detailed source and correspondence evidence retained in private local receipts.",
+      "blocker": "Current authoritative truck entrance and permit evidence remains unverified."
+    },
+    {
+      "at": "2026-10-26T23:27:29+02:00",
+      "item": "B4",
+      "status": "in_progress",
+      "summary": "B4 is the next required open prerequisite to D1: C4 is complete, while B4 remains partial. The user directed moving to the next open point. B4-only gates are recorded; D1 has not started. C3 remains blocked separately.",
+      "evidence": ".unlazy/b4-current/GATES.md; code and test audit underway.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T03:03:19.330428+00:00",
+      "item": null,
+      "status": null,
+      "summary": "14-point assignment: C2 and C4 accepted; C3 blocked pending current terminal entrance/permit evidence. D6 active next. Continue assigned IDs in order; 40-minute no-significant-progress skip rule applies.",
+      "evidence": null,
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T03:09:31.594443+00:00",
+      "item": "D6",
+      "status": "in_progress",
+      "summary": "D6: API36 languageOnly now exercised; both offline voices available and EN/RO street-name-number TTS callbacks completed. Closing behavior/test gaps; do not claim acoustic output or reviewed Romanian maneuver wording.",
+      "evidence": "EN/RO maneuver-language request assertions and API36 English TTS from analysis/private/c2-g4-current/build-result.json; new API36 languageOnly result analysis/private/c2-g4-current/d6-language-only-api36-2026-10-27.json and .log: English and Romanian offline voices found; both street-name/number utterances completed; EN/RO resource and safety-fallback assertions passed. TTS callback does not prove acoustic output. Mute/notification Stop/audio interruption and Romanian safety wording remain open.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T03:18:31.240475+00:00",
+      "item": "D6",
+      "status": "in_progress",
+      "summary": "D6: EN/RO offline TTS and controlled utterance interruption pass on API36 emulator. Production audio focus, service mute/notification Stop qualification, full Romanian resource coverage, and safety-wording review remain open.",
+      "evidence": "Existing EN/RO route-language request assertions and API36 English TTS from analysis/private/c2-g4-current/build-result.json. Rebuilt Preview APKs; ./gradlew.bat --offline -I tools/preview.gradle :app:assembleDebug :app:assembleDebugAndroidTest --console=plain exit 0 (69 tasks; 5 executed). API36 languageOnly: app/test adb install -r exit 0/0; adb -s emulator-5582 shell am instrument -w -e languageOnly true org.eurorig.app.preview.test/org.eurorig.app.NativeSmokeInstrumentation exit 0. Receipt: analysis/private/c2-g4-current/d6-language-only-emulator-2026-10-27.json and .log; EN/RO offline voices available, street-name/number speech onDone, controlled stop onStop(interrupted=true), locale resource/safety-fallback assertions PASS. Emulator has no host audio route; no acoustic output claim. App audio focus/call interruption, production mute/Stop, missing-pack UX, full RO resources and Sol safety-wording review remain open.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T03:20:36.032676+00:00",
+      "item": "D6",
+      "status": "in_progress",
+      "summary": "D6: route/voice language changes now block while a route exists; EN/RO TTS, route-language guard and controlled stop pass on API36 emulator.",
+      "evidence": "Production change: InterfacePages.choose blocks changed voice_language while Store.route exists, preserves current route language and shows localized EN/RO replan warning (app/src/main/java/org/eurorig/app/InterfacePages.java; app/src/main/res/values/strings.xml; app/src/main/res/values-ro/strings.xml). Instrumented checks in app/src/androidTest/java/org/eurorig/app/LanguageChecks.java cover EN/RO resource values, route-language guard, actual offline EN/RO street-name/number TTS onDone, and controlled TTS stop onStop(interrupted=true); absent voices report UNAVAILABLE. Build command ./gradlew.bat --offline -I tools/preview.gradle :app:assembleDebug :app:assembleDebugAndroidTest --console=plain exit 0 (69 tasks; 17 executed). API36 emulator app/test installs exit 0/0; languageOnly instrumentation exit 0. Receipt analysis/private/c2-g4-current/d6-language-guard-emulator-2026-10-27.json and .log. Emulator lacks host audio; no acoustic output claim. Remaining: full Romanian resource coverage, missing-pack UI/service behavior, app-level audio focus/call interruption, service mute and notification Stop qualification, Sol review of Romanian safety/maneuver wording.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T03:24:38.215393+00:00",
+      "item": "D6",
+      "status": "in_progress",
+      "summary": "D6: voice settings now expose offline readiness and safe visual fallback; route language cannot change under an existing route. EN/RO TTS, missing-pack logic, and controlled interruption tests pass on API36.",
+      "evidence": "Production changes: InterfacePages.choose blocks changed voice_language while Store.route exists, with localized EN/RO replan warning; voice settings asynchronously checks an offline voice matching the selected language and shows installed, missing-pack/visual-guidance, or engine-unavailable status (InterfacePages.java; values/strings.xml; values-ro/strings.xml). LanguageChecks verifies EN/RO status rows, missing-pack helper/text path, route-language guard, EN/RO street-name-and-number TTS onDone, and controlled engine interruption onStop(interrupted=true). Build ./gradlew.bat --offline -I tools/preview.gradle :app:assembleDebug :app:assembleDebugAndroidTest --console=plain exit 0 (69 tasks; 9 executed); API36 emulator app/test installs 0/0, languageOnly instrumentation exit 0. Receipt analysis/private/c2-g4-current/d6-voice-status-emulator-2026-10-27.json and .log. Both offline voices were present. Emulator lacks a host audio route, so no acoustic output is claimed. Physical Tab S9 currently has speaker media volume 0 and was not changed. Open: production audio-focus/call-interruption behavior and test, service mute/notification Stop qualification, full Romanian resources, and Sol review of maneuver-safety wording.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T03:35:07.357043+00:00",
+      "item": "D6",
+      "status": "in_progress",
+      "summary": "D6: Romanian resources now cover 90 of 94 English keys; four safety prompts remain English pending review. API36 EN/RO localization, offline TTS completion, and controlled TTS interruption checks pass.",
+      "evidence": "Production changes: InterfacePages voice-language guard and offline readiness display remain verified. values-ro now has 90/94 English string keys; only delivery_permission, action_route_access_permissions, action_calculate_route, and action_update_route remain English pending safety review. Placeholder parity passes. LanguageChecks adds Romanian setup/search and route-endpoint formatting assertions. API36 Preview build passed (69 tasks; 4 executed), installs 0/0, languageOnly instrumentation passed with English and Romanian offline voices, both utterances reached onDone, and controlled interruption produced onStop(interrupted=true). Receipt analysis/private/c2-g4-current/d6-localization-coverage-emulator-2026-10-27.json/.log. Acoustic output is not measured; emulator has no host audio route. Remaining: audio focus/call interruption handling and service mute/notification Stop qualification, safety review, and physical acoustic validation.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T06:10:56.183879+00:00",
+      "item": "D6",
+      "status": "in_progress",
+      "summary": "D6: profile flow fully resource-backed (fuel/emission pickers and Romanian axle wording); PROFILE_LIMITS stays removed, profile_limits resource is the source of truth. Four safety keys (delivery_permission, action_route_access_permissions, action_calculate_route, action_update_route) still English pending review.",
+      "evidence": "values/d6_vehicle_profiles.xml and values-ro/d6_vehicle_profiles.xml carry identical 85-key sets with no duplicates; 17 new fuel/emission keys localized in RO; InterfacePages now uses labels()/optionText()/choices(...) array overload instead of hardcoded String[]; MainActivity.error(int) and detailsText(Context,...) plus SearchCoverageChecks and ProfileIssuePresentation imports keep both APKs compiling. 2026-10-27 offline gate: :routing:test :app:assembleDebug :app:assembleDebugAndroidTest BUILD SUCCESSFUL exit 0 (stale-daemon loopback failure cleared by gradlew --stop, rerun clean).",
+      "blocker": "Audio focus/call interruption handling, service mute/notification Stop qualification, safety review of the four remaining English keys, and physical acoustic validation still open. No device smoke run for this change."
+    },
+    {
+      "at": "2026-10-27T06:16:04.886246+00:00",
+      "item": "D6",
+      "status": "in_progress",
+      "summary": "D6: profile flow fully resource-backed. Parent-reviewed Romanian terminology landed: full limits sentence, profile_axle=Sarcina maximă pe osie (detached from axle count), localized fuel values (Motorină/Benzină/Etanol/GPL/GNC/GNL/Hidrogen/Electric). PROFILE_LIMITS stays removed, profile_limits resource is the source of truth.",
+      "evidence": "aapt2 dump of app-debug.apk shows (ro) values for profile_limits, profile_axle and every profile_fuel_* key; values-ro key set identical to default (85/85, no duplicates, no English labels). 2026-10-27 offline gate BUILD SUCCESSFUL exit 0.",
+      "blocker": "Four safety keys (delivery_permission, action_route_access_permissions, action_calculate_route, action_update_route) intentionally English pending review. Audio focus/call interruption, service mute/notification Stop qualification, physical acoustic validation and device smoke run still open."
+    },
+    {
+      "at": "2026-10-27T07:03:20.880202+00:00",
+      "item": "D6",
+      "status": "in_progress",
+      "summary": "Romanian/English guidance: route and navigation preference screens localized (route computing incl. localized mode names, country options, access permissions, ETA target, driving mode, lane guidance, autozoom, current street, truck lane, right turns) with content descriptions; 36 paired keys added to values/d6_route_controls.xml and values-ro/d6_route_controls.xml",
+      "evidence": "153/153 identical key order and 0 duplicates in both d6_route_controls files; no English UI literal left on lines 51-68 of InterfacePages.java; offline gate :routing:test :app:assembleDebug :app:assembleDebugAndroidTest BUILD SUCCESSFUL in 31s with 0 error lines under JDK 21; aapt2 dump of app-debug.apk shows () and (ro) for route_settings_title, route_lane_none, route_right_turns_detail, route_eta_to_waypoint",
+      "blocker": "Build fails as class file has wrong version 65.0 unless JAVA_HOME points at JDK 21 (empty JAVA_HOME picks PATH JDK 17.0.3) - not a source defect. Settings, map-view, notifications and voice-adjacent screens remain English by scope; no device/instrumentation run for this slice."
+    },
+    {
+      "at": "2026-10-27T08:21:58.756912+00:00",
+      "item": "D6",
+      "status": "complete",
+      "summary": "D6 complete: English/Romanian safety, access, route, notification and voice paths localized; offline voice and device output evidence verified.",
+      "evidence": "analysis/private/d6-current/receipt.md; .unlazy/d6-current/GATES.md all 7 gates met; Preview build/lint and API36 tests pass; Tab S9 offline EN/RO TTS and non-silent speaker-route capture recorded, media volume preserved.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T08:51:52.067826+00:00",
+      "item": "D5",
+      "status": "complete",
+      "summary": "D5 complete: Valhalla maneuver timing, road/speed display, signpost and lane evidence verified with API36 fixtures; older/ambiguous lane evidence withheld.",
+      "evidence": "analysis/private/d5-current/receipt.md; .unlazy/d5-current/GATES.md; five routing tests; app/test APK build and lint; API36 emulator instrumentation; two Python map-enrichment tests; independent source and safety reviews.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T08:59:48.132908+00:00",
+      "item": "D5",
+      "status": "complete",
+      "summary": "D6 revalidated after D5; D5 gates G1-G4 all reverified. Moving to E1, ten ordered stops and lifecycle acceptance.",
+      "evidence": "analysis/private/d5-current/receipt.md and .unlazy/d5-current/GATES.md (4/4 gates); analysis/private/d6-current/receipt.md and .unlazy/d6-current/GATES.md (7/7 gates; 4 automated gates rerun after D5); API36 and Tab S9 evidence retained.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T09:43:42+00:00",
+      "item": "E1",
+      "status": "complete",
+      "summary": "E1 complete: ten ordered stops, editor/accessibility and lifecycle gates pass. The tested disconnected seam remains a hard refusal; no join tolerance or invented connector was added. Moving to E2.",
+      "evidence": "analysis/private/e1-current/receipt.md; .unlazy/e1-current/GATES.md 5/5; D5 4/4 and D6 7/7 regression gates reverified.",
+      "blocker": null
+    },
+    {
+      "at": "2026-10-27T13:19:15.977932+00:00",
+      "item": null,
+      "status": null,
+      "summary": "Handover reconciled package acceptance with prerequisites; retained technical evidence without counting partial packages.",
+      "evidence": "docs/HANDOVER-CLAUDE-2026-10-27.md",
+      "blocker": null
+    }
+  ]
+}

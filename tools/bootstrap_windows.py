@@ -3,7 +3,10 @@ import concurrent.futures
 import hashlib
 import json
 from pathlib import Path
+import subprocess
+import sys
 import urllib.request
+import venv
 import xml.etree.ElementTree as ET
 import zipfile
 
@@ -35,6 +38,8 @@ def install(name, url, checksum=None, algorithm='sha256', target=None):
     return folder
 
 def main():
+    if sys.version_info[:2] != (3, 12):
+        raise RuntimeError('Run the Windows bootstrap with Python 3.12')
     packages = ET.fromstring(read('https://dl.google.com/android/repository/repository2-3.xml'))
     selected = []
     for path in ['platforms;android-36', 'build-tools;36.0.0', 'platform-tools']:
@@ -43,7 +48,7 @@ def main():
         selected.append((path.replace(';', '-'), 'https://dl.google.com/android/repository/' + archive.findtext('complete/url'), archive.findtext('complete/checksum'), 'sha1'))
     versions = json.loads(read('https://api.azul.com/metadata/v1/zulu/packages/?java_version=21&os=windows&arch=x86_64&archive_type=zip&java_package_type=jdk&latest=true&release_status=ga'))
     jdk = next(v for v in versions if '-ca-jdk' in v['name'])
-    selected += [('jdk21', jdk['download_url'], None, 'sha256'), ('gradle', 'https://services.gradle.org/distributions/gradle-8.13-bin.zip', read('https://services.gradle.org/distributions/gradle-8.13-bin.zip.sha256').decode().strip(), 'sha256')]
+    selected += [('jdk21', jdk['download_url'], None, 'sha256'), ('gradle', 'https://services.gradle.org/distributions/gradle-9.6.0-bin.zip', read('https://services.gradle.org/distributions/gradle-9.6.0-bin.zip.sha256').decode().strip(), 'sha256')]
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as pool:
         list(pool.map(lambda args: install(*args), selected))
     sdk = DEST / 'sdk'
@@ -58,6 +63,13 @@ def main():
             src = next(p for p in (DEST / source.split('/')[0]).iterdir() if p.is_dir())
         shutil.copytree(src, sdk / destination, dirs_exist_ok=True)
     (ROOT / 'local.properties').write_text('sdk.dir=' + str(sdk).replace('\\', '/').replace(':', '\\:') + '\n')
+    from verify_android_sdk import verify
+    verify(sdk)
+    python_env = DEST / 'qa-python'
+    if not (python_env / 'Scripts/python.exe').is_file():
+        venv.EnvBuilder(with_pip=True).create(python_env)
+    subprocess.run([str(python_env / 'Scripts/python.exe'), '-m', 'pip', 'install',
+                    '-r', str(ROOT / 'tools/test-requirements.txt')], check=True)
     print('Ready. Review Android SDK terms before building: https://developer.android.com/studio/terms', flush=True)
 
 if __name__ == '__main__':

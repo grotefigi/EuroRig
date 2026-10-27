@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="profile_invalid_saved">Profilul camionului salvat este nevalid. Verificați și salvați profilul vehiculului înainte de a planifica sau porni ghidarea.</string>
+    <string name="profile_weight_unsupported">Rutarea offline acceptă mase totale încărcate de cel mult 100 de tone. Masa introdusă este păstrată; acest profil nu poate fi rutat.</string>
+    <string name="profile_mass_exceeds_permitted">Masa totală încărcată depășește masa maximă autorizată (%.1f t).</string>
+</resources>

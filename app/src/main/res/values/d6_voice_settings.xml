@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="voice_settings_summary">Offline instructions and audio output</string>
+    <string name="voice_bluetooth_title">Bluetooth</string>
+    <string name="voice_bluetooth_detail">Pair or select audio output using Android</string>
+    <string name="voice_bluetooth_unavailable">Bluetooth settings are unavailable on this device.</string>
+</resources>
